@@ -71,25 +71,25 @@ class ConfigManager:
             return config
         except json.JSONDecodeError as e:
             if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"配置文件格式错误: {self.config_file_path}，错误详情: {str(e)}")
+                self.app.logging_manager.error("CONFIG", f"配置文件格式错误: {self.config_file_path}，错误详情: {str(e)}")
                 self.app.logging_manager.debug("CONFIG", f"JSON解析失败: {e}")
             else:
                 print(f"配置文件格式错误: {self.config_file_path}，错误详情: {str(e)}")
         except PermissionError:
             if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"没有权限读取配置文件: {self.config_file_path}")
+                self.app.logging_manager.error("CONFIG", f"没有权限读取配置文件: {self.config_file_path}")
                 self.app.logging_manager.debug("CONFIG", f"权限错误: 无法读取 {self.config_file_path}")
             else:
                 print(f"没有权限读取配置文件: {self.config_file_path}")
         except IOError as e:
             if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"配置文件IO错误: {str(e)}")
+                self.app.logging_manager.error("CONFIG", f"配置文件IO错误: {str(e)}")
                 self.app.logging_manager.debug("CONFIG", f"IO错误: {e}")
             else:
                 print(f"配置文件IO错误: {str(e)}")
         except Exception as e:
             if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"配置加载错误: {str(e)}")
+                self.app.logging_manager.error("CONFIG", f"配置加载错误: {str(e)}")
                 self.app.logging_manager.debug("CONFIG", f"未知错误: {e}")
             else:
                 print(f"配置加载错误: {str(e)}")
@@ -118,21 +118,21 @@ class ConfigManager:
             return True
         except PermissionError:
             if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"没有权限写入配置文件: {self.config_file_path}")
+                self.app.logging_manager.error("CONFIG", f"没有权限写入配置文件: {self.config_file_path}")
                 self.app.logging_manager.debug("CONFIG", f"权限错误: 无法写入 {self.config_file_path}")
             else:
                 print(f"没有权限写入配置文件: {self.config_file_path}")
             return False
         except IOError as e:
             if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"配置文件IO错误: {str(e)}")
+                self.app.logging_manager.error("CONFIG", f"配置文件IO错误: {str(e)}")
                 self.app.logging_manager.debug("CONFIG", f"IO错误: {e}")
             else:
                 print(f"配置文件IO错误: {str(e)}")
             return False
         except Exception as e:
             if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"配置保存错误: {str(e)}")
+                self.app.logging_manager.error("CONFIG", f"配置保存错误: {str(e)}")
                 self.app.logging_manager.debug("CONFIG", f"未知错误: {e}")
             else:
                 print(f"配置保存错误: {str(e)}")
@@ -247,7 +247,7 @@ class ConfigManager:
                                         self.app.ocr_groups[i]['region_var'].set(f"{region[0]},{region[1]} - {region[2]},{region[3]}")
                                     except (TypeError, ValueError):
                                         if hasattr(self.app, 'logging_manager'):
-                                            self.app.logging_manager.log_message(f"配置文件中的OCR区域格式错误: {value}")
+                                            self.app.logging_manager.error("CONFIG", f"配置文件中的OCR区域格式错误: {value}")
                                 else:
                                     if hasattr(self.app.ocr_groups[i][key], 'set'):
                                         self.app.ocr_groups[i][key].set(value)
@@ -313,7 +313,7 @@ class ConfigManager:
                                         self.app.number_regions[i]['region_var'].set(f"{region[0]},{region[1]},{region[2]},{region[3]}")
                                     except (TypeError, ValueError):
                                         if hasattr(self.app, 'logging_manager'):
-                                            self.app.logging_manager.log_message(f"配置文件中的数字识别区域格式错误: {value}")
+                                            self.app.logging_manager.error("CONFIG", f"配置文件中的数字识别区域格式错误: {value}")
                                 elif hasattr(self.app.number_regions[i][key], 'set'):
                                     self.app.number_regions[i][key].set(value)
 
@@ -437,14 +437,14 @@ class ConfigManager:
             CV2_AVAILABLE = False
         
         if not CV2_AVAILABLE:
-            self.app.logging_manager.log_message("[图像检测] 错误: OpenCV未安装，无法加载参考图像")
+            self.app.logging_manager.error("CONFIG", "[图像检测] 错误: OpenCV未安装，无法加载参考图像")
             return
         
         if os.path.exists(image_path):
             try:
                 template = cv2.imread(image_path, cv2.IMREAD_COLOR)
                 if template is None:
-                    self.app.logging_manager.log_message(f"[图像检测] 无法读取图像文件: {image_path}")
+                    self.app.logging_manager.error("CONFIG", f"[图像检测] 无法读取图像文件: {image_path}")
                     return
                 
                 h, w = template.shape[:2]
@@ -460,7 +460,7 @@ class ConfigManager:
                 group = self.app.image_groups[group_index]
                 update_image_preview(group["image_preview"], group.get("preview_container"), image_path)
             except Exception as e:
-                self.app.logging_manager.log_message(f"[图像检测] 加载参考图像失败: {str(e)}")
+                self.app.logging_manager.error("CONFIG", f"[图像检测] 加载参考图像失败: {str(e)}")
     
     def _load_bg_template_image(self, group_index, image_path):
         """加载后台监控图像模板"""
@@ -560,7 +560,7 @@ class ConfigManager:
                     self.app.color_recognition_region = color_recognition_region
                 except (TypeError, ValueError):
                     if hasattr(self.app, 'logging_manager'):
-                        self.app.logging_manager.log_message(f"配置文件中的颜色识别区域格式错误: {color_recognition_region}")
+                        self.app.logging_manager.error("CONFIG", f"配置文件中的颜色识别区域格式错误: {color_recognition_region}")
 
         # 加载目标颜色
         if 'target_color' in script_config and script_config['target_color']:
@@ -575,7 +575,7 @@ class ConfigManager:
                     self.app.target_color = target_color
                 except (TypeError, ValueError):
                     if hasattr(self.app, 'logging_manager'):
-                        self.app.logging_manager.log_message(f"配置文件中的目标颜色格式错误: {target_color}")
+                        self.app.logging_manager.error("CONFIG", f"配置文件中的目标颜色格式错误: {target_color}")
 
         # 加载颜色容差
         if 'color_tolerance' in script_config and hasattr(self.app, 'tolerance_var'):
@@ -950,7 +950,7 @@ class ConfigManager:
             self.app.logging_manager.log_message("配置加载成功")
             return True, config_version
         except Exception as e:
-            self.app.logging_manager.log_message(f"处理配置时发生错误: {str(e)}")
+            self.app.logging_manager.error("CONFIG", f"处理配置时发生错误: {str(e)}")
             return False, '1.0.0'
     
     def _load_click_config(self, config):
@@ -972,7 +972,7 @@ class ConfigManager:
                 with open(self.config_file_path, 'w', encoding='utf-8') as f:
                     json.dump(config, f, indent=2, ensure_ascii=False)
             except Exception as e:
-                self.app.logging_manager.log_message(f"更新配置版本失败: {str(e)}")
+                self.app.logging_manager.error("CONFIG", f"更新配置版本失败: {str(e)}")
     
     def _update_tesseract_path_var(self):
         """更新界面中的Tesseract路径变量"""
@@ -1189,4 +1189,4 @@ class ConfigManager:
                 group['region'] = region_tuple
                 group['region_var'].set(f"{region_tuple[0]},{region_tuple[1]},{region_tuple[2]},{region_tuple[3]}")
             except (TypeError, ValueError):
-                self.app.logging_manager.log_message(f"配置文件中的OCR区域格式错误: {region}")
+                self.app.logging_manager.error("CONFIG", f"配置文件中的OCR区域格式错误: {region}")

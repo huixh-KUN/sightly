@@ -63,15 +63,15 @@ class ColorRecognition:
 
     def recognize_color(self):
         if not self.region:
-            self.app.logging_manager.log_message("颜色识别失败: 未设置识别区域")
+            self.app.logging_manager.error("COLOR", "颜色识别失败: 未设置识别区域")
             return False
         try:
             screenshot = self.screenshot_manager.get_region_screenshot(self.region, priority=self.PRIORITY)
             if not screenshot:
-                self.app.logging_manager.log_message("颜色识别失败: 无法获取截图")
+                self.app.logging_manager.error("COLOR", "颜色识别失败: 无法获取截图")
                 return False
             if screenshot.size[0] == 0 or screenshot.size[1] == 0:
-                self.app.logging_manager.log_message("颜色识别失败: 截图为空")
+                self.app.logging_manager.error("COLOR", "颜色识别失败: 截图为空")
                 return False
             current_hash = imagehash.average_hash(screenshot.resize((32, 32)))
             self.last_image_hash = current_hash
@@ -84,9 +84,9 @@ class ColorRecognition:
                 return True
             return False
         except Exception as e:
-            self.app.logging_manager.log_message(f"颜色识别错误: {str(e)}")
+            self.app.logging_manager.error("COLOR", f"颜色识别错误: {str(e)}")
             import traceback
-            self.app.logging_manager.log_message(f"错误详情: {traceback.format_exc()}")
+            self.app.logging_manager.error("COLOR", f"错误详情: {traceback.format_exc()}")
             return False
     
     def execute_commands(self):

@@ -46,10 +46,10 @@ class AlarmModule:
 
     def _play_file(self, filepath, volume=0.7):
         if not MEDIA_AVAILABLE:
-            self.app.logging_manager.log_message("QtMultimedia 不可用，无法播放声音")
+            self.app.logging_manager.error("ALARM", "QtMultimedia 不可用，无法播放声音")
             return
         if not filepath or not os.path.exists(filepath):
-            self.app.logging_manager.log_message(f"声音文件不存在: {filepath}")
+            self.app.logging_manager.error("ALARM", f"声音文件不存在: {filepath}")
             return
         try:
             player = QMediaPlayer()
@@ -60,14 +60,14 @@ class AlarmModule:
             player.play()
             self._player = player
         except Exception as e:
-            self.app.logging_manager.log_message(f"播放声音失败: {str(e)}")
+            self.app.logging_manager.error("ALARM", f"播放声音失败: {str(e)}")
 
     def play_alarm_sound(self, alarm_var):
         if not alarm_var.get():
             return
         sound_file = self.app.alarm_sound_path.get()
         if not sound_file or not os.path.exists(sound_file):
-            self.app.logging_manager.log_message("未设置有效的全局报警声音文件")
+            self.app.logging_manager.error("ALARM", "未设置有效的全局报警声音文件")
             return
         volume = max(0.0, min(1.0, self.app.alarm_volume.get() / 100))
         self._play_file(sound_file, volume)

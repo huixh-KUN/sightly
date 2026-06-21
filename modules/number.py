@@ -154,7 +154,7 @@ class NumberModule:
                         )
                         self._last_results[region_index] = text
             except Exception as e:
-                self.app.logging_manager.log_message(
+                self.app.logging_manager.error("NUMBER",
                     f"数字识别{region_index+1}错误: {str(e)}"
                 )
                 time.sleep(5)
@@ -165,7 +165,7 @@ class NumberModule:
                 region, priority=self.PRIORITY
             )
         except Exception as e:
-            self.app.logging_manager.log_message(
+            self.app.logging_manager.error("NUMBER",
                 f"数字识别错误: 屏幕截图失败 - {str(e)}"
             )
             return None

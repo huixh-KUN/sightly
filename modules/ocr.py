@@ -100,7 +100,7 @@ class OCRModule:
                         self.perform_ocr_for_group_optimized(group, i, last_hashes, frame_counts)
                         self.last_recognition_times[i] = current_time
             except Exception as e:
-                self.app.logging_manager.log_message(f"错误: {str(e)}")
+                self.app.logging_manager.error("OCR", f"错误: {str(e)}")
                 self.app.logging_manager.debug("OCR", f"ocr_loop 异常: {e}")
                 time.sleep(5)
         self.app.logging_manager.debug("OCR", "ocr_loop 结束")
@@ -153,12 +153,12 @@ class OCRModule:
     
     def _validate_ocr_group_input(self, group, group_index):
         if not group:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 组配置为空")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")
             return False, None, None, None, None
 
         region = group.get("region")
         if not region:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 未设置识别区域")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未设置识别区域")
             return False, None, None, None, None
 
         keywords_str = safe_group_get(group, "keywords", "").strip()
@@ -172,7 +172,7 @@ class OCRModule:
             if len(region) != 4:
                 raise ValueError("区域坐标格式错误")
         except (ValueError, TypeError) as e:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
             return False, None, None, None, None
 
         left = min(x1, x2)
@@ -181,7 +181,7 @@ class OCRModule:
         bottom = max(y1, y2)
 
         if (right - left) < 10 or (bottom - top) < 10:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 识别区域太小")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 识别区域太小")
             return False, None, None, None, None
 
         return True, left, top, right, bottom
@@ -196,7 +196,7 @@ class OCRModule:
                 self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图返回 None")
             return screenshot
         except Exception as e:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 屏幕截图失败 - {str(e)}")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 屏幕截图失败 - {str(e)}")
             self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图异常: {e}")
             return None
     
@@ -222,7 +222,7 @@ class OCRModule:
 
             screenshot = self._capture_screen_region(left, top, right, bottom, group_index)
             if not screenshot:
-                self.app.logging_manager.log_message(f"识别组{group_index+1}: 截图失败或为空")
+                self.app.logging_manager.error("OCR", f"识别组{group_index+1}: 截图失败或为空")
                 self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图失败或为空")
                 return
 
@@ -244,7 +244,7 @@ class OCRModule:
 
             processed_image = _preprocess_image(screenshot, group_index)
             if not processed_image:
-                self.app.logging_manager.log_message(f"识别组{group_index+1}: 图像预处理失败")
+                self.app.logging_manager.error("OCR", f"识别组{group_index+1}: 图像预处理失败")
                 self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 图像预处理失败")
                 return
 
@@ -306,13 +306,13 @@ class OCRModule:
                     self.app.logging_manager.log_message(f"识别组{group_index+1}: OCR未识别到文字")
 
         except Exception as e:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 未知错误 - {str(e)}")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未知错误 - {str(e)}")
             import traceback
-            self.app.logging_manager.log_message(f"错误详情: {traceback.format_exc()}")
+            self.app.logging_manager.error("OCR", f"错误详情: {traceback.format_exc()}")
     
     def _validate_trigger_input(self, group, group_index):
         if not group:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 组配置为空")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")
             return False, None, None, None
 
         key = safe_group_get(group, "key", "")
@@ -329,7 +329,7 @@ class OCRModule:
             return click_pos
 
         if not region:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 未设置识别区域，无法计算点击位置")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未设置识别区域，无法计算点击位置")
             return None, None
 
         try:
@@ -338,7 +338,7 @@ class OCRModule:
             click_y = (y1 + y2) // 2
             return click_x, click_y
         except (ValueError, TypeError) as e:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
             return None, None
     
     def _execute_key_press(self, key, group_index):
@@ -366,7 +366,7 @@ class OCRModule:
                 temp_alarm_var = ConfigVar(True)
                 self.app.alarm_module.play_alarm_sound(temp_alarm_var)
         except Exception as e:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 播放报警声音失败 - {str(e)}")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 播放报警声音失败 - {str(e)}")
     
     def trigger_action_for_group(self, group, group_index, click_enabled, click_pos=None):
         try:
@@ -393,9 +393,9 @@ class OCRModule:
 
             self._execute_key_press(key, group_index)
         except Exception as e:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}错误: 触发动作失败 - {str(e)}")
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 触发动作失败 - {str(e)}")
             import traceback
-            self.app.logging_manager.log_message(f"错误详情: {traceback.format_exc()}")
+            self.app.logging_manager.error("OCR", f"错误详情: {traceback.format_exc()}")
 
         if 'alarm_enabled' in locals():
             self._play_alarm_if_enabled(alarm_enabled, group_index)

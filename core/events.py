@@ -56,7 +56,7 @@ class EventManager:
                 continue
             except Exception as e:
                 if hasattr(self.app, 'logging_manager'):
-                    self.app.logging_manager.log_message(f"事件处理错误: {str(e)}")
+                    self.app.logging_manager.error("EVENTS", f"事件处理错误: {str(e)}")
                 else:
                     print(f"事件处理错误: {str(e)}")
                 time.sleep(0.5)
@@ -143,6 +143,6 @@ class EventManager:
                 delay_max = max(delay_min, int(delay_max_var.get()))
                 self.app.logging_manager.log_message(f"按下了 {key} 键，延迟范围 {delay_min}-{delay_max} 毫秒")
             except Exception as e:
-                self.app.logging_manager.log_message(f"按键执行错误: {str(e)}")
+                self.app.logging_manager.error("EVENTS", f"按键执行错误: {str(e)}")
         elif event_type == 'exit':
             pass

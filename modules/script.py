@@ -210,13 +210,13 @@ class ScriptExecutor(RecorderBase):
                                             self.app.input_controller.key_up(key, priority=self.PRIORITY)
                                             pressed_keys.remove(key)
                                 except Exception as e:
-                                    self.app.logging_manager.log_message(f"执行按键 {key} 时出错: {str(e)}")
+                                    self.app.logging_manager.error("SCRIPT", f"执行按键 {key} 时出错: {str(e)}")
                         else:
                             next_cmd = commands[i + 1] if i + 1 < len(commands) else None
                             self._execute_with_optimization(command, next_cmd)
             except Exception as e:
                 error_msg = f"脚本执行出错: {str(e)}"
-                self.app.logging_manager.log_message(error_msg)
+                self.app.logging_manager.error("SCRIPT", error_msg)
                 _set_status_text(self.app, f"执行错误: {str(e)}")
             finally:
                 for key in pressed_keys:
@@ -224,7 +224,7 @@ class ScriptExecutor(RecorderBase):
                         self.app.input_controller.key_up(key, priority=self.PRIORITY)
                         self.app.logging_manager.log_message(f"确保抬起: {key}")
                     except Exception as e:
-                        self.app.logging_manager.log_message(f"抬起按键 {key} 时出错: {str(e)}")
+                        self.app.logging_manager.error("SCRIPT", f"抬起按键 {key} 时出错: {str(e)}")
                 self.is_running = False
 
         self.execution_thread = threading.Thread(target=execute, daemon=True)
@@ -280,7 +280,7 @@ class ScriptExecutor(RecorderBase):
                         self._execute_with_optimization(command, next_cmd)
             except Exception as e:
                 error_msg = f"脚本执行出错: {str(e)}"
-                self.app.logging_manager.log_message(error_msg)
+                self.app.logging_manager.error("SCRIPT", error_msg)
                 _set_status_text(self.app, f"执行错误: {str(e)}")
             finally:
                 for key in pressed_keys:
@@ -288,7 +288,7 @@ class ScriptExecutor(RecorderBase):
                         self.app.input_controller.key_up(key, priority=self.PRIORITY)
                         self.app.logging_manager.log_message(f"确保抬起: {key}")
                     except Exception as e:
-                        self.app.logging_manager.log_message(f"抬起按键 {key} 时出错: {str(e)}")
+                        self.app.logging_manager.error("SCRIPT", f"抬起按键 {key} 时出错: {str(e)}")
                 self.is_running = False
                 self.app.logging_manager.log_message("脚本执行完成")
 
@@ -416,9 +416,9 @@ class ScriptExecutor(RecorderBase):
                 QTimer.singleShot(0, lambda: self.app.script.start(start_color_recognition=False))
         except Exception as e:
             error_msg = f"执行命令出错: {str(e)}"
-            self.app.logging_manager.log_message(error_msg)
+            self.app.logging_manager.error("SCRIPT", error_msg)
             import traceback
-            self.app.logging_manager.log_message(f"错误详情: {traceback.format_exc()}")
+            self.app.logging_manager.error("SCRIPT", f"错误详情: {traceback.format_exc()}")
             return
 
     def pause_script(self):

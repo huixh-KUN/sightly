@@ -52,7 +52,7 @@ class MainWindow(QMainWindow):
 
         self.config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
         self.config_file_path = os.path.join(self.config_dir, "config.json")
-        self.log_file_path = os.path.abspath("autodoor.log")
+        self.log_file_path = os.path.abspath("logs/sightly.log")
         os.makedirs(self.config_dir, exist_ok=True)
         self._is_running = False
         self._is_paused = False
@@ -344,7 +344,7 @@ class MainWindow(QMainWindow):
             self.logging_manager.log_message(f"  ✓ {module_id} 已启动")
         except Exception as e:
             self.logging_manager.debug("MODULE", f"模块 {module_id} 启动失败: {e}")
-            self.logging_manager.log_message(f"  ✗ {module_id} 启动失败: {e}")
+            self.logging_manager.error("MODULE", f"  ✗ {module_id} 启动失败: {e}")
 
     def _stop_module(self, module_id):
         try:

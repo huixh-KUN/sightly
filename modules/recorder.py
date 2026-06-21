@@ -27,5 +27,5 @@ class RecorderBase:
             try:
                 cleanup_func(resource)
             except Exception as e:
-                self.app.logging_manager.log_message(f"资源清理失败: {e}")
+                self.app.logging_manager.error("RECORDER", f"资源清理失败: {e}")
         self.resources.clear()

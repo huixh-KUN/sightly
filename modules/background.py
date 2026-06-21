@@ -209,7 +209,7 @@ class BackgroundMonitor:
                     time.sleep(1)
                 
             except Exception as e:
-                self.app.logging_manager.log_message(
+                self.app.logging_manager.error("BG",
                     f"后台监控组{self.group_index + 1}错误: {str(e)}"
                 )
                 time.sleep(5)
@@ -384,7 +384,7 @@ class BackgroundMonitor:
             # 切换回原窗口
             quick_switch._restore_foreground_window()
         else:
-            self.app.logging_manager.log_message(
+            self.app.logging_manager.error("BG",
                 f"后台监控组{self.group_index + 1}窗口切换失败，跳过操作"
             )
 

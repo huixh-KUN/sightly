@@ -27,7 +27,7 @@ class PlatformAdapter:
     def get_log_file_path(self):
         """获取日志文件路径"""
         project_root = os.path.abspath('.')
-        return os.path.join(project_root, "autodoor.log")
+        return os.path.join(project_root, "logs", "sightly.log")
 
 
 class WindowsInputAdapter:

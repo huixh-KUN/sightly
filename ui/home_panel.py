@@ -22,6 +22,7 @@ class HomePanel(QWidget):
         self.start_btn.clicked.connect(self.module_state.request_start_all)
         self.stop_btn.clicked.connect(self.module_state.request_stop_all)
         self.app.logging_manager.log_callback = self.log_viewer.log
+        self.app.logging_manager.error_callback = self.log_viewer.log_error
         self.app.logging_manager.clear_callback = self.log_viewer.clear
         self.app.logging_manager.debug("HOME", "HomePanel 信号连接完成")
 

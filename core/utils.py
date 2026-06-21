@@ -28,8 +28,8 @@ def handle_error(func, logging_manager=None, *args, **kwargs):
         # 构造错误信息
         error_msg = f"{caller_func}错误: {str(e)}"
         if logging_manager:
-            logging_manager.log_message(error_msg)
-            logging_manager.log_message(f"错误详情: {traceback.format_exc()}")
+            logging_manager.error("UTILS", error_msg)
+            logging_manager.error("UTILS", f"错误详情: {traceback.format_exc()}")
         return None
 
 

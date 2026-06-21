@@ -129,7 +129,7 @@ class TimedModule:
             except Exception as e:
                 import platform
                 plat = platform.system()
-                self.app.logging_manager.log_message(
+                self.app.logging_manager.error("TIMED",
                     f"[{plat}] 定时任务{group_index+1}错误: {str(e)}"
                 )
                 break

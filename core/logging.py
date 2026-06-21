@@ -7,38 +7,28 @@ from PySide6.QtCore import QTimer, Qt
 
 
 class LoggingManager:
-    """
-    日志管理类，负责记录和显示日志信息
-    
-    性能优化:
-    - 限制GUI日志条目数量，防止内存无限增长
-    - GUI更新节流，批量刷新减少渲染次数
-    """
-    
     MAX_LOG_LINES = 500
-    GUI_UPDATE_INTERVAL = 50  # ms
-    
+    GUI_UPDATE_INTERVAL = 50
+
     def __init__(self, app):
-        """
-        初始化日志管理器
-        Args:
-            app: 应用程序实例
-        """
         self.app = app
         self._log_buffer = deque(maxlen=self.MAX_LOG_LINES)
         self._gui_update_pending = False
         self._pending_logs = []
         self._update_lock = threading.Lock()
         self.log_callback = None
+        self.error_callback = None
         self.clear_callback = None
-        # 使用持久 QTimer 确保跨线程安全（QTimer.singleShot 从非主线程调用时回调可能被丢弃）
         self._flush_timer = QTimer()
         self._flush_timer.setSingleShot(True)
         self._flush_timer.timeout.connect(self._flush_gui_updates)
-        self._debug_log_path = os.path.join(
-            os.path.dirname(self.app.log_file_path), "autodoor_debug.log"
-        )
+
+        log_dir = os.path.dirname(self.app.log_file_path)
+        os.makedirs(log_dir, exist_ok=True)
+        self._debug_log_path = os.path.join(log_dir, "sightly_debug.log")
         self._debug_lock = threading.Lock()
+        self._error_log_path = os.path.join(log_dir, "sightly_error.log")
+        self._error_lock = threading.Lock()
     
     def debug(self, tag, message):
         """写入调试日志文件（仅文件，不显示在控制台/UI）"""
@@ -50,6 +40,24 @@ class LoggingManager:
                     f.write(debug_entry)
         except Exception:
             pass
+
+    def error(self, tag, message):
+        """记录错误日志（写入 error 日志文件 + 主日志文件 + GUI 红色显示）"""
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        entry = f"[{timestamp}] [{tag}] {message}\n"
+        try:
+            with self._error_lock:
+                with open(self._error_log_path, 'a', encoding='utf-8') as f:
+                    f.write(entry)
+        except Exception:
+            pass
+        try:
+            with open(self.app.log_file_path, 'a', encoding='utf-8') as f:
+                f.write(entry)
+        except Exception:
+            pass
+        if self.error_callback:
+            QTimer.singleShot(0, lambda: self.error_callback(entry.rstrip('\n')))
     
     def log_message(self, message):
         """

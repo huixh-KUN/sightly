@@ -38,14 +38,18 @@ class LogViewer(QWidget):
         layout.addWidget(self.text_edit, 1)
 
     def log(self, message):
-        """Append a log message (thread-safe)."""
         QTimer.singleShot(0, lambda: self._do_log(message))
 
     def _do_log(self, message):
         self.text_edit.appendPlainText(message)
 
+    def log_error(self, message):
+        QTimer.singleShot(0, lambda: self._do_log_error(message))
+
+    def _do_log_error(self, message):
+        self.text_edit.appendHtml(f'<span style="color: #FF5252;">{message}</span>')
+
     def clear(self):
-        """Clear all log content (thread-safe)."""
         QTimer.singleShot(0, self.text_edit.clear)
 
     def set_max_lines(self, count):
