@@ -574,7 +574,10 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("灵眸")
 
-    icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon", "sightly.png")
+    if hasattr(sys, '_MEIPASS'):
+        icon_path = os.path.join(sys._MEIPASS, "icon", "sightly.png")
+    else:
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon", "sightly.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 
