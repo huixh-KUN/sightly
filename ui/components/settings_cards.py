@@ -1,3 +1,6 @@
+import os
+import sys
+
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel,
     QGridLayout, QPushButton, QFileDialog, QDialog
@@ -69,11 +72,22 @@ class AlarmSettingsCard(QFrame):
     """警报设置卡片"""
 
     config_changed = Signal()
+    preview_requested = Signal(str)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("settingsCard")
+        self._default_path = self._resolve_default_sound()
+        self._sound_file = self._default_path
         self._setup_ui()
+
+    def _resolve_default_sound(self):
+        if hasattr(sys, '_MEIPASS'):
+            root = sys._MEIPASS
+        else:
+            root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        path = os.path.join(root, "voice", "alarm.mp3")
+        return os.path.normpath(path)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -87,14 +101,21 @@ class AlarmSettingsCard(QFrame):
         row = QHBoxLayout()
         row.setSpacing(12)
         row.addWidget(QLabel("警报音效"))
-        self._sound_path = QLabel("未选择")
-        self._sound_path.setStyleSheet("color: #9AA0A6;")
+        self._sound_path = QLabel(os.path.basename(self._sound_file))
+        self._sound_path.setStyleSheet("color: #8AB4F8; font-weight: 500;")
         row.addWidget(self._sound_path, 1)
         browse_btn = QPushButton("浏览")
         browse_btn.setCursor(Qt.PointingHandCursor)
         browse_btn.clicked.connect(self._browse_sound)
         row.addWidget(browse_btn)
+        preview_btn = QPushButton("试听")
+        preview_btn.setCursor(Qt.PointingHandCursor)
+        preview_btn.clicked.connect(self._preview_sound)
+        row.addWidget(preview_btn)
         layout.addLayout(row)
+
+    def _preview_sound(self):
+        self.preview_requested.emit(self._sound_file)
 
     def _browse_sound(self):
         path, _ = QFileDialog.getOpenFileName(

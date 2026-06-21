@@ -1,4 +1,5 @@
 import time
+import logging
 import win32gui
 import win32con
 from typing import Optional, Tuple
@@ -84,9 +85,8 @@ class QuickSwitchBackend:
                 win32gui.SetForegroundWindow(self._original_fg_window)
                 time.sleep(0.1)
                 
-            except Exception:
-                pass
-        self._original_fg_window = None
+            except Exception as e:
+                logging.getLogger(__name__).error(f"恢复窗口失败: {e}")
     
     def _switch_to_target(self) -> bool:
         """
@@ -97,44 +97,33 @@ class QuickSwitchBackend:
         """
         if not self.hwnd:
             return False
-        
+
+        if not win32gui.IsWindow(self.hwnd):
+            return False
+
+        if win32gui.IsIconic(self.hwnd):
+            win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
+            time.sleep(0.1)
+
         try:
-            if not win32gui.IsWindow(self.hwnd):
-                return False
-            
-            # 首先确保窗口可见
-            if win32gui.IsIconic(self.hwnd):
-                win32gui.ShowWindow(self.hwnd, win32con.SW_RESTORE)
-                time.sleep(0.1)  # 增加等待时间
-            
-            # 方法2: 先将窗口设置为最顶层，然后激活
-            # 先设置为最顶层
-            win32gui.SetWindowPos(self.hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, 
+            win32gui.SetWindowPos(self.hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0,
                                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-            time.sleep(0.1)  # 增加等待时间
-            # 然后激活窗口
+            time.sleep(0.1)
             win32gui.SetForegroundWindow(self.hwnd)
-            time.sleep(0.1)  # 增加等待时间，确保窗口完全激活
-            
-            # 取消最顶层状态
-            win32gui.SetWindowPos(self.hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, 
+            time.sleep(0.1)
+            win32gui.SetWindowPos(self.hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0,
                                win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-            time.sleep(0.1)  # 增加等待时间
-            
-            # 等待窗口完全激活
-            time.sleep(0.2)  # 增加等待时间，确保窗口完全激活
+            time.sleep(0.1)
+            time.sleep(0.2)
             return True
-            
         except Exception:
             try:
-                # 即使出现异常，也要尝试取消最顶层状态
-                win32gui.SetWindowPos(self.hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0, 
+                win32gui.SetWindowPos(self.hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0,
                                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-            except Exception:
-                pass
-            # 即使出现异常，也尝试返回True，因为窗口可能已经成功激活
-            time.sleep(0.5)  # 增加等待时间，确保窗口完全激活
-            return True
+            except Exception as e:
+                logging.getLogger(__name__).error(f"取消窗口最顶层状态失败: {e}")
+        time.sleep(0.5)
+        return True
     
     def switch_to_target(self) -> bool:
         """

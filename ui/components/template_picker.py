@@ -112,3 +112,8 @@ class TemplatePicker(QFrame):
 
     def has_template(self):
         return self._manager.has_template()
+
+    def set_pixmap(self, pixmap):
+        if pixmap and not pixmap.isNull():
+            self._manager.load_from_pixmap(pixmap)
+            self.template_selected.emit(pixmap)

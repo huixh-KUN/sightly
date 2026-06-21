@@ -1,14 +1,10 @@
 import os
 import sys
+import winsound
 
 from PySide6.QtWidgets import QFileDialog
-from PySide6.QtCore import QUrl
-
-try:
-    from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-    MEDIA_AVAILABLE = True
-except ImportError:
-    MEDIA_AVAILABLE = False
+from PySide6.QtCore import QObject, Signal, QUrl
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 
 def select_alarm_sound(app):
@@ -26,14 +22,21 @@ def select_alarm_sound(app):
         if hasattr(app, 'save_config') and callable(app.save_config):
             try:
                 app.save_config()
-            except Exception:
-                pass
+            except Exception as e:
+                app.logging_manager.error("ALARM", f"保存报警配置失败: {e}")
 
 
-class AlarmModule:
+class AlarmModule(QObject):
+    """报警播放模块。WAV 文件直接 winsound 播放（任意线程）；
+    非 WAV 文件通过信号投递到主线程用 QtMultimedia 播放。"""
+    _qt_play_requested = Signal(str, float)
+
     def __init__(self, app):
+        super().__init__()
         self.app = app
         self._player = None
+        self._audio = None
+        self._qt_play_requested.connect(self._play_with_qt)
 
     def get_default_alarm_sound_path(self):
         if hasattr(sys, '_MEIPASS'):
@@ -45,22 +48,31 @@ class AlarmModule:
         return alarm_path
 
     def _play_file(self, filepath, volume=0.7):
-        if not MEDIA_AVAILABLE:
-            self.app.logging_manager.error("ALARM", "QtMultimedia 不可用，无法播放声音")
+        if getattr(self.app, '_is_closing', False):
             return
         if not filepath or not os.path.exists(filepath):
             self.app.logging_manager.error("ALARM", f"声音文件不存在: {filepath}")
             return
         try:
-            player = QMediaPlayer()
-            audio_output = QAudioOutput()
-            player.setAudioOutput(audio_output)
-            player.setSource(QUrl.fromLocalFile(filepath))
-            audio_output.setVolume(volume)
-            player.play()
-            self._player = player
+            if filepath.lower().endswith('.wav'):
+                winsound.PlaySound(filepath, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+            else:
+                self._qt_play_requested.emit(filepath, volume)
         except Exception as e:
             self.app.logging_manager.error("ALARM", f"播放声音失败: {str(e)}")
+
+    def _play_with_qt(self, filepath, volume):
+        if getattr(self.app, '_is_closing', False):
+            return
+        try:
+            self._player = QMediaPlayer()
+            self._audio = QAudioOutput()
+            self._player.setAudioOutput(self._audio)
+            self._player.setSource(QUrl.fromLocalFile(filepath))
+            self._audio.setVolume(volume)
+            self._player.play()
+        except Exception as e:
+            self.app.logging_manager.error("ALARM", f"Qt播放声音失败: {str(e)}")
 
     def play_alarm_sound(self, alarm_var):
         if not alarm_var.get():
@@ -74,8 +86,7 @@ class AlarmModule:
         self.app.logging_manager.log_message("报警声音已播放")
 
     def play_start_sound(self):
-        sound_file = self.get_default_alarm_sound_path()
-        self._play_file(sound_file, 0.7)
+        self._play_file(self.get_default_alarm_sound_path(), 0.7)
 
     def play_stop_sound(self):
         if hasattr(sys, '_MEIPASS'):

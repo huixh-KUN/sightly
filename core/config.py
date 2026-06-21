@@ -28,6 +28,24 @@ class ConfigVar:
         pass
 
 
+def strip_configvar(obj):
+    """递归去除嵌套 dict/list 中的 ConfigVar 包装，返回纯 JSON 可序列化对象"""
+    if isinstance(obj, dict):
+        return {k: strip_configvar(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [strip_configvar(v) for v in obj]
+    elif isinstance(obj, ConfigVar):
+        return obj.get()
+    # 清除不可 JSON 序列化的对象（如 QPixmap）
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    try:
+        json.dumps(obj)
+        return obj
+    except (TypeError, ValueError):
+        return None
+
+
 def safe_group_get(group, key, default):
     """Like dict.get(key, default) but avoids evaluating tkinter var constructors.
     
@@ -490,8 +508,8 @@ class ConfigManager:
                 
                 from ui.background_tab import update_bg_image_preview
                 update_bg_image_preview(self.app, group_index, image_path)
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CONFIG", f"更新背景图预览失败: {e}")
     
     def load_alarm_config(self, config):
         """
@@ -630,13 +648,13 @@ class ConfigManager:
         if self.app._save_config_timer:
             try:
                 self.app.root.after_cancel(self.app._save_config_timer)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("CONFIG", f"取消保存定时器失败: {e}")
         
         try:
             self.app._save_config_timer = self.app.root.after(1000, self.app.save_config)
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CONFIG", f"设置保存定时器失败: {e}")
     
     def _get_timed_config(self):
         """获取定时功能配置"""

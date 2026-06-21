@@ -1,3 +1,6 @@
+import os
+import winsound
+
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PySide6.QtCore import Qt
 
@@ -15,13 +18,29 @@ class SettingsPanel(QWidget):
     def _connect_signals(self):
         self._general.config_changed.connect(self._on_config_changed)
         self._alarm.config_changed.connect(self._on_config_changed)
+        self._alarm.preview_requested.connect(self._preview_sound)
+
+    def _preview_sound(self, path):
+        if not path or not os.path.exists(path):
+            self.app.logging_manager.log_message(f"音频文件不存在: {path}")
+            return
+        try:
+            winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+        except Exception as e:
+            self.app.logging_manager.error("ALARM", f"试听失败: {e}")
 
     def _on_config_changed(self):
+        alarm_cfg = self._alarm.get_config()
+        if alarm_cfg.get("sound_path"):
+            self.app.alarm_sound_path.set(alarm_cfg["sound_path"])
+        if "volume" in alarm_cfg:
+            self.app.alarm_volume.set(alarm_cfg["volume"])
+            self.app.alarm_volume_str.set(str(alarm_cfg["volume"]))
         if hasattr(self.app, 'save_config') and callable(self.app.save_config):
             try:
                 self.app.save_config()
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("SETTINGS", f"保存配置失败: {e}")
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)

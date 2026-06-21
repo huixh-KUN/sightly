@@ -9,9 +9,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QIcon, QFont, QShortcut, QKeySequence
 
-from ui.components import ModuleStateController
-
-from ui.theme import Colors, ThemeManager
+from core.state import AppState
+from ui.theme import ThemeManager
+from core.config import ConfigManager, strip_configvar, ConfigVar
+from core.logging import LoggingManager
+from input.keyboard import setup_shortcuts
 from ui.widgets import StatusIndicator, NavButton, Divider
 from ui.home_panel import HomePanel
 from ui.ocr_panel import OCRPanel
@@ -22,9 +24,6 @@ from ui.background_panel import BackgroundPanel
 from ui.script_panel import ScriptPanel
 from ui.settings_panel import SettingsPanel
 
-from core.config import ConfigManager, ConfigVar
-from core.logging import LoggingManager
-from input.keyboard import setup_shortcuts
 from input.controller import InputController
 from core.threading import ThreadManager
 from core.events import EventManager
@@ -42,12 +41,11 @@ class MainWindow(QMainWindow):
 
         self.setStyleSheet(ThemeManager.qss())
 
-        self.config_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config")
-        self.config_file_path = os.path.join(self.config_dir, "config.json")
         self.log_file_path = os.path.abspath("logs/sightly.log")
-        os.makedirs(self.config_dir, exist_ok=True)
+        self.config_file_path = os.path.abspath("config/config.json")
         self._is_running = False
         self._is_paused = False
+        self._is_closing = False
         self.tesseract_available = True
 
         self.ocr_groups = []
@@ -58,15 +56,19 @@ class MainWindow(QMainWindow):
         self.script_config = {}
         self.settings_config = {}
 
-        self.start_shortcut_var = ConfigVar("F10")
-        self.stop_shortcut_var = ConfigVar("F12")
-        self.record_hotkey_var = ConfigVar("F11")
+        self.app_state = AppState(self)
 
-        self.module_state = ModuleStateController(self)
+        self.alarm_sound_path = ConfigVar("")
+        self.alarm_volume = ConfigVar(70)
+        self.alarm_volume_str = ConfigVar("70")
+        self.alarm_enabled = {
+            "ocr": ConfigVar(False),
+            "timed": ConfigVar(False),
+            "number": ConfigVar(False),
+            "image": ConfigVar(False),
+        }
 
         self._init_backend()
-        self.module_state.set_debug_logger(self.logging_manager)
-        self.logging_manager.debug("INIT", "ModuleStateController 初始化完成")
         self.logging_manager.debug("INIT", "MainWindow.__init__ 完成")
         self._init_ui()
         self.logging_manager.debug("INIT", "_init_ui 完成")
@@ -93,6 +95,7 @@ class MainWindow(QMainWindow):
 
     def _init_backend(self):
         self.logging_manager = LoggingManager(self)
+        self.app_state.set_logger(self.logging_manager)
         self.logging_manager.debug("INIT", "LoggingManager 初始化完成")
         self.input_controller = InputController(self)
         self.logging_manager.debug("INIT", "InputController 初始化完成")
@@ -102,6 +105,7 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("INIT", "EventManager 初始化完成")
         self.config_manager = ConfigManager(self)
         self.logging_manager.debug("INIT", "ConfigManager 初始化完成")
+        self._migrate_old_config()
         self.platform_adapter = PlatformAdapter(self)
         self.logging_manager.debug("INIT", "PlatformAdapter 初始化完成")
 
@@ -145,12 +149,12 @@ class MainWindow(QMainWindow):
         self.module_controller = ModuleController(self)
         self.logging_manager.debug("INIT", "ModuleController 初始化完成")
 
-        self.module_state.register("ocr", "文字识别", "监控屏幕文字，匹配关键词触发", "📝")
-        self.module_state.register("timed", "定时功能", "按设定间隔自动执行按键操作", "⏱")
-        self.module_state.register("number", "数字识别", "识别屏幕数字变化触发动作", "🔢")
-        self.module_state.register("image", "图像检测", "检测屏幕图像匹配模板触发", "🖼️")
-        self.module_state.register("background", "后台监控", "监控指定窗口的内容变化", "🖥️")
-        self.module_state.register("script", "脚本运行", "录制和执行按键脚本", "📜")
+        self.app_state.register_module("ocr", "文字识别", "监控屏幕文字，匹配关键词触发", "📝")
+        self.app_state.register_module("timed", "定时功能", "按设定间隔自动执行按键操作", "⏱")
+        self.app_state.register_module("number", "数字识别", "识别屏幕数字变化触发动作", "🔢")
+        self.app_state.register_module("image", "图像检测", "检测屏幕图像匹配模板触发", "🖼️")
+        self.app_state.register_module("background", "后台监控", "监控指定窗口的内容变化", "🖥️")
+        self.app_state.register_module("script", "脚本运行", "录制和执行按键脚本", "📜")
         self.logging_manager.debug("INIT", "所有模块注册完成")
 
     def _init_ui(self):
@@ -262,9 +266,10 @@ class MainWindow(QMainWindow):
             self.nav_buttons[nav_keys.index(page_id)].setChecked(True)
 
     def _init_signals(self):
-        self.module_state.all_start_requested.connect(self._on_start_all)
-        self.module_state.all_stop_requested.connect(self._on_stop_all)
-        self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested")
+        self.app_state.all_start_requested.connect(self._on_start_all)
+        self.app_state.all_stop_requested.connect(self._on_stop_all)
+        self.app_state.config_loaded.connect(self._on_config_loaded)
+        self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested/config_loaded")
 
     def _init_module_bindings(self):
         home = self.panels.get('home')
@@ -272,7 +277,7 @@ class MainWindow(QMainWindow):
             toggles = home.get_toggles()
             self.logging_manager.debug("INIT", f"绑定模块开关: {list(toggles.keys())}")
             for module_id, toggle in toggles.items():
-                self.module_state.bind_switch(module_id, toggle)
+                self.app_state.bind_module_switch(module_id, toggle)
         self.logging_manager.debug("INIT", "模块开关绑定完成")
 
     def _on_start_all(self):
@@ -282,7 +287,7 @@ class MainWindow(QMainWindow):
         self._is_running = True
         self.logging_manager.debug("START", "_on_start_all 开始")
         self._sync_panel_configs()
-        enabled = self.module_state.enabled_modules()
+        enabled = self.app_state.enabled_modules()
         self.logging_manager.debug("START", f"已启用模块: {enabled}")
         for module_id in enabled:
             self._start_module(module_id)
@@ -363,9 +368,8 @@ class MainWindow(QMainWindow):
             elif module_id == 'script':
                 self.script_module.stop()
             self.logging_manager.debug("MODULE", f"模块 {module_id} 停止成功")
-        except Exception:
-            self.logging_manager.debug("MODULE", f"模块 {module_id} 停止异常")
-            pass
+        except Exception as e:
+            self.logging_manager.error("MODULE", f"模块 {module_id} 停止失败: {e}")
 
     def start_module(self, module_name, start_func):
         """Called by modules (ocr.py, etc.) to start their worker thread."""
@@ -380,98 +384,169 @@ class MainWindow(QMainWindow):
     def log_message(self, message):
         self.logging_manager.log_message(message)
 
-    def _collect_module_config(self):
-        return {mid: self.module_state.is_enabled(mid) for mid in self.module_state.modules}
 
-    def _apply_module_config(self, config_dict):
-        for mid, enabled in config_dict.items():
-            self.module_state.set_enabled(mid, enabled)
+    def _migrate_old_config(self):
+        if self.app_state._wm.list_workspaces():
+            return
+        old_config = self.config_manager.read_config()
+        if old_config:
+            self.app_state.create_workspace("默认配置")
+            self.app_state._wm.save("默认配置", old_config)
+            # 重新加载已保存的配置，覆盖 create_workspace 发出的空 config_loaded
+            self.app_state._load_workspace("默认配置")
+            self.logging_manager.debug("CONFIG", "旧配置已迁移到默认工作空间")
 
-    def load_saved_config(self):
-        self.logging_manager.debug("CONFIG", "开始加载保存的配置")
-        config = self.config_manager.read_config()
+    def _on_config_loaded(self, config):
+        self.logging_manager.debug("CONFIG", f"分发配置到面板, keys={list(config.keys()) if config else 'EMPTY'}")
+        for panel_id in self.panels:
+            panel = self.panels[panel_id]
+            if not hasattr(panel, 'set_config'):
+                continue
+            panel_cfg = config.get(panel_id) if config else None
+            if panel_cfg is not None:
+                self.logging_manager.debug("CONFIG", f"  面板 {panel_id}: set_config({type(panel_cfg).__name__})")
+                panel.set_config(panel_cfg)
+                if panel_id == 'settings':
+                    self._apply_settings(panel_cfg)
+            else:
+                if panel_id == 'script':
+                    panel.set_config({"script_content": "", "color_commands": ""})
+                elif panel_id == 'settings':
+                    panel.set_config({})
+                else:
+                    panel.set_config([])
+                self.logging_manager.debug("CONFIG", f"  面板 {panel_id}: set_config(empty)")
         if config:
-            module_enabled = config.get("module_enabled", {})
-            self.logging_manager.debug("CONFIG", f"模块启用状态: {module_enabled}")
-            self._apply_module_config(module_enabled)
-
-            script_cfg = config.get("script", {})
-            if script_cfg and 'script' in self.panels:
-                self.panels['script'].set_config(script_cfg)
-                self.logging_manager.debug("CONFIG", "脚本内容已恢复")
-
-            settings_cfg = config.get("settings", {})
-            if settings_cfg and 'settings' in self.panels:
-                self.panels['settings'].set_config(settings_cfg)
-                self.logging_manager.debug("CONFIG", "设置已恢复")
-                self._apply_settings(settings_cfg)
-
             self.logging_manager.log_message("配置已加载")
         else:
             self.logging_manager.debug("CONFIG", "无保存的配置")
 
+    def load_saved_config(self, workspace_name=None):
+        self.logging_manager.debug("CONFIG", f"开始加载保存的配置 (name={workspace_name})")
+        if workspace_name:
+            self.save_config()
+            self.app_state.switch_workspace(workspace_name)
+        else:
+            loaded = self.app_state.startup_load()
+            self.logging_manager.debug("CONFIG", f"startup_load 返回: {loaded!r}")
+            if loaded:
+                self.logging_manager.debug("CONFIG", f"工作空间已加载: {loaded}")
+
     def _apply_settings(self, settings_cfg):
         general = settings_cfg.get("general", {})
         if general.get("start_key"):
-            self.start_shortcut_var.set(general["start_key"])
+            self.app_state.start_shortcut = general["start_key"]
         if general.get("stop_key"):
-            self.stop_shortcut_var.set(general["stop_key"])
+            self.app_state.stop_shortcut = general["stop_key"]
         self._register_shortcuts()
+        alarm = settings_cfg.get("alarm", {})
+        if alarm.get("sound_path"):
+            self.alarm_sound_path.set(alarm["sound_path"])
+        if "volume" in alarm:
+            self.alarm_volume.set(alarm["volume"])
+            self.alarm_volume_str.set(str(alarm["volume"]))
         self.logging_manager.debug("CONFIG", "设置已应用")
 
     def save_config(self):
         self.logging_manager.debug("CONFIG", "开始保存配置")
-        config = self.config_manager.read_config() or {}
-        config["module_enabled"] = self._collect_module_config()
-
-        if 'script' in self.panels:
-            config["script"] = self.panels['script'].collect_config()
-        if 'settings' in self.panels:
-            config["settings"] = self.panels['settings'].collect_config()
-
-        self.logging_manager.debug("CONFIG", f"模块启用状态: {config.get('module_enabled', {})}")
-        self.config_manager.save_config(config)
+        extra_config = {}
+        for panel_id, panel in self.panels.items():
+            if hasattr(panel, 'collect_config'):
+                extra_config[panel_id] = panel.collect_config()
+                self.logging_manager.debug("CONFIG", f"  面板 {panel_id}: {len(extra_config[panel_id])} 项")
+        self._save_template_images(extra_config)
+        extra_config = strip_configvar(extra_config)
+        self.app_state.save_current(extra_config)
+        self.logging_manager.debug("CONFIG", f"模块启用状态: {self.app_state._module_states}")
         self.logging_manager.debug("CONFIG", "配置保存完成")
 
+    def _save_template_images(self, config):
+        try:
+            bg_list = config.get("background", [])
+            if not self.app_state.current:
+                return
+            for i, g in enumerate(bg_list):
+                if not isinstance(g, dict) or g.get("type") != "image":
+                    continue
+                pixmap = g.get("reference_image")
+                if pixmap and hasattr(pixmap, "save") and not pixmap.isNull():
+                    path = self.app_state._wm.save_template_image(self.app_state.current, "background", i, pixmap)
+                    g["reference_image"] = path
+                else:
+                    g.pop("reference_image", None)
+        except Exception as e:
+            self.logging_manager.error("CONFIG", f"保存模板图片失败: {e}")
+
     def closeEvent(self, event):
+        self._is_closing = True
         self.logging_manager.debug("CLOSE", "窗口关闭中...")
-        self.save_config()
+        try:
+            self.save_config()
+        except Exception as e:
+            self.logging_manager.error("CLOSE", f"保存配置失败: {e}")
+        try:
+            self.app_state.save_index()
+        except Exception as e:
+            self.logging_manager.error("CLOSE", f"保存索引失败: {e}")
         self._shutdown_all_modules()
         super().closeEvent(event)
 
     def _shutdown_all_modules(self):
         self.logging_manager.debug("CLOSE", "停止所有模块...")
-        try:
-            if hasattr(self, 'script_module'):
+        if hasattr(self, 'script_module'):
+            try:
                 self.script_module.stop(stop_color_recognition=False)
-            if hasattr(self, 'number_module'):
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 script_module 失败: {e}")
+        if hasattr(self, 'number_module'):
+            try:
                 self.number_module.stop_number_recognition()
-            if hasattr(self, 'timed_module'):
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 number_module 失败: {e}")
+        if hasattr(self, 'timed_module'):
+            try:
                 self.timed_module.stop_timed_tasks()
-            if hasattr(self, 'image_manager'):
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 timed_module 失败: {e}")
+        if hasattr(self, 'image_manager'):
+            try:
                 self.image_manager.stop_all_detection()
-            if hasattr(self, 'color_manager'):
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 image_manager 失败: {e}")
+        if hasattr(self, 'color_manager'):
+            try:
                 self.color_manager.stop_color_recognition()
-            if hasattr(self, 'ocr_module'):
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 color_manager 失败: {e}")
+        if hasattr(self, 'ocr_module'):
+            try:
                 self.ocr_module.stop_monitoring()
-            if hasattr(self, 'background_manager'):
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 ocr_module 失败: {e}")
+        if hasattr(self, 'background_manager'):
+            try:
                 self.background_manager.stop_all_groups()
-            if hasattr(self, 'event_manager'):
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 background_manager 失败: {e}")
+        if hasattr(self, 'event_manager'):
+            try:
                 self.event_manager.stop_event_thread()
-            if hasattr(self, 'global_listener') and self.global_listener:
-                try:
-                    self.global_listener.stop()
-                    if hasattr(self.global_listener, 'join'):
-                        self.global_listener.join(timeout=2)
-                except Exception:
-                    pass
-            # 清理延迟创建的 script_executor
-            script_exec = getattr(self, 'script_executor', None) or getattr(self, 'script_module', None)
-            if hasattr(script_exec, 'is_running') and script_exec.is_running:
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 event_manager 失败: {e}")
+        if hasattr(self, 'global_listener') and self.global_listener:
+            try:
+                self.global_listener.stop()
+                if hasattr(self.global_listener, 'join'):
+                    self.global_listener.join(timeout=2)
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 global_listener 失败: {e}")
+        script_exec = getattr(self, 'script_executor', None) or getattr(self, 'script_module', None)
+        if hasattr(script_exec, 'is_running') and script_exec.is_running:
+            try:
                 script_exec.stop_script()
-            self.logging_manager.debug("CLOSE", "所有模块已停止")
-        except Exception as e:
-            self.logging_manager.debug("CLOSE", f"停止模块时出错: {e}")
+            except Exception as e:
+                self.logging_manager.error("CLOSE", f"停止 script_executor 失败: {e}")
+        self.logging_manager.debug("CLOSE", "所有模块已停止")
 
     def run(self):
         self.logging_manager.debug("RUN", "run() 开始执行")
@@ -487,10 +562,10 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("RUN", "窗口显示完成")
 
     def _register_shortcuts(self):
-        QShortcut(QKeySequence(self.start_shortcut_var.get()), self).activated.connect(
+        QShortcut(QKeySequence(self.app_state.start_shortcut), self).activated.connect(
             lambda: self._on_start_all() if not self._is_running else None
         )
-        QShortcut(QKeySequence(self.stop_shortcut_var.get()), self).activated.connect(
+        QShortcut(QKeySequence(self.app_state.stop_shortcut), self).activated.connect(
             lambda: self._on_stop_all() if self._is_running else None
         )
 
@@ -499,7 +574,7 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("灵眸")
 
-    icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon", "autodoor.png")
+    icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon", "sightly.png")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
 

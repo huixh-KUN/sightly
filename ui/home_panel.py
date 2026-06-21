@@ -1,29 +1,32 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QFrame, QGridLayout, QScrollArea
+    QFrame, QGridLayout, QScrollArea,
+    QInputDialog, QMessageBox
 )
 from PySide6.QtCore import Qt
 
-from ui.widgets import SectionTitle, PrimaryButton, DangerButton, InfoLabel
-from ui.components import LogViewer, ModuleCard
+from ui.widgets import SectionTitle, PrimaryButton, DangerButton, InfoLabel, TextButton
+from ui.components import LogViewer, ModuleCard, ComboBox
 
 
 class HomePanel(QWidget):
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
-        self.module_state = app.module_state
+        self.app_state = app.app_state
         self._cards = {}
+        self._ws_switching = False
         self._setup_ui()
         self._connect_signals()
 
     def _connect_signals(self):
-        self.module_state.module_enabled_changed.connect(self._on_module_state)
-        self.start_btn.clicked.connect(self.module_state.request_start_all)
-        self.stop_btn.clicked.connect(self.module_state.request_stop_all)
+        self.app_state.module_enabled_changed.connect(self._on_module_state)
+        self.start_btn.clicked.connect(self.app_state.request_start_all)
+        self.stop_btn.clicked.connect(self.app_state.request_stop_all)
         self.app.logging_manager.log_callback = self.log_viewer.log
         self.app.logging_manager.error_callback = self.log_viewer.log_error
         self.app.logging_manager.clear_callback = self.log_viewer.clear
+        self.ws_combo.currentTextChanged.connect(self._on_ws_selected)
         self.app.logging_manager.debug("HOME", "HomePanel 信号连接完成")
 
     def _on_module_state(self, module_id, enabled):
@@ -80,6 +83,25 @@ class HomePanel(QWidget):
 
         layout.addWidget(controls)
 
+        ws_card = QFrame()
+        ws_card.setObjectName("card")
+        ws_layout = QHBoxLayout(ws_card)
+        ws_layout.setContentsMargins(24, 12, 24, 12)
+        ws_layout.setSpacing(12)
+
+        ws_layout.addWidget(QLabel("工作空间"))
+        self.ws_combo = ComboBox()
+        self._refresh_ws_list()
+        ws_layout.addWidget(self.ws_combo, 1)
+
+        new_ws_btn = TextButton("新建")
+        new_ws_btn.clicked.connect(self._create_workspace)
+        ws_layout.addWidget(new_ws_btn)
+        del_ws_btn = TextButton("删除")
+        del_ws_btn.clicked.connect(self._delete_workspace)
+        ws_layout.addWidget(del_ws_btn)
+        layout.addWidget(ws_card)
+
         modules = QFrame()
         modules.setObjectName("card")
         m_layout = QVBoxLayout(modules)
@@ -119,8 +141,7 @@ class HomePanel(QWidget):
         l_header = QHBoxLayout()
         l_header.addWidget(QLabel("运行日志"))
         l_header.addStretch()
-        clear_btn = QPushButton("清除")
-        clear_btn.setCursor(Qt.PointingHandCursor)
+        clear_btn = TextButton("清除")
         clear_btn.clicked.connect(self._clear_log)
         l_header.addWidget(clear_btn)
         l_layout.addLayout(l_header)
@@ -134,6 +155,55 @@ class HomePanel(QWidget):
 
         scroll.setWidget(container)
         outer.addWidget(scroll)
+
+    def _refresh_ws_list(self):
+        self._ws_switching = True
+        current = self.app_state.current
+        self.ws_combo.clear()
+        self.ws_combo.addItems(self.app_state.workspace_list)
+        if current:
+            idx = self.ws_combo.findText(current)
+            if idx >= 0:
+                self.ws_combo.setCurrentIndex(idx)
+        self._ws_switching = False
+
+    
+    def _create_workspace(self):
+        name, ok = QInputDialog.getText(self, "新建工作空间", "工作空间名称:")
+        if ok and name.strip():
+            self.app.logging_manager.debug("HOME", f"_create_workspace({name.strip()!r})")
+            self.app_state.create_workspace(name.strip())
+            self._refresh_ws_list()
+            self.app.logging_manager.log_message(f"已创建并切换到工作空间: {name.strip()}")
+
+    def _delete_workspace(self):
+        name = self.ws_combo.currentText()
+        if not name:
+            return
+        if len(self.app_state.workspace_list) <= 1:
+            self.app.logging_manager.log_message("至少保留一个工作空间")
+            return
+        ret = QMessageBox.question(
+            self, "确认删除",
+            f"确定要删除工作空间「{name}」吗？\n该操作不可恢复。",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if ret != QMessageBox.Yes:
+            return
+        self.app.logging_manager.debug("HOME", f"_delete_workspace({name!r})")
+        self.app_state.delete_workspace(name)
+        self._refresh_ws_list()
+        self.app.logging_manager.log_message(f"已删除工作空间: {name}")
+
+    def _on_ws_selected(self, name):
+        if self._ws_switching or not name:
+            return
+        if self.app_state.current == name:
+            return
+        self.app.logging_manager.debug("HOME", f"_on_ws_selected: {self.app_state.current!r} -> {name!r}")
+        self.app.save_config()
+        self.app_state.switch_workspace(name)
+        self.app.logging_manager.log_message(f"已切换到工作空间: {name}")
 
     def _clear_log(self):
         self.app.logging_manager.debug("HOME", "清除日志")
