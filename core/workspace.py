@@ -9,12 +9,10 @@ class WorkspaceManager:
 
     def __init__(self, base_dir=None):
         if base_dir is None:
-            base_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                "workspace"
-            )
+            base_dir = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "Sightly", "workspace")
         self._base_dir = base_dir
         os.makedirs(self._base_dir, exist_ok=True)
+        self._migrate_old_workspace()
 
     @property
     def base_dir(self):
@@ -102,3 +100,16 @@ class WorkspaceManager:
 
     def _workspace_path(self, name):
         return os.path.join(self._base_dir, name)
+
+    def _migrate_old_workspace(self):
+        old_base = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "workspace"
+        )
+        if not os.path.exists(old_base) or old_base == self._base_dir:
+            return
+        for name in os.listdir(old_base):
+            old_path = os.path.join(old_base, name)
+            new_path = os.path.join(self._base_dir, name)
+            if os.path.isdir(old_path) and not os.path.exists(new_path):
+                shutil.copytree(old_path, new_path)
