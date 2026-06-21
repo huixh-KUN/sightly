@@ -29,6 +29,6 @@ pyinstaller sightly.spec --noconfirm
 echo.
 echo [3/3] Build complete!
 echo.
-echo Output: dist\Sightly\
+echo Output: dist\Sightly\Sightly.exe
 echo.
 pause

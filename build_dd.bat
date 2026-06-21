@@ -38,7 +38,7 @@ pyinstaller sightly.spec --noconfirm
 echo.
 echo [3/3] Build complete!
 echo.
-echo Output: dist\Sightly_dd\
+echo Output: dist\Sightly_dd\Sightly.exe
 echo Input Method: DD Virtual Keyboard (DD Version)
 echo.
 echo NOTE: DD version may be flagged by antivirus software
