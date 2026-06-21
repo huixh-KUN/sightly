@@ -114,6 +114,10 @@ sightly/
 配置自动保存在系统目录：
 - Windows：`%APPDATA%/灵眸/config.json`
 
+## 特别鸣谢
+
+本项目基于 [AutoDoor OCR](https://github.com/wdhq4261761/autodoor) 二次开发，感谢原作者 **Flown王砖家** 的开源贡献。
+
 ## 许可证
 
 MIT License
