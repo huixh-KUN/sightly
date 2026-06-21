@@ -1,0 +1,24 @@
+{
+  "module_enabled": {
+    "ocr": false,
+    "timed": false,
+    "number": false,
+    "image": false,
+    "background": false,
+    "script": false
+  },
+  "script": {
+    "script_content": "",
+    "color_commands": ""
+  },
+  "settings": {
+    "general": {
+      "language": "简体中文",
+      "start_key": "",
+      "stop_key": ""
+    },
+    "alarm": {
+      "sound_path": ""
+    }
+  }
+}
