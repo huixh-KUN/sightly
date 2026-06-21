@@ -589,11 +589,11 @@ class ConfigManager:
                     r, g, b = target_color
                     self.app.color_var.set(f"RGB({r}, {g}, {b})")
                     if hasattr(self.app, 'color_display'):
-                    r, g, b = target_color
-                    color_hex = f"#{r:02x}{g:02x}{b:02x}"
-                    self.app.color_display.setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
-                    # 同时更新实际使用的属性
-                    self.app.target_color = target_color
+                        r, g, b = target_color
+                        color_hex = f"#{r:02x}{g:02x}{b:02x}"
+                        self.app.color_display.setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
+                        # 同时更新实际使用的属性
+                        self.app.target_color = target_color
                 except (TypeError, ValueError):
                     if hasattr(self.app, 'logging_manager'):
                         self.app.logging_manager.error("CONFIG", f"配置文件中的目标颜色格式错误: {target_color}")
