@@ -44,7 +44,7 @@ class ModuleController:
         if hasattr(self.app, 'module_indicators') and module_key in self.app.module_indicators:
             color = '#00e676' if is_running else '#9CA3AF'
             try:
-                self.app.module_indicators[module_key].configure(text_color=color)
+                self.app.module_indicators[module_key].setStyleSheet(f"color: {color}")
             except Exception as e:
                 self.app.logging_manager.error("CTRL", f"更新指示灯 {module_key} 失败: {e}")
 
@@ -57,17 +57,17 @@ class ModuleController:
         if hasattr(self.app, 'module_switches'):
             for switch in self.app.module_switches.values():
                 try:
-                    switch.configure(state="disabled")
+                    switch.setEnabled(False)
                 except Exception as e:
                     self.app.logging_manager.error("CTRL", f"禁用模块开关失败: {e}")
 
         try:
-            self.app.global_start_btn.configure(state="disabled")
+            self.app.global_start_btn.setEnabled(False)
         except Exception as e:
             self.app.logging_manager.error("CTRL", f"禁用全局开始按钮失败: {e}")
 
         try:
-            self.app.global_stop_btn.configure(state="normal")
+            self.app.global_stop_btn.setEnabled(True)
         except Exception as e:
             self.app.logging_manager.error("CTRL", f"启用全局停止按钮失败: {e}")
         
@@ -143,17 +143,17 @@ class ModuleController:
         if hasattr(self.app, 'module_switches'):
             for switch in self.app.module_switches.values():
                 try:
-                    switch.configure(state="normal")
+                    switch.setEnabled(True)
                 except Exception as e:
                     self.app.logging_manager.error("CTRL", f"恢复模块开关失败: {e}")
 
         try:
-            self.app.global_start_btn.configure(state="normal")
+            self.app.global_start_btn.setEnabled(True)
         except Exception as e:
             self.app.logging_manager.error("CTRL", f"恢复全局开始按钮失败: {e}")
 
         try:
-            self.app.global_stop_btn.configure(state="disabled")
+            self.app.global_stop_btn.setEnabled(False)
         except Exception as e:
             self.app.logging_manager.error("CTRL", f"禁用全局停止按钮失败: {e}")
         
@@ -162,37 +162,34 @@ class ModuleController:
         self.app.is_running = False
     
     def _toggle_all_ui_state(self, state):
-        root = getattr(self.app, 'root', None)
-        if root is None:
-            return
+        from PySide6.QtWidgets import QWidget
         try:
-            for child in root.winfo_children():
+            for child in self.app.findChildren(QWidget):
                 self._toggle_widget_state(child, state)
         except Exception as e:
             self.app.logging_manager.error("CTRL", f"遍历子组件失败: {e}")
-    
+
     def _toggle_widget_state(self, widget, state):
+        from PySide6.QtWidgets import QWidget
         stop_btn = getattr(self.app, 'global_stop_btn', None)
         start_btn = getattr(self.app, 'global_start_btn', None)
         indicators = getattr(self.app, 'module_indicators', {})
-        
+
         if widget in (stop_btn, start_btn):
             return
-        
         for indicator in indicators.values():
             if widget == indicator:
                 return
-        
         if hasattr(self.app, 'script_tabview') and widget == self.app.script_tabview:
             return
-        
+
         try:
-            widget.configure(state=state)
+            widget.setEnabled(state == "normal")
         except Exception as e:
             self.app.logging_manager.error("CTRL", f"配置组件状态失败: {e}")
-        
+
         try:
-            for child in widget.winfo_children():
+            for child in widget.findChildren(QWidget):
                 self._toggle_widget_state(child, state)
         except Exception as e:
             self.app.logging_manager.error("CTRL", f"遍历子组件失败: {e}")

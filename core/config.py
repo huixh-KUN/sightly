@@ -429,7 +429,8 @@ class ConfigManager:
                             group['color_var'].set(f"RGB({r}, {g}, {b})")
                         if 'color_display' in group:
                             r, g, b = tuple(value)
-                            group['color_display'].configure(fg_color=f"#{r:02x}{g:02x}{b:02x}")
+                            color_hex = f"#{r:02x}{g:02x}{b:02x}"
+                            group['color_display'].setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
                     elif hasattr(group[key], 'set'):
                         group[key].set(value)
             
@@ -588,7 +589,9 @@ class ConfigManager:
                     r, g, b = target_color
                     self.app.color_var.set(f"RGB({r}, {g}, {b})")
                     if hasattr(self.app, 'color_display'):
-                        self.app.color_display.configure(fg_color=f"#{r:02x}{g:02x}{b:02x}")
+                    r, g, b = target_color
+                    color_hex = f"#{r:02x}{g:02x}{b:02x}"
+                    self.app.color_display.setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
                     # 同时更新实际使用的属性
                     self.app.target_color = target_color
                 except (TypeError, ValueError):
@@ -636,23 +639,19 @@ class ConfigManager:
                 self.app.combo_after_delay.set('300')
     
     def defer_save_config(self):
-        """
-        延迟保存配置，避免频繁保存
-        """
-        if not hasattr(self.app, 'root') or not self.app.root:
-            return
-        
+        from PySide6.QtCore import QTimer
+
         if not hasattr(self.app, '_save_config_timer'):
             self.app._save_config_timer = None
-        
+
         if self.app._save_config_timer:
             try:
-                self.app.root.after_cancel(self.app._save_config_timer)
+                self.app._save_config_timer.stop()
             except Exception as e:
                 self.app.logging_manager.error("CONFIG", f"取消保存定时器失败: {e}")
-        
+
         try:
-            self.app._save_config_timer = self.app.root.after(1000, self.app.save_config)
+            self.app._save_config_timer = QTimer.singleShot(1000, self.app.save_config)
         except Exception as e:
             self.app.logging_manager.error("CONFIG", f"设置保存定时器失败: {e}")
     
@@ -1153,11 +1152,10 @@ class ConfigManager:
         def set_key_value(val):
             if hasattr(group['key'], 'set'):
                 group['key'].set(val)
-            elif hasattr(group['key'], 'configure'):
-                group['key'].configure(state='normal')
-                group['key'].delete(0, 'end')
-                group['key'].insert(0, val)
-                group['key'].configure(state='disabled')
+            elif hasattr(group['key'], 'setText'):
+                group['key'].setEnabled(True)
+                group['key'].setText(val)
+                group['key'].setEnabled(False)
 
         def safe_set_int(var, val, default=0):
             try:

@@ -148,8 +148,9 @@ class InputController:
                 error_msg = str(e).lower()
                 if self.app and ("accessibility" in error_msg or "permission" in error_msg):
                     self._log("❌ 辅助功能权限缺失，请授权后重试")
-                    if hasattr(self.app, 'root') and hasattr(self.app, '_guide_accessibility_setup'):
-                        self.app.root.after(0, self.app._guide_accessibility_setup)
+                    if hasattr(self.app, '_guide_accessibility_setup'):
+                        from PySide6.QtCore import QTimer
+                        QTimer.singleShot(0, self.app._guide_accessibility_setup)
                 elif self.app:
                     self._log(f"❌ 操作错误: {e}")
                 raise

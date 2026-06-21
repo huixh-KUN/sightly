@@ -48,8 +48,6 @@ def _get_script_text(app):
 def _set_status_text(app, text):
     if hasattr(app, 'status_label') and app.status_label:
         QTimer.singleShot(0, lambda: app.status_label.setText(text))
-    elif hasattr(app, 'status_var'):
-        app.status_var.set(text)
 
 
 class ScriptModule:

@@ -1,91 +1,96 @@
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QKeyEvent, QShortcut, QKeySequence
+from PySide6.QtWidgets import QApplication
+
+
 def start_key_listening(app, target_var, button, is_shortcut=False):
-    """开始监听用户按下的按键"""
-    current_focus = app.root.focus_get()
-    
-    original_status = app.status_var.get()
-    
-    original_text = button.cget("text")
-    if hasattr(button, 'configure'):
-        button.configure(state="disabled")
-    else:
-        button.configure(state="disabled")
-    
-    app.status_var.set("请按任意按键进行设置，按ESC键清空当前记录")
-    
-    def on_key_press(event):
-        """处理按键按下事件
-        屏蔽中文输入法，只处理物理按键事件
-        """
-        app.status_var.set(original_status)
-        
-        keysym = event.keysym
-        
-        if not keysym:
-            return "break"
-        
-        allowed_function_keys = [
-            "Insert", "Delete", "Home", "End", "Prior", "Next", "PageUp", "PageDown",
-            "Up", "Down", "Left", "Right",
-            "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-            "Escape", "Tab", "Return", "Enter", "Space", "space", "BackSpace", "Backspace",
-            "Control_L", "Control_R", "Shift_L", "Shift_R", "Alt_L", "Alt_R"
-        ]
-        
-        if not (
-            len(keysym) == 1 or 
-            keysym in allowed_function_keys or 
-            keysym.startswith("Key")
-        ):
-            return "break"
-        
-        keysym_map = {
-            "Prior": "PageUp",
-            "Next": "PageDown",
-            "Return": "Enter",
-            "space": "Space"
-        }
-        
-        keysym = keysym_map.get(keysym, keysym)
-        
-        if keysym == "Escape":
-            _set_target_value(target_var, "")
-            _restore_button_state(button)
-            app.root.unbind("<KeyPress>", funcid=key_listener_id)
-            if current_focus:
-                current_focus.focus_set()
-            return "break"
-        
-        _set_target_value(target_var, keysym)
-        
-        if is_shortcut:
-            app.update_hotkey()
-        
-        _restore_button_state(button)
-        app.root.unbind("<KeyPress>", funcid=key_listener_id)
-        if current_focus:
-            current_focus.focus_set()
-        
-        return "break"
-    
-    key_listener_id = app.root.bind("<KeyPress>", on_key_press)
-    app.root.focus_set()
+    from PySide6.QtWidgets import QWidget
+
+    original_text = button.text() if hasattr(button, 'text') else ""
+    if hasattr(button, 'setEnabled'):
+        button.setEnabled(False)
+
+    app.status_label.setText("请按任意按键进行设置，按ESC键清空当前记录")
+
+    _key_filter = _KeyFilter(app, target_var, button, is_shortcut, original_text)
+    app._key_filter = _key_filter
+    QApplication.instance().installEventFilter(_key_filter)
+
+
+class _KeyFilter:
+    def __init__(self, app, target_var, button, is_shortcut, original_text):
+        self.app = app
+        self.target_var = target_var
+        self.button = button
+        self.is_shortcut = is_shortcut
+        self.original_text = original_text
+
+    def eventFilter(self, obj, event):
+        if event.type() != QKeyEvent.Type.KeyPress:
+            return False
+
+        key = event.key()
+        text = event.text()
+
+        if key == Qt.Key.Key_Escape:
+            _set_target_value(self.target_var, "")
+            _restore_button_state(self.button)
+            self._cleanup()
+            return True
+
+        key_name = _qt_key_to_name(key, text)
+        if key_name is None:
+            return True
+
+        _set_target_value(self.target_var, key_name)
+        if self.is_shortcut:
+            self.app.update_hotkey()
+
+        _restore_button_state(self.button)
+        self._cleanup()
+        return True
+
+    def _cleanup(self):
+        QApplication.instance().removeEventFilter(self)
+        if hasattr(self.app, '_key_filter'):
+            del self.app._key_filter
+        if hasattr(self.app, 'status_label'):
+            self.app.status_label.setText("空闲")
+
+
+def _qt_key_to_name(key, text):
+    special_map = {
+        Qt.Key_Insert: "Insert", Qt.Key_Delete: "Delete",
+        Qt.Key_Home: "Home", Qt.Key_End: "End",
+        Qt.Key_PageUp: "PageUp", Qt.Key_PageDown: "PageDown",
+        Qt.Key_Up: "Up", Qt.Key_Down: "Down",
+        Qt.Key_Left: "Left", Qt.Key_Down: "Down",
+        Qt.Key_Return: "Enter", Qt.Key_Enter: "Enter",
+        Qt.Key_Space: "Space", Qt.Key_Escape: "Escape",
+        Qt.Key_Tab: "Tab", Qt.Key_Backspace: "Backspace",
+        Qt.Key_Control: "Control_L", Qt.Key_Shift: "Shift_L",
+        Qt.Key_Alt: "Alt_L",
+    }
+
+    if key in special_map:
+        return special_map[key]
+
+    if Qt.Key_F1 <= key <= Qt.Key_F12:
+        return f"F{key - Qt.Key_F1 + 1}"
+
+    if text and len(text) == 1 and text.isprintable():
+        return text
+
+    return None
 
 
 def _set_target_value(target_var, value):
-    """设置目标变量的值，支持StringVar和CTkEntry"""
     if hasattr(target_var, 'set'):
         target_var.set(value)
-    elif hasattr(target_var, 'configure'):
-        target_var.configure(state='normal')
-        target_var.delete(0, 'end')
-        if value:
-            target_var.insert(0, value)
-        target_var.configure(state='disabled')
+    elif hasattr(target_var, 'setText'):
+        target_var.setText(value)
 
 
 def _restore_button_state(button):
-    """恢复按钮状态，支持CustomTkinter和Tkinter"""
-    if hasattr(button, 'configure'):
-        button.configure(state="normal")
-    else:
-        button.configure(state="normal")
+    if hasattr(button, 'setEnabled'):
+        button.setEnabled(True)

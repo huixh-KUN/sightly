@@ -285,5 +285,3 @@ def _set_status_text(app, text):
     if hasattr(app, 'status_label') and app.status_label:
         from PySide6.QtCore import QTimer
         QTimer.singleShot(0, lambda: app.status_label.setText(text))
-    elif hasattr(app, 'status_var'):
-        app.status_var.set(text)

@@ -123,7 +123,8 @@ class ColorRecognitionManager:
                 self.app.color_var.set(f"RGB({r}, {g}, {b})")
             if hasattr(self.app, 'color_display'):
                 try:
-                    self.app.color_display.configure(fg_color=f"#{r:02x}{g:02x}{b:02x}")
+                    color_hex = f"#{r:02x}{g:02x}{b:02x}"
+                    self.app.color_display.setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
                 except Exception as e:
                     self.app.logging_manager.error("COLOR", f"更新颜色显示失败: {e}")
         
@@ -173,5 +174,3 @@ class ColorRecognitionManager:
 def _set_status_text(app, text):
     if hasattr(app, 'status_label') and app.status_label:
         QTimer.singleShot(0, lambda: app.status_label.setText(text))
-    elif hasattr(app, 'status_var'):
-        app.status_var.set(text)

@@ -205,22 +205,22 @@ class UIProxy:
             pass
     
     def show_progress(self, message):
-        if hasattr(self.app, 'status_var'):
-            self.app.status_var.set(message)
-        if hasattr(self.app, 'root') and self.app.root:
-            try:
-                self.app.root.update_idletasks()
-            except Exception as e:
-                self.app.logging_manager.error("PROXY", f"更新进度状态失败: {e}")
-    
+        if hasattr(self.app, 'status_label'):
+            self.app.status_label.setText(message)
+        try:
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
+        except Exception as e:
+            self.app.logging_manager.error("PROXY", f"更新进度状态失败: {e}")
+
     def hide_progress(self):
-        if hasattr(self.app, 'status_var'):
-            self.app.status_var.set("")
-        if hasattr(self.app, 'root') and self.app.root:
-            try:
-                self.app.root.update_idletasks()
-            except Exception as e:
-                self.app.logging_manager.error("PROXY", f"清除进度状态失败: {e}")
+        if hasattr(self.app, 'status_label'):
+            self.app.status_label.setText("空闲")
+        try:
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
+        except Exception as e:
+            self.app.logging_manager.error("PROXY", f"清除进度状态失败: {e}")
 
 
 class BackgroundProxy:
