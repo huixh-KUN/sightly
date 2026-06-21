@@ -30,14 +30,6 @@ from core.threading import ThreadManager
 from core.events import EventManager
 from core.platform import PlatformAdapter
 from core.controller import ModuleController
-from modules.ocr import OCRModule
-from modules.timed import TimedModule
-from modules.number import NumberModule
-from modules.alarm import AlarmModule
-from modules.script import ScriptModule
-from modules.color import ColorRecognitionManager
-from modules.image import ImageDetectionManager
-from modules.background import BackgroundManager
 
 
 class MainWindow(QMainWindow):
@@ -113,21 +105,30 @@ class MainWindow(QMainWindow):
         self.platform_adapter = PlatformAdapter(self)
         self.logging_manager.debug("INIT", "PlatformAdapter 初始化完成")
 
-        self.ocr_module = OCRModule(self)
+        from modules.ocr import OCRModule as _OCR
+        from modules.timed import TimedModule as _Timed
+        from modules.number import NumberModule as _Number
+        from modules.alarm import AlarmModule as _Alarm
+        from modules.script import ScriptModule as _Script
+        from modules.color import ColorRecognitionManager as _Color
+        from modules.image import ImageDetectionManager as _Image
+        from modules.background import BackgroundManager as _BG
+
+        self.ocr_module = _OCR(self)
         self.logging_manager.debug("INIT", "OCRModule 初始化完成")
-        self.timed_module = TimedModule(self)
+        self.timed_module = _Timed(self)
         self.logging_manager.debug("INIT", "TimedModule 初始化完成")
-        self.number_module = NumberModule(self)
+        self.number_module = _Number(self)
         self.logging_manager.debug("INIT", "NumberModule 初始化完成")
-        self.alarm_module = AlarmModule(self)
+        self.alarm_module = _Alarm(self)
         self.logging_manager.debug("INIT", "AlarmModule 初始化完成")
-        self.script_module = ScriptModule(self)
+        self.script_module = _Script(self)
         self.logging_manager.debug("INIT", "ScriptModule 初始化完成")
-        self.color_manager = ColorRecognitionManager(self)
+        self.color_manager = _Color(self)
         self.logging_manager.debug("INIT", "ColorRecognitionManager 初始化完成")
-        self.image_manager = ImageDetectionManager(self)
+        self.image_manager = _Image(self)
         self.logging_manager.debug("INIT", "ImageDetectionManager 初始化完成")
-        self.background_manager = BackgroundManager(self)
+        self.background_manager = _BG(self)
         self.logging_manager.debug("INIT", "BackgroundManager 初始化完成")
 
         self.modules = {
@@ -497,6 +498,10 @@ class MainWindow(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     app.setApplicationName("灵眸")
+
+    icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon", "autodoor.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
 
     window = MainWindow()
     window.run()
