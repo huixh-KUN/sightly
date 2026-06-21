@@ -43,6 +43,14 @@ class AccentLabel(QLabel):
         self.setObjectName("accentText")
 
 
+class TextButton(QPushButton):
+    """通用文字按钮，不限定宽度，文字自适应"""
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMinimumWidth(60)
+
+
 class PrimaryButton(QPushButton):
     def __init__(self, text="", parent=None):
         super().__init__(text, parent)

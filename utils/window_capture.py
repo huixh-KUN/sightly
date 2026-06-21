@@ -1,4 +1,5 @@
 import ctypes
+import logging
 import win32gui
 import win32ui
 import win32con
@@ -208,26 +209,26 @@ def capture_window(hwnd: int) -> Optional[Image.Image]:
         try:
             if saveBitMap:
                 win32gui.DeleteObject(saveBitMap.GetHandle())
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).error(f"释放位图资源失败: {e}")
         
         try:
             if saveDC:
                 saveDC.DeleteDC()
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).error(f"释放设备上下文失败: {e}")
         
         try:
             if mfcDC:
                 mfcDC.DeleteDC()
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).error(f"释放MFC设备上下文失败: {e}")
         
         try:
             if hwndDC:
                 win32gui.ReleaseDC(hwnd, hwndDC)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).error(f"释放窗口设备上下文失败: {e}")
 
 
 def capture_window_region(hwnd: int, region: tuple) -> Optional[Image.Image]:

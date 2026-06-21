@@ -1,15 +1,11 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo   AutoDoor Standard Build Script
-echo   Input Method: PyAutoGUI
+echo   Sightly Build Script
 echo ========================================
 echo.
 
-set AUTODOOR_USE_DD=0
-
-if exist "build" rmdir /s /q "build"
-if exist "dist\autodoor" rmdir /s /q "dist\autodoor"
+set SIGHTLY_USE_DD=0
 
 echo [1/3] Checking dependencies...
 pip show pyinstaller >nul 2>&1
@@ -19,15 +15,20 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/3] Building standard version...
-rem TODO: 需要新的 .spec 文件
-echo Need to create new spec file for main.py
-echo pyinstaller main.spec --noconfirm
+if "%1"=="--clean" (
+    echo Cleaning build cache...
+    if exist "build" rmdir /s /q "build"
+    if exist "dist\Sightly" rmdir /s /q "dist\Sightly"
+    echo [2/3] Building standard version (full rebuild)...
+) else (
+    echo [2/3] Building standard version (using cache)...
+)
+
+pyinstaller sightly.spec --noconfirm
 
 echo.
 echo [3/3] Build complete!
 echo.
-echo Output: dist\autodoor\
-echo Input Method: PyAutoGUI (Standard)
+echo Output: dist\Sightly\
 echo.
 pause

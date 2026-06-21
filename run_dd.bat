@@ -4,12 +4,12 @@ chcp 65001 >nul
 cd /d "%~dp0"
 
 echo ========================================
-echo   AutoDoor - DD Version
+echo   Sightly - DD Version
 echo   Input Method: DD Virtual Keyboard
 echo ========================================
 echo.
 
-set AUTODOOR_USE_DD=1
+set SIGHTLY_USE_DD=1
 
 if not exist "drivers\DD64.dll" (
     echo ERROR: DD64.dll not found in drivers folder
@@ -20,7 +20,7 @@ if not exist "drivers\DD64.dll" (
     exit /b 1
 )
 
-echo Starting AutoDoor with DD Virtual Keyboard...
+echo Starting Sightly with DD Virtual Keyboard...
 echo.
 
 python main.py

@@ -210,8 +210,8 @@ class UIProxy:
         if hasattr(self.app, 'root') and self.app.root:
             try:
                 self.app.root.update_idletasks()
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("PROXY", f"更新进度状态失败: {e}")
     
     def hide_progress(self):
         if hasattr(self.app, 'status_var'):
@@ -219,8 +219,8 @@ class UIProxy:
         if hasattr(self.app, 'root') and self.app.root:
             try:
                 self.app.root.update_idletasks()
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("PROXY", f"清除进度状态失败: {e}")
 
 
 class BackgroundProxy:

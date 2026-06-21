@@ -1,12 +1,12 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QFrame,
+    QScrollArea, QFrame,
     QSpinBox, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal
 
 from ui.theme import Colors
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel
+from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel, TextButton
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
 from core.config import ConfigVar
@@ -67,6 +67,7 @@ class TimedPanel(QWidget):
         if group in self.groups:
             self.groups.remove(group)
             self.scroll_layout.removeWidget(group)
+            group.setParent(None)
             group.deleteLater()
             self._renumber()
 
@@ -76,6 +77,13 @@ class TimedPanel(QWidget):
 
     def collect_config(self):
         return [g.collect_config() for g in self.groups]
+
+    def set_config(self, config_list):
+        for g in self.groups[:]:
+            self._delete_group(g)
+        for cfg in config_list:
+            self.add_group()
+            self.groups[-1].set_config(cfg)
 
 
 class TimedGroupWidget(GroupCard):
@@ -162,15 +170,33 @@ class TimedGroupWidget(GroupCard):
         pos_row.setSpacing(12)
         self.pos_label = InfoLabel("未选择")
         pos_row.addWidget(self.pos_label)
-        pos_btn = QPushButton("选择位置")
-        pos_btn.setFixedWidth(90)
-        pos_btn.setCursor(Qt.PointingHandCursor)
+        pos_btn = TextButton("选择位置")
         pos_btn.clicked.connect(self._select_position)
         pos_row.addWidget(pos_btn)
         pos_row.addStretch()
         grid.addLayout(pos_row, 3, 0, 1, 3)
 
         layout.addLayout(grid)
+
+    def set_config(self, cfg):
+        self.toggle.setChecked(cfg.get("enabled", False))
+        try:
+            self.interval_spin.setValue(int(cfg.get("interval", 10)))
+            self.delay_min_spin.setValue(int(cfg.get("delay_min", 300)))
+            self.delay_max_spin.setValue(int(cfg.get("delay_max", 500)))
+            self.offset_spin.setValue(int(cfg.get("click_offset", 0)))
+            self._pos_x = int(cfg.get("position_x", 0))
+            self._pos_y = int(cfg.get("position_y", 0))
+        except (ValueError, TypeError):
+            pass
+        if self._pos_x or self._pos_y:
+            self.pos_label.setText(f"({self._pos_x}, {self._pos_y})")
+            self.pos_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        key = cfg.get("key", "")
+        if key:
+            self.key_input.set_key(key)
+        self.click_toggle.setChecked(cfg.get("click_enabled", False))
+        self.alarm_toggle.setChecked(cfg.get("alarm", False))
 
     def set_title(self, index):
         self.index = index

@@ -12,7 +12,7 @@ from core.priority_lock import PriorityLock
 from .key_mapping import KEY_NAME_MAPPING, get_pyautogui_key, get_dd_code
 
 
-USE_DD_INPUT = os.environ.get('AUTODOOR_USE_DD', '0') == '1'
+USE_DD_INPUT = os.environ.get('SIGHTLY_USE_DD', '0') == '1'
 
 _dd_input_instance = None
 _pyautogui_input_instance = None
@@ -25,8 +25,8 @@ def _get_dd_input(app=None):
         try:
             from .dd_input import DDVirtualInput
             _dd_input_instance = DDVirtualInput(app=app)
-        except Exception:
-            pass
+        except Exception as e:
+            app.logging_manager.error("INPUT", f"加载DD输入模块失败: {e}")
     return _dd_input_instance
 
 
@@ -37,8 +37,8 @@ def _get_pyautogui_input(app=None):
         try:
             from .pyautogui_input import PyAutoGUIInput
             _pyautogui_input_instance = PyAutoGUIInput(app=app)
-        except Exception:
-            pass
+        except Exception as e:
+            app.logging_manager.error("INPUT", f"加载PyAutoGUI输入模块失败: {e}")
     return _pyautogui_input_instance
 
 

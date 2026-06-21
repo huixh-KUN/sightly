@@ -1,12 +1,12 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QFrame,
+    QScrollArea, QFrame,
     QSpinBox, QGridLayout, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
 
 from ui.theme import Colors
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel
+from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel, TextButton
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
 from core.config import ConfigVar
@@ -67,6 +67,7 @@ class ImagePanel(QWidget):
         if group in self.groups:
             self.groups.remove(group)
             self.scroll_layout.removeWidget(group)
+            group.setParent(None)
             group.deleteLater()
             self._renumber()
 
@@ -76,6 +77,14 @@ class ImagePanel(QWidget):
 
     def collect_config(self):
         return [g.collect_config() for g in self.groups]
+
+    def set_config(self, config_list):
+        for g in self.groups[:]:
+            self._delete_group(g)
+        for cfg in config_list:
+            self.add_group()
+            self.groups[-1].set_config(cfg)
+
 class ImageGroupWidget(GroupCard):
     delete_requested = Signal()
 
@@ -110,9 +119,7 @@ class ImageGroupWidget(GroupCard):
         grid.addWidget(QLabel("检测区域"), 0, 0)
         self.region_label = InfoLabel("未选择")
         grid.addWidget(self.region_label, 0, 1)
-        region_btn = QPushButton("选择区域")
-        region_btn.setFixedWidth(90)
-        region_btn.setCursor(Qt.PointingHandCursor)
+        region_btn = TextButton("选择区域")
         region_btn.clicked.connect(self._select_region)
         grid.addWidget(region_btn, 0, 2)
 
@@ -121,14 +128,10 @@ class ImageGroupWidget(GroupCard):
         template_row.setSpacing(8)
         self.template_label = InfoLabel("未选择")
         template_row.addWidget(self.template_label, 1)
-        template_btn = QPushButton("选择图片")
-        template_btn.setFixedWidth(90)
-        template_btn.setCursor(Qt.PointingHandCursor)
+        template_btn = TextButton("选择图片")
         template_btn.clicked.connect(self._select_template)
         template_row.addWidget(template_btn)
-        screenshot_btn = QPushButton("截图")
-        screenshot_btn.setFixedWidth(70)
-        screenshot_btn.setCursor(Qt.PointingHandCursor)
+        screenshot_btn = TextButton("截图")
         screenshot_btn.clicked.connect(self._capture_template)
         template_row.addWidget(screenshot_btn)
         grid.addLayout(template_row, 1, 1, 1, 2)
@@ -197,6 +200,34 @@ class ImageGroupWidget(GroupCard):
 
         layout.addLayout(grid)
 
+    def set_config(self, cfg):
+        self.toggle.setChecked(cfg.get("enabled", False))
+        region = cfg.get("region")
+        if region:
+            self.region = tuple(region)
+            x1, y1, x2, y2 = self.region
+            self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
+            self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        ref = cfg.get("reference_image", "")
+        if ref and os.path.exists(ref):
+            self.template_path = ref
+            self.template_label.setText(ref.split("/")[-1].split("\\")[-1])
+            self.template_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        try:
+            self.threshold_spin.setValue(int(cfg.get("threshold", 80)))
+            self.interval_spin.setValue(int(cfg.get("interval", 5)))
+            self.pause_spin.setValue(int(cfg.get("pause", 180)))
+            self.delay_min_spin.setValue(int(cfg.get("delay_min", 300)))
+            self.delay_max_spin.setValue(int(cfg.get("delay_max", 500)))
+            self.offset_spin.setValue(int(cfg.get("click_offset", 0)))
+        except (ValueError, TypeError):
+            pass
+        key = cfg.get("key", "")
+        if key:
+            self.key_input.set_key(key)
+        self.click_toggle.setChecked(cfg.get("click", False))
+        self.alarm_toggle.setChecked(cfg.get("alarm", False))
+
     def set_title(self, index):
         self.index = index
         self.title_label.setText(f"检测组 {index + 1}")
@@ -243,7 +274,7 @@ class ImageGroupWidget(GroupCard):
 
     def _on_template_captured(self, pixmap):
         import os, tempfile
-        tmp = os.path.join(tempfile.gettempdir(), f"autodoor_template_{self.index}.png")
+        tmp = os.path.join(tempfile.gettempdir(), f"sightly_template_{self.index}.png")
         pixmap.save(tmp)
         self.template_label.setText(f"截图 ({pixmap.width()}x{pixmap.height()})")
         self.template_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")

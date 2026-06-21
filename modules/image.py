@@ -80,8 +80,8 @@ class ImageDetection:
                         self.execute_commands(match_result)
                         self.last_trigger_time = current_time
                         time.sleep(5)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("IMAGE", f"图像检测循环异常: {e}")
             finally:
                 self.is_running = False
                 _set_status_text(self.app, "图像检测已停止")
@@ -111,7 +111,8 @@ class ImageDetection:
                 self.last_match_pos = (abs_x, abs_y)
                 return (abs_x, abs_y, score)
             return None
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("IMAGE", f"图像检测失败: {e}")
             return None
     
     def execute_commands(self, match_result):
@@ -151,8 +152,8 @@ class ImageDetection:
             try:
                 temp_alarm_var = ConfigVar(True)
                 self.app.alarm_module.play_alarm_sound(temp_alarm_var)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("IMAGE", f"播放报警声音失败: {e}")
         
         if self.commands:
             from modules.script import ScriptExecutor
@@ -213,8 +214,8 @@ class ImageDetectionManager:
                 preview = group["image_preview"]
                 if isinstance(preview, QLabel):
                     preview.setPixmap(pixmap.scaled(60, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("IMAGE", f"更新图像预览失败: {e}")
     
     def start_detection(self, group_index):
         from PySide6.QtWidgets import QMessageBox

@@ -52,8 +52,8 @@ class ColorRecognition:
                     if self.recognize_color():
                         self.execute_commands()
                         time.sleep(self.interval)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("COLOR", f"颜色识别循环异常: {e}")
             finally:
                 self.is_running = False
                 _set_status_text(self.app, "颜色识别已停止")
@@ -124,8 +124,8 @@ class ColorRecognitionManager:
             if hasattr(self.app, 'color_display'):
                 try:
                     self.app.color_display.configure(fg_color=f"#{r:02x}{g:02x}{b:02x}")
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("COLOR", f"更新颜色显示失败: {e}")
         
         from ui.utils import create_color_picker
         create_color_picker(self.app, on_color_selected, self.app.logging_manager.log_message)

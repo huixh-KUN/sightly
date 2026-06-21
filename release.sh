@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# AutoDoor OCR 自动发布脚本
+# Sightly 自动发布脚本
 # 用于在本地设置版本号，创建标签并推送，触发GitHub Actions自动构建和发布
 
-echo "=== AutoDoor OCR 自动发布脚本 ==="
+echo "=== Sightly 自动发布脚本 ==="
 
 # 检查git状态
 echo "1. 检查git状态..."
@@ -14,17 +14,17 @@ fi
 
 # 获取当前版本号
 echo "2. 获取当前版本信息..."
-current_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "autodoor_V1.0")
+current_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "sightly_V1.0")
 echo "当前版本标签：$current_tag"
 
 # 提示输入新的版本号
 echo "3. 请输入新的版本号："
-echo "   格式示例：autodoor_V1.1 或 autodoor_V2.0"
+echo "   格式示例：sightly_V1.1 或 sightly_V2.0"
 read -p "新版本号：" new_tag
 
 # 验证版本号格式
-if [[ ! $new_tag =~ ^autodoor_V[0-9]+\.[0-9]+$ ]]; then
-    echo "错误：版本号格式不正确，请使用 autodoor_VX.Y 格式（X和Y为数字）"
+if [[ ! $new_tag =~ ^sightly_V[0-9]+\.[0-9]+$ ]]; then
+    echo "错误：版本号格式不正确，请使用 sightly_VX.Y 格式（X和Y为数字）"
     exit 1
 fi
 
@@ -53,6 +53,6 @@ echo "✅ 代码已推送成功！"
 # 完成提示
 echo "\n=== 发布流程已启动 ==="
 echo "GitHub Actions正在构建并发布版本 $new_tag..."
-echo "请访问 https://github.com/[your-username]/autodoor/actions 查看构建状态"
+echo "请访问 https://github.com/[your-username]/sightly/actions 查看构建状态"
 echo "构建完成后，发布包将自动上传到 GitHub Releases"
 echo "\n发布成功！🎉"

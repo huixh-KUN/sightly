@@ -72,7 +72,7 @@ class ScriptModule:
         self.app.logging_manager.log_message("脚本已启动")
         if start_color_recognition:
             try:
-                if self.app.module_state.is_enabled('color'):
+                if self.app.app_state.is_module_enabled('color'):
                     self.app.color_manager.start_color_recognition()
             except Exception:
                 pass
@@ -103,7 +103,7 @@ class ScriptModule:
         self.app.logging_manager.log_message("脚本已启动")
         if start_color_recognition:
             try:
-                if self.app.module_state.is_enabled('color'):
+                if self.app.app_state.is_module_enabled('color'):
                     self.app.color_manager.start_color_recognition()
                     self.app.logging_manager.log_message("颜色识别已自动启动")
             except Exception:

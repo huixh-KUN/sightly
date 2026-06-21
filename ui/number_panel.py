@@ -1,12 +1,12 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QFrame,
+    QScrollArea, QFrame,
     QSpinBox, QDoubleSpinBox, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal
 
 from ui.theme import Colors
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel
+from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel, TextButton
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
 from core.config import ConfigVar
@@ -67,6 +67,7 @@ class NumberPanel(QWidget):
         if group in self.groups:
             self.groups.remove(group)
             self.scroll_layout.removeWidget(group)
+            group.setParent(None)
             group.deleteLater()
             self._renumber()
 
@@ -76,6 +77,13 @@ class NumberPanel(QWidget):
 
     def collect_config(self):
         return [g.collect_config() for g in self.groups]
+
+    def set_config(self, config_list):
+        for g in self.groups[:]:
+            self._delete_group(g)
+        for cfg in config_list:
+            self.add_group()
+            self.groups[-1].set_config(cfg)
 
 
 class NumberGroupWidget(GroupCard):
@@ -111,9 +119,7 @@ class NumberGroupWidget(GroupCard):
         grid.addWidget(QLabel("识别区域"), 0, 0)
         self.region_label = InfoLabel("未选择")
         grid.addWidget(self.region_label, 0, 1)
-        region_btn = QPushButton("选择区域")
-        region_btn.setFixedWidth(90)
-        region_btn.setCursor(Qt.PointingHandCursor)
+        region_btn = TextButton("选择区域")
         region_btn.clicked.connect(self._select_region)
         grid.addWidget(region_btn, 0, 2)
 
@@ -158,6 +164,26 @@ class NumberGroupWidget(GroupCard):
         grid.addWidget(self.alarm_toggle, 4, 1, 1, 2)
 
         layout.addLayout(grid)
+
+    def set_config(self, cfg):
+        self.toggle.setChecked(cfg.get("enabled", False))
+        region = cfg.get("region")
+        if region:
+            self.region = tuple(region)
+            x1, y1, x2, y2 = self.region
+            self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
+            self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        try:
+            self.threshold_spin.setValue(int(cfg.get("threshold", 500)))
+            self.confidence_spin.setValue(float(cfg.get("confidence_threshold", 0.3)))
+            self.delay_min_spin.setValue(int(cfg.get("delay_min", 100)))
+            self.delay_max_spin.setValue(int(cfg.get("delay_max", 200)))
+        except (ValueError, TypeError):
+            pass
+        key = cfg.get("key", "")
+        if key:
+            self.key_input.set_key(key)
+        self.alarm_toggle.setChecked(cfg.get("alarm", False))
 
     def set_title(self, index):
         self.index = index

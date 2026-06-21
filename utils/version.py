@@ -126,8 +126,8 @@ class VersionChecker:
                 with open(config_file_path, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                 self.ignored_version = config.get('update', {}).get('ignored_version')
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("VERSION", f"加载忽略版本配置失败: {e}")
 
     def get_current_version(self):
         return "1.0.0"
@@ -164,8 +164,8 @@ class VersionChecker:
                     from datetime import datetime
                     release_date_obj = datetime.fromisoformat(release_date.replace('Z', '+00:00'))
                     release_date_str = release_date_obj.strftime('%Y-%m-%d')
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("VERSION", f"解析发布日期失败: {e}")
 
             download_url = 'https://my.feishu.cn/wiki/GqoWwddPMizkLYkogn8cdoynn3c?from=from_copylink'
 

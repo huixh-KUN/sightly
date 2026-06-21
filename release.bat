@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 
-echo === AutoDoor OCR 自动发布脚本 ===
+echo === Sightly 自动发布脚本 ===
 echo.
 
 rem 检查git状态
@@ -18,18 +18,18 @@ if not "%git_status%" == "" (
 rem 获取当前版本号
 echo 2. 获取当前版本信息...
 for /f "tokens=*" %%i in ('git describe --tags --abbrev^=0 2^>nul') do set current_tag=%%i
-if "%current_tag%" == "" set current_tag=autodoor_V1.0
+if "%current_tag%" == "" set current_tag=sightly_V1.0
 echo 当前版本标签：%current_tag%
 
 rem 提示输入新的版本号
 echo 3. 请输入新的版本号：
-echo    格式示例：autodoor_V1.1 或 autodoor_V2.0
+echo    格式示例：sightly_V1.1 或 sightly_V2.0
 set /p new_tag=新版本号：
 
 rem 验证版本号格式
-echo %new_tag% | findstr /r "^autodoor_V[0-9][0-9]*\.[0-9][0-9]*$" >nul
+echo %new_tag% | findstr /r "^sightly_V[0-9][0-9]*\.[0-9][0-9]*$" >nul
 if errorlevel 1 (
-    echo 错误：版本号格式不正确，请使用 autodoor_VX.Y 格式（X和Y为数字）
+    echo 错误：版本号格式不正确，请使用 sightly_VX.Y 格式（X和Y为数字）
     pause
     exit /b 1
 )
@@ -62,7 +62,7 @@ echo ✅ 代码已推送成功！
 echo.
 echo === 发布流程已启动 ===
 echo GitHub Actions正在构建并发布版本 %new_tag%...
-echo 请访问 https://github.com/[your-username]/autodoor/actions 查看构建状态
+echo 请访问 https://github.com/[your-username]/sightly/actions 查看构建状态
 echo 构建完成后，发布包将自动上传到 GitHub Releases
 echo.
 echo 发布成功！🎉

@@ -1,6 +1,8 @@
 import sys
 import os
 
+from PySide6.QtCore import QTimer
+
 PYINPUT_AVAILABLE = False
 try:
     from pynput import keyboard as pynput_keyboard
@@ -55,26 +57,20 @@ def get_key_name(key):
         return str(key)
 
 def handle_global_key_press(app, key):
-    """处理全局按键事件
-    Args:
-        app: 应用实例
-        key: 按键对象
-    """
     try:
         key_name = get_key_name(key)
+        ks = app.app_state
 
-        # 检查是否是开始快捷键
-        if key_name == app.start_shortcut_var.get().upper() and not app.is_running:
-            app.root.after(0, app.start_all)
-        # 检查是否是结束快捷键
-        if key_name == app.stop_shortcut_var.get().upper() and app.is_running:
-            app.root.after(0, app.stop_all)
-        if key_name == app.record_hotkey_var.get().upper():
-            app.root.after(0, lambda: (
-                app.script.start_recording() if not hasattr(app, 'script_executor') or not getattr(app.script_executor, 'is_recording', False) else app.script.stop_recording()
+        if key_name == ks.start_shortcut.upper() and not app.is_running:
+            QTimer.singleShot(0, app._on_start_all)
+        if key_name == ks.stop_shortcut.upper() and app.is_running:
+            QTimer.singleShot(0, app._on_stop_all)
+        if key_name == ks.record_hotkey.upper():
+            QTimer.singleShot(0, lambda: (
+                app.script_module.start_recording() if not hasattr(app, 'script_executor') or not getattr(app.script_executor, 'is_recording', False) else app.script_module.stop_recording()
             ))
     except Exception as e:
-        app.logging_manager.log_message(f"全局快捷键处理错误: {str(e)}")
+        app.logging_manager.error("HOTKEY", f"全局快捷键处理错误: {e}")
 
 def setup_global_shortcuts(app):
     """设置全局快捷键
@@ -93,18 +89,12 @@ def setup_global_shortcuts(app):
             app.logging_manager.log_message("全局快捷键监听已启动 (使用pynput)")
             return True
         except Exception as e:
-            app.logging_manager.log_message(f"pynput全局快捷键设置失败: {str(e)}")
+            app.logging_manager.error("HOTKEY", f"pynput 全局快捷键设置失败: {e}")
     return False
 
 def setup_shortcuts(app):
-    """设置快捷键绑定
-    Args:
-        app: 应用实例
-    """
-    # 停止旧的全局键盘监听器（如果存在）
     stop_old_listener(app)
 
-    # 只使用全局快捷键
     if setup_global_shortcuts(app):
         app.logging_manager.log_message("全局快捷键设置成功")
     else:

@@ -324,8 +324,8 @@ class BackgroundMonitor:
             try:
                 temp_alarm_var = ConfigVar(True)
                 self.app.alarm_module.play_alarm_sound(temp_alarm_var)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("BG", f"播放报警声音失败: {e}")
         
         # 如果只设置了报警，无需切换窗口
         if not self.trigger_click and not self.trigger_key:

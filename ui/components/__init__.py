@@ -1,5 +1,4 @@
 from ui.components.switch_button import SwitchButton
-from ui.components.module_state import ModuleStateController
 from ui.components.module_card import ModuleCard
 from ui.components.screenshot import ScreenCaptureOverlay
 from ui.components.template_manager import TemplateManager

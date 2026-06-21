@@ -4,4 +4,4 @@ DD输入初始化钩子
 """
 import os
 
-os.environ['AUTODOOR_USE_DD'] = '1'
+os.environ['SIGHTLY_USE_DD'] = '1'

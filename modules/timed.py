@@ -195,13 +195,13 @@ class TimedModule:
             if hasattr(self.app, 'save_config') and callable(self.app.save_config):
                 try:
                     self.app.save_config()
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("TIMED", f"保存定时配置失败: {e}")
         if hasattr(self, '_pos_callback') and self._pos_callback:
             try:
                 self._pos_callback(pos_x, pos_y)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("TIMED", f"位置回调失败: {e}")
             self._pos_callback = None
         self._cancel_selection()
 
@@ -209,6 +209,6 @@ class TimedModule:
         if hasattr(self.app, 'cancel_selection') and callable(self.app.cancel_selection):
             try:
                 self.app.cancel_selection()
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("TIMED", f"取消选择失败: {e}")
         self.app.is_selecting = False

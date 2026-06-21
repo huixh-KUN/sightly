@@ -1,13 +1,15 @@
+import os
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QScrollArea, QFrame, QLineEdit,
+    QScrollArea, QFrame, QLineEdit,
     QSpinBox, QGridLayout,
     QFileDialog, QColorDialog
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel
+from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel, TextButton
 from ui.components import ComboBox
 from ui.components import Toggle
 from ui.components import TemplatePicker, KeyCaptureWidget, WindowSelector
@@ -89,6 +91,7 @@ class BackgroundPanel(QWidget):
         if group in self.groups:
             self.groups.remove(group)
             self.scroll_layout.removeWidget(group)
+            group.setParent(None)
             group.deleteLater()
             self._renumber()
 
@@ -98,6 +101,14 @@ class BackgroundPanel(QWidget):
 
     def collect_config(self):
         return [g.collect_config() for g in self.groups]
+
+    def set_config(self, config_list):
+        for g in self.groups[:]:
+            self._delete_group(g)
+        for cfg in config_list:
+            mon_type = cfg.get("type", "ocr")
+            self.add_group(mon_type)
+            self.groups[-1].set_config(cfg)
 
     def _on_window_selected(self, hwnd, title):
         self.app.background_manager.set_target_window(hwnd)
@@ -143,9 +154,7 @@ class BackgroundGroupWidget(GroupCard):
         grid.addWidget(QLabel("监控区域"), 0, 0)
         self.region_label = InfoLabel("未选择")
         grid.addWidget(self.region_label, 0, 1)
-        region_btn = QPushButton("选择区域")
-        region_btn.setFixedWidth(90)
-        region_btn.setCursor(Qt.PointingHandCursor)
+        region_btn = TextButton("选择区域")
         region_btn.clicked.connect(self._select_region)
         grid.addWidget(region_btn, 0, 2)
 
@@ -189,9 +198,7 @@ class BackgroundGroupWidget(GroupCard):
             self.color_hex.setPlaceholderText("#RRGGBB")
             self.color_hex.setMaxLength(7)
             color_layout.addWidget(self.color_hex)
-            color_btn = QPushButton("取色")
-            color_btn.setFixedWidth(60)
-            color_btn.setCursor(Qt.PointingHandCursor)
+            color_btn = TextButton("取色")
             color_btn.clicked.connect(self._pick_color)
             color_layout.addWidget(color_btn)
             grid.addLayout(color_layout, 1, 1, 1, 2)
@@ -251,6 +258,52 @@ class BackgroundGroupWidget(GroupCard):
 
         layout.addLayout(grid)
 
+    def set_config(self, cfg):
+        self.toggle.setChecked(cfg.get("enabled", False))
+        region = cfg.get("region")
+        if region:
+            self.region = tuple(region)
+            x1, y1, x2, y2 = self.region
+            self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
+            self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        try:
+            self.interval_spin.setValue(int(cfg.get("interval", 3)))
+            self.pause_spin.setValue(int(cfg.get("pause", 180)))
+            self.offset_spin.setValue(int(cfg.get("click_offset", 0)))
+        except (ValueError, TypeError):
+            pass
+        key = cfg.get("key", "")
+        if key:
+            self.key_input.set_key(key)
+        self.click_toggle.setChecked(cfg.get("click_enabled", False))
+        self.alarm_toggle.setChecked(cfg.get("alarm", False))
+
+        if self.monitor_type == "ocr":
+            self.keywords_input.setText(cfg.get("keywords", ""))
+            lang = cfg.get("language", "简体中文")
+            idx = self.lang_combo.findText(lang)
+            if idx >= 0:
+                self.lang_combo.setCurrentIndex(idx)
+        elif self.monitor_type == "image":
+            try:
+                self.threshold_spin.setValue(int(cfg.get("threshold", 80)))
+            except (ValueError, TypeError):
+                pass
+            ref = cfg.get("reference_image", "")
+            if ref and os.path.exists(ref):
+                pixmap = QPixmap(ref)
+                if not pixmap.isNull():
+                    self.template_pixmap = pixmap
+                    self.template_picker.set_pixmap(pixmap)
+        elif self.monitor_type == "color":
+            tc = cfg.get("target_color")
+            if tc and len(tc) == 3:
+                self.color_hex.setText(f"#{tc[0]:02x}{tc[1]:02x}{tc[2]:02x}")
+            try:
+                self.tolerance_spin.setValue(int(cfg.get("tolerance", 30)))
+            except (ValueError, TypeError):
+                pass
+
     def set_title(self, index):
         self.index = index
         type_names = {"ocr": "OCR", "image": "图像", "color": "颜色"}
@@ -269,8 +322,8 @@ class BackgroundGroupWidget(GroupCard):
                     window_size = get_window_size(hwnd)
                     if window_size:
                         region_ratio = RelativeCoordinate.pixel_to_ratio(self.region, window_size)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("BG", f"获取窗口大小失败: {e}")
 
         cfg = {
             "enabled": ConfigVar(self.toggle.isChecked()),
@@ -325,8 +378,8 @@ class BackgroundGroupWidget(GroupCard):
                 y1 -= win_top
                 x2 -= win_left
                 y2 -= win_top
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("BG", f"坐标转换失败: {e}")
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
         self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")

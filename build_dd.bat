@@ -1,12 +1,12 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo   AutoDoor DD Build Script
+echo   Sightly DD Build Script
 echo   Input Method: DD Virtual Keyboard
 echo ========================================
 echo.
 
-set AUTODOOR_USE_DD=1
+set SIGHTLY_USE_DD=1
 
 if not exist "drivers\DD64.dll" (
     echo ERROR: DD64.dll not found
@@ -16,10 +16,6 @@ if not exist "drivers\DD64.dll" (
     exit /b 1
 )
 
-if exist "build" rmdir /s /q "build"
-if exist "dist\autodoor_dd" rmdir /s /q "dist\autodoor_dd"
-if exist "dist\main" rmdir /s /q "dist\main"
-
 echo [1/3] Checking dependencies...
 pip show pyinstaller >nul 2>&1
 if errorlevel 1 (
@@ -28,15 +24,21 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/3] Building DD version...
-rem TODO: 需要新的 .spec 文件
-echo Need to create new spec file for main.py
-echo pyinstaller main.spec --noconfirm
+if "%1"=="--clean" (
+    echo Cleaning build cache...
+    if exist "build" rmdir /s /q "build"
+    if exist "dist\Sightly_dd" rmdir /s /q "dist\Sightly_dd"
+    echo [2/3] Building DD version (full rebuild)...
+) else (
+    echo [2/3] Building DD version (using cache)...
+)
+
+pyinstaller sightly.spec --noconfirm
 
 echo.
 echo [3/3] Build complete!
 echo.
-echo Output: dist\main\
+echo Output: dist\Sightly_dd\
 echo Input Method: DD Virtual Keyboard (DD Version)
 echo.
 echo NOTE: DD version may be flagged by antivirus software

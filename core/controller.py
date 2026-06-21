@@ -1,6 +1,6 @@
 """
 模块控制器，负责统一管理各功能模块的启动和停止
-（PySide6 迁移后仅用于旧版 autodoor.py 兼容路径）
+（PySide6 迁移后仅用于旧版兼容路径）
 """
 
 
@@ -45,8 +45,8 @@ class ModuleController:
             color = '#00e676' if is_running else '#9CA3AF'
             try:
                 self.app.module_indicators[module_key].configure(text_color=color)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("CTRL", f"更新指示灯 {module_key} 失败: {e}")
 
     def start_all(self):
         """开始运行"""
@@ -58,18 +58,18 @@ class ModuleController:
             for switch in self.app.module_switches.values():
                 try:
                     switch.configure(state="disabled")
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("CTRL", f"禁用模块开关失败: {e}")
 
         try:
             self.app.global_start_btn.configure(state="disabled")
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CTRL", f"禁用全局开始按钮失败: {e}")
 
         try:
             self.app.global_stop_btn.configure(state="normal")
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CTRL", f"启用全局停止按钮失败: {e}")
         
         self._toggle_all_ui_state("disabled")
 
@@ -144,18 +144,18 @@ class ModuleController:
             for switch in self.app.module_switches.values():
                 try:
                     switch.configure(state="normal")
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("CTRL", f"恢复模块开关失败: {e}")
 
         try:
             self.app.global_start_btn.configure(state="normal")
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CTRL", f"恢复全局开始按钮失败: {e}")
 
         try:
             self.app.global_stop_btn.configure(state="disabled")
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CTRL", f"禁用全局停止按钮失败: {e}")
         
         self._toggle_all_ui_state("normal")
         
@@ -168,8 +168,8 @@ class ModuleController:
         try:
             for child in root.winfo_children():
                 self._toggle_widget_state(child, state)
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CTRL", f"遍历子组件失败: {e}")
     
     def _toggle_widget_state(self, widget, state):
         stop_btn = getattr(self.app, 'global_stop_btn', None)
@@ -188,11 +188,11 @@ class ModuleController:
         
         try:
             widget.configure(state=state)
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CTRL", f"配置组件状态失败: {e}")
         
         try:
             for child in widget.winfo_children():
                 self._toggle_widget_state(child, state)
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("CTRL", f"遍历子组件失败: {e}")

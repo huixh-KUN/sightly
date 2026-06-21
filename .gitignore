@@ -10,8 +10,7 @@ dist/
 build/
 *.manifest
 *.spec
-!autodoor.spec
-!autodoor_dd.spec
+!sightly.spec
 
 # Virtual Environment
 /venv/
@@ -62,7 +61,8 @@ ehthumbs.db
 Desktop.ini
 
 # User config
-autodoor_config.json
+sightly_config.json
+/workspace/
 
 # Backup files
 *.bak
