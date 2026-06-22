@@ -58,6 +58,19 @@ class WindowSelector(QWidget):
     def title(self):
         return self._title
 
+    def set_window_by_hwnd(self, hwnd: int) -> None:
+        """按句柄设置窗口（恢复用），不发射信号"""
+        try:
+            import win32gui
+            title = win32gui.GetWindowText(hwnd)
+        except Exception:
+            title = ""
+        self._hwnd = hwnd
+        self._title = title
+        self._status.setText(f"已选择: {title}")
+        self._status.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self._capture_preview(hwnd)
+
     def _open_window_list(self):
         try:
             import win32gui

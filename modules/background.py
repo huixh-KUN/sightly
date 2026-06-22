@@ -4,8 +4,10 @@ import time
 from typing import Optional, Dict, Any
 
 from utils.window_capture import (
-    capture_window_region, find_window_by_title, 
-    get_window_rect, get_window_title
+    capture_window_region, find_window_by_title,
+    find_window_by_class_and_process,
+    get_window_rect, get_window_title,
+    get_window_class_name, get_window_process_name,
 )
 from utils.quick_switch import QuickSwitchBackend
 from utils.coordinate import RelativeCoordinate, WindowCoordinate
@@ -470,6 +472,8 @@ class BackgroundManager:
         self.quick_switch = QuickSwitchBackend()
         self.target_hwnd: Optional[int] = None
         self.target_title: Optional[str] = None
+        self.window_class: Optional[str] = None
+        self.window_process: Optional[str] = None
     
     def find_target_window(self, keyword: str) -> tuple:
         """
@@ -490,9 +494,69 @@ class BackgroundManager:
         return (False, "未找到匹配的窗口")
     
     def set_target_window(self, hwnd: int) -> None:
-        """设置目标窗口"""
+        """设置目标窗口，自动采集类名和进程名"""
         self.target_hwnd = hwnd
         self.target_title = get_window_title(hwnd) if hwnd else None
+        self.window_class = get_window_class_name(hwnd) if hwnd else None
+        self.window_process = get_window_process_name(hwnd) if hwnd else None
+    
+    def auto_reconnect(self, window_class: str, window_process: str = None,
+                       window_title: str = None) -> bool:
+        """
+        按类名+进程名自动重连目标窗口
+
+        匹配策略（逐级回退）：
+          1. class_name + process_name 精确匹配
+          2. class_name 仅类名匹配
+          3. window_title 完整标题子串匹配（回退方案）
+
+        Args:
+            window_class: 窗口类名
+            window_process: 进程名，可选
+            window_title: 窗口标题，可选（用于回退匹配）
+
+        Returns:
+            bool: 是否成功重连
+        """
+        hwnd = find_window_by_class_and_process(window_class, window_process or "")
+        if not hwnd and window_class:
+            hwnd = find_window_by_class_and_process(window_class, "")
+        if not hwnd and window_title:
+            self._log("BG", f"auto_reconnect: 回退到标题匹配 title={window_title}")
+            import win32gui
+            kw = window_title.lower()
+            def enum_cb(h, _):
+                try:
+                    if win32gui.IsWindowVisible(h) and kw in win32gui.GetWindowText(h).lower():
+                        nonlocal hwnd
+                        hwnd = h
+                        return False
+                except Exception:
+                    pass
+                return True
+            try:
+                win32gui.EnumWindows(enum_cb, None)
+            except Exception:
+                pass
+        self._log("BG",
+            f"auto_reconnect: class={window_class}, process={window_process}, "
+            f"title={window_title}, found={hwnd}")
+        if hwnd:
+            self.set_target_window(hwnd)
+            return True
+        return False
+
+    def _log(self, tag, msg):
+        if hasattr(self.app, 'logging_manager'):
+            self.app.logging_manager.debug(tag, msg)
+    
+    def window_info(self) -> Dict[str, Any]:
+        """返回窗口标识信息，供配置持久化使用"""
+        return {
+            "window_class": self.window_class,
+            "window_process": self.window_process,
+            "window_title": self.target_title,
+        }
     
     def create_group(self, index: int, monitor_type: str = "ocr") -> BackgroundMonitor:
         """创建监控组"""

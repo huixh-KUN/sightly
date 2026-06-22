@@ -314,7 +314,10 @@ class MainWindow(QMainWindow):
                 elif panel_id == 'image':
                     self.image_groups = config
                 elif panel_id == 'background':
-                    self.background_groups = config
+                    if isinstance(config, dict):
+                        self.background_groups = config.get("groups", [])
+                    else:
+                        self.background_groups = config
                 elif panel_id == 'script':
                     self.script_config = config
                 elif panel_id == 'settings':
@@ -482,7 +485,8 @@ class MainWindow(QMainWindow):
 
     def _save_template_images(self, config):
         try:
-            bg_list = config.get("background", [])
+            bg_raw = config.get("background", [])
+            bg_list = bg_raw.get("groups", bg_raw) if isinstance(bg_raw, dict) else bg_raw
             if not self.app_state.current:
                 return
             for i, g in enumerate(bg_list):

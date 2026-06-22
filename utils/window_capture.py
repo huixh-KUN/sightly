@@ -281,3 +281,146 @@ def get_window_size(hwnd: int) -> Optional[Tuple[int, int]]:
         return (rect[2] - rect[0], rect[3] - rect[1])
     except Exception:
         return None
+
+
+def get_window_class_name(hwnd: int) -> Optional[str]:
+    """
+    获取窗口类名
+
+    Args:
+        hwnd: 窗口句柄
+
+    Returns:
+        str: 类名，失败返回 None
+    """
+    try:
+        return win32gui.GetClassName(hwnd)
+    except Exception:
+        return None
+
+
+def get_window_process_name(hwnd: int) -> Optional[str]:
+    """
+    获取窗口所属进程名（不含路径）
+
+    通过 GetWindowThreadProcessId + OpenProcess + GetModuleBaseName 获取。
+    优先用 PROCESS_QUERY_LIMITED_INFORMATION（Vista+），失败回退到 CreateToolhelp32Snapshot。
+
+    Args:
+        hwnd: 窗口句柄
+
+    Returns:
+        str: 进程名（如 "MuMuPlayer.exe"），失败返回 None
+    """
+    from ctypes import wintypes
+
+    try:
+        pid = wintypes.DWORD()
+        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if not pid.value:
+            return None
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        handle = ctypes.windll.kernel32.OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value
+        )
+        if handle:
+            try:
+                exe_name = ctypes.create_unicode_buffer(260)
+                size = wintypes.DWORD(260)
+                if ctypes.windll.kernel32.GetModuleBaseNameW(handle, None, exe_name, size):
+                    return exe_name.value
+            finally:
+                ctypes.windll.kernel32.CloseHandle(handle)
+
+        # 回退：通过 CreateToolhelp32Snapshot 枚举进程
+        return _get_process_name_by_pid(pid.value)
+    except Exception:
+        return None
+
+
+def _get_process_name_by_pid(pid: int) -> Optional[str]:
+    """通过 CreateToolhelp32Snapshot 按 PID 查进程名"""
+    from ctypes import wintypes
+
+    TH32CS_SNAPPROCESS = 0x00000002
+    MAX_PATH = 260
+
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.POINTER(wintypes.ULONG)),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", wintypes.LONG),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", wintypes.CHAR * MAX_PATH),
+        ]
+
+    try:
+        snapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot == ctypes.c_void_p(-1).value:
+            return None
+
+        try:
+            pe = PROCESSENTRY32W()
+            pe.dwSize = ctypes.sizeof(PROCESSENTRY32W)
+            if not ctypes.windll.kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
+                return None
+
+            while True:
+                if pe.th32ProcessID == pid:
+                    return pe.szExeFile.decode("utf-8", errors="replace")
+                if not ctypes.windll.kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
+                    break
+            return None
+        finally:
+            ctypes.windll.kernel32.CloseHandle(snapshot)
+    except Exception:
+        return None
+
+
+def find_window_by_class_and_process(class_name: str, process_name: str) -> Optional[int]:
+    """
+    通过类名+进程名查找窗口
+
+    枚举所有可见窗口，先按类名过滤，再按进程名过滤。
+    返回第一个匹配的窗口句柄。
+
+    Args:
+        class_name: 窗口类名
+        process_name: 进程名（不含路径）
+
+    Returns:
+        int: 窗口句柄，未找到返回 None
+    """
+    if not class_name:
+        return None
+
+    candidates = []
+
+    def enum_callback(hwnd, _):
+        if not win32gui.IsWindowVisible(hwnd):
+            return True
+
+        cls = win32gui.GetClassName(hwnd)
+        if cls and cls.lower() == class_name.lower():
+            if process_name:
+                proc = get_window_process_name(hwnd)
+                if proc and proc.lower() == process_name.lower():
+                    candidates.append(hwnd)
+                    return False  # 找到即停
+            else:
+                candidates.append(hwnd)
+                return False
+        return True
+
+    try:
+        win32gui.EnumWindows(enum_callback, None)
+    except Exception:
+        return None
+
+    return candidates[0] if candidates else None
