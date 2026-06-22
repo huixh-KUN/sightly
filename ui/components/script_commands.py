@@ -113,7 +113,7 @@ class MouseCommandCard(QFrame):
         row.addWidget(self._btn_combo)
         row.addSpacing(8)
         row.addWidget(QLabel("操作"))
-        self._action_combo = ComboBox(items=["Down", "Up"], width=90)
+        self._action_combo = ComboBox(items=["Down", "Up", "Click"], width=90)
         row.addWidget(self._action_combo)
         row.addWidget(QLabel("次数"))
         self._count_spin = QSpinBox()

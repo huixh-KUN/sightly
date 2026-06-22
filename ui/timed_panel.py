@@ -75,6 +75,9 @@ class TimedPanel(QWidget):
         for i, g in enumerate(self.groups):
             g.set_title(i)
 
+    def set_enabled(self, enabled):
+        super().setEnabled(enabled)
+
     def collect_config(self):
         return [g.collect_config() for g in self.groups]
 

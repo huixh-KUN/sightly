@@ -81,6 +81,9 @@ class OCRPanel(QWidget):
     def collect_config(self):
         return [g.collect_config() for g in self.groups]
 
+    def set_enabled(self, enabled):
+        super().setEnabled(enabled)
+
     def set_config(self, config_list):
         for g in self.groups[:]:
             self._delete_group(g)

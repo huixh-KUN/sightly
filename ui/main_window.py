@@ -268,8 +268,9 @@ class MainWindow(QMainWindow):
     def _init_signals(self):
         self.app_state.all_start_requested.connect(self._on_start_all)
         self.app_state.all_stop_requested.connect(self._on_stop_all)
+        self.app_state.record_hotkey_triggered.connect(self._on_record_hotkey)
         self.app_state.config_loaded.connect(self._on_config_loaded)
-        self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested/config_loaded")
+        self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested/record_hotkey_triggered/config_loaded")
 
     def _init_module_bindings(self):
         home = self.panels.get('home')
@@ -293,6 +294,7 @@ class MainWindow(QMainWindow):
             self._start_module(module_id)
         if not enabled:
             self.logging_manager.log_message("未启用任何模块，请在首页勾选")
+        self._lock_panels(True)
         self._set_status("运行中", running=True)
         self.logging_manager.debug("START", "_on_start_all 完成")
 
@@ -312,7 +314,10 @@ class MainWindow(QMainWindow):
                 elif panel_id == 'image':
                     self.image_groups = config
                 elif panel_id == 'background':
-                    self.background_groups = config
+                    if isinstance(config, dict):
+                        self.background_groups = config.get("groups", [])
+                    else:
+                        self.background_groups = config
                 elif panel_id == 'script':
                     self.script_config = config
                 elif panel_id == 'settings':
@@ -328,8 +333,26 @@ class MainWindow(QMainWindow):
         for module_id in ['ocr', 'timed', 'number', 'image', 'background', 'script']:
             self._stop_module(module_id)
         self.alarm_module.play_stop_sound()
+        self._lock_panels(False)
         self._set_status("空闲", running=False)
         self.logging_manager.debug("STOP", "_on_stop_all 完成")
+
+    def _lock_panels(self, locked):
+        lockable = ['ocr', 'background', 'image', 'timed', 'number', 'settings']
+        for pid in lockable:
+            panel = self.panels.get(pid)
+            if panel and hasattr(panel, 'set_enabled'):
+                panel.set_enabled(not locked)
+        home = self.panels.get('home')
+        if home and hasattr(home, 'set_toggles_enabled'):
+            home.set_toggles_enabled(not locked)
+
+    def _on_record_hotkey(self):
+        is_recording = getattr(getattr(self, 'script_executor', None), 'is_recording', False)
+        if is_recording:
+            self.script_module.stop_recording()
+        else:
+            self.script_module.start_recording()
 
     def _start_module(self, module_id):
         try:
@@ -462,7 +485,8 @@ class MainWindow(QMainWindow):
 
     def _save_template_images(self, config):
         try:
-            bg_list = config.get("background", [])
+            bg_raw = config.get("background", [])
+            bg_list = bg_raw.get("groups", bg_raw) if isinstance(bg_raw, dict) else bg_raw
             if not self.app_state.current:
                 return
             for i, g in enumerate(bg_list):
@@ -562,12 +586,17 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("RUN", "窗口显示完成")
 
     def _register_shortcuts(self):
-        QShortcut(QKeySequence(self.app_state.start_shortcut), self).activated.connect(
-            lambda: self._on_start_all() if not self._is_running else None
-        )
-        QShortcut(QKeySequence(self.app_state.stop_shortcut), self).activated.connect(
-            lambda: self._on_stop_all() if self._is_running else None
-        )
+        if hasattr(self, '_q_shortcuts'):
+            for sc in self._q_shortcuts:
+                sc.setEnabled(False)
+                sc.deleteLater()
+        self._q_shortcuts = []
+        sc_start = QShortcut(QKeySequence(self.app_state.start_shortcut), self)
+        sc_start.activated.connect(lambda: self._on_start_all() if not self._is_running else None)
+        self._q_shortcuts.append(sc_start)
+        sc_stop = QShortcut(QKeySequence(self.app_state.stop_shortcut), self)
+        sc_stop.activated.connect(lambda: self._on_stop_all() if self._is_running else None)
+        self._q_shortcuts.append(sc_stop)
 
 
 def main():
