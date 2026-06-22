@@ -49,6 +49,13 @@ class LogViewer(QWidget):
     def _do_log_error(self, message):
         self.text_edit.appendHtml(f'<span style="color: #FF5252;">{message}</span>')
 
+    def append_batch(self, lines):
+        QTimer.singleShot(0, lambda: self._do_append_batch(lines))
+
+    def _do_append_batch(self, lines):
+        for line in lines:
+            self.text_edit.appendPlainText(line)
+
     def clear(self):
         QTimer.singleShot(0, self.text_edit.clear)
 

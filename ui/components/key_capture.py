@@ -1,3 +1,5 @@
+import datetime
+
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
@@ -27,11 +29,18 @@ class KeyCaptureWidget(QWidget):
 
     keyChanged = Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, logging_manager=None):
         super().__init__(parent)
         self._key = ""
         self._listening = False
+        self._log = logging_manager
         self._setup_ui()
+
+    def _debug(self, msg):
+        if self._log:
+            self._log.debug("KEYCAPTURE", msg)
+        else:
+            print(f"[KEYCAPTURE] {msg}")
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -102,6 +111,7 @@ class KeyCaptureWidget(QWidget):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setFocus()
         self.grabKeyboard()
+        self._debug("开始监听按键")
 
     def _stop_listening(self):
         self._listening = False
@@ -110,6 +120,7 @@ class KeyCaptureWidget(QWidget):
         self.releaseKeyboard()
         self.setFocusPolicy(Qt.NoFocus)
         self._update_display()
+        self._debug(f"停止监听，捕获按键: {self._key!r}")
         self.keyChanged.emit(self._key)
 
     def _on_reset(self):
@@ -125,6 +136,7 @@ class KeyCaptureWidget(QWidget):
             return super().keyPressEvent(event)
 
         key_name = self._resolve_key(event)
+        self._debug(f"监听中捕获按键: raw_key={event.key()} mods={event.modifiers()} resolved={key_name!r}")
         if key_name:
             self._key = key_name
             self._key_label.setText(key_name)

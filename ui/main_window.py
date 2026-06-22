@@ -294,6 +294,7 @@ class MainWindow(QMainWindow):
             self._start_module(module_id)
         if not enabled:
             self.logging_manager.log_message("未启用任何模块，请在首页勾选")
+        self._lock_panels(True)
         self._set_status("运行中", running=True)
         self.logging_manager.debug("START", "_on_start_all 完成")
 
@@ -329,8 +330,19 @@ class MainWindow(QMainWindow):
         for module_id in ['ocr', 'timed', 'number', 'image', 'background', 'script']:
             self._stop_module(module_id)
         self.alarm_module.play_stop_sound()
+        self._lock_panels(False)
         self._set_status("空闲", running=False)
         self.logging_manager.debug("STOP", "_on_stop_all 完成")
+
+    def _lock_panels(self, locked):
+        lockable = ['ocr', 'background', 'image', 'timed', 'number', 'settings']
+        for pid in lockable:
+            panel = self.panels.get(pid)
+            if panel and hasattr(panel, 'set_enabled'):
+                panel.set_enabled(not locked)
+        home = self.panels.get('home')
+        if home and hasattr(home, 'set_toggles_enabled'):
+            home.set_toggles_enabled(not locked)
 
     def _on_record_hotkey(self):
         is_recording = getattr(getattr(self, 'script_executor', None), 'is_recording', False)
@@ -570,12 +582,17 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("RUN", "窗口显示完成")
 
     def _register_shortcuts(self):
-        QShortcut(QKeySequence(self.app_state.start_shortcut), self).activated.connect(
-            lambda: self._on_start_all() if not self._is_running else None
-        )
-        QShortcut(QKeySequence(self.app_state.stop_shortcut), self).activated.connect(
-            lambda: self._on_stop_all() if self._is_running else None
-        )
+        if hasattr(self, '_q_shortcuts'):
+            for sc in self._q_shortcuts:
+                sc.setEnabled(False)
+                sc.deleteLater()
+        self._q_shortcuts = []
+        sc_start = QShortcut(QKeySequence(self.app_state.start_shortcut), self)
+        sc_start.activated.connect(lambda: self._on_start_all() if not self._is_running else None)
+        self._q_shortcuts.append(sc_start)
+        sc_stop = QShortcut(QKeySequence(self.app_state.stop_shortcut), self)
+        sc_stop.activated.connect(lambda: self._on_stop_all() if self._is_running else None)
+        self._q_shortcuts.append(sc_stop)
 
 
 def main():

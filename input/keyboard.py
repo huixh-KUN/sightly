@@ -2,6 +2,8 @@ import sys
 import os
 import re
 
+from PySide6.QtCore import QTimer
+
 PYINPUT_AVAILABLE = False
 try:
     from pynput import keyboard as pynput_keyboard
@@ -74,6 +76,11 @@ def get_available_keys():
 
 def stop_old_listener(app):
     """停止旧的全局键盘监听器（如果存在）"""
+    if hasattr(app, '_listener_health_timer') and app._listener_health_timer:
+        try:
+            app._listener_health_timer.stop()
+        except Exception:
+            pass
     if hasattr(app, 'global_listener') and app.global_listener:
         try:
             app.global_listener.stop()
@@ -108,7 +115,9 @@ def _match_shortcut(app, key_name, pressed_mods):
             continue
         target_mods, target_key = _parse_combo(shortcut_str)
         target_key_upper = target_key.upper() if target_key else ""
-        if pressed_mods == target_mods and key_name == target_key_upper:
+        match = (pressed_mods == target_mods and key_name == target_key_upper)
+        app.logging_manager.debug("HOTKEY", f"  match {shortcut_str!r}: mods_match={pressed_mods==target_mods} key_match={key_name==target_key_upper} cond={condition() if match else '?'}")
+        if match:
             if condition():
                 action_signal.emit()
                 return True
@@ -118,7 +127,9 @@ def _match_shortcut(app, key_name, pressed_mods):
     if record_s:
         target_mods, target_key = _parse_combo(record_s)
         target_key_upper = target_key.upper() if target_key else ""
-        if pressed_mods == target_mods and key_name == target_key_upper:
+        match = (pressed_mods == target_mods and key_name == target_key_upper)
+        app.logging_manager.debug("HOTKEY", f"  match record_hotkey {record_s!r}: mods_match={pressed_mods==target_mods} key_match={key_name==target_key_upper}")
+        if match:
             ks.record_hotkey_triggered.emit()
             return True
     return False
@@ -158,6 +169,7 @@ def setup_global_shortcuts(app):
                     return
                 try:
                     key_name = raw.upper()
+                    app.logging_manager.debug("HOTKEY", f"on_press key={key_name!r} mods={pressed_mods}")
                     _match_shortcut(app, key_name, pressed_mods.copy())
                 except Exception as e:
                     app.logging_manager.error("HOTKEY", f"全局快捷键处理错误: {e}")
@@ -169,6 +181,21 @@ def setup_global_shortcuts(app):
 
             app.global_listener = pynput_keyboard.Listener(on_press=on_press, on_release=on_release)
             app.global_listener.start()
+
+            def _check_listener():
+                try:
+                    alive = app.global_listener.running
+                except Exception:
+                    alive = False
+                app.logging_manager.debug("HOTKEY", f"健康检查: listener_alive={alive}")
+                if not alive:
+                    app.logging_manager.error("HOTKEY", "全局快捷键监听已停止，正在重启...")
+                    setup_shortcuts(app)
+
+            app._listener_health_timer = QTimer()
+            app._listener_health_timer.setInterval(10000)
+            app._listener_health_timer.timeout.connect(_check_listener)
+            app._listener_health_timer.start()
             app.logging_manager.log_message("全局快捷键监听已启动 (使用pynput)")
             return True
         except Exception as e:
