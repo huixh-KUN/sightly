@@ -30,12 +30,18 @@ class SettingsPanel(QWidget):
             self.app.logging_manager.error("ALARM", f"试听失败: {e}")
 
     def _on_config_changed(self):
+        general = self._general.get_config()
+        if general.get("start_key"):
+            self.app.app_state.start_shortcut = general["start_key"]
+        if general.get("stop_key"):
+            self.app.app_state.stop_shortcut = general["stop_key"]
         alarm_cfg = self._alarm.get_config()
         if alarm_cfg.get("sound_path"):
             self.app.alarm_sound_path.set(alarm_cfg["sound_path"])
         if "volume" in alarm_cfg:
             self.app.alarm_volume.set(alarm_cfg["volume"])
             self.app.alarm_volume_str.set(str(alarm_cfg["volume"]))
+        self.app._register_shortcuts()
         if hasattr(self.app, 'save_config') and callable(self.app.save_config):
             try:
                 self.app.save_config()

@@ -42,10 +42,12 @@ class GeneralSettingsCard(QFrame):
 
         grid.addWidget(QLabel("启动快捷键"), 1, 0)
         self._start_key = KeyCaptureWidget()
+        self._start_key.keyChanged.connect(lambda v: self.config_changed.emit())
         grid.addWidget(self._start_key, 1, 1)
 
         grid.addWidget(QLabel("停止快捷键"), 2, 0)
         self._stop_key = KeyCaptureWidget()
+        self._stop_key.keyChanged.connect(lambda v: self.config_changed.emit())
         grid.addWidget(self._stop_key, 2, 1)
 
         layout.addLayout(grid)

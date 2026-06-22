@@ -268,8 +268,9 @@ class MainWindow(QMainWindow):
     def _init_signals(self):
         self.app_state.all_start_requested.connect(self._on_start_all)
         self.app_state.all_stop_requested.connect(self._on_stop_all)
+        self.app_state.record_hotkey_triggered.connect(self._on_record_hotkey)
         self.app_state.config_loaded.connect(self._on_config_loaded)
-        self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested/config_loaded")
+        self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested/record_hotkey_triggered/config_loaded")
 
     def _init_module_bindings(self):
         home = self.panels.get('home')
@@ -330,6 +331,13 @@ class MainWindow(QMainWindow):
         self.alarm_module.play_stop_sound()
         self._set_status("空闲", running=False)
         self.logging_manager.debug("STOP", "_on_stop_all 完成")
+
+    def _on_record_hotkey(self):
+        is_recording = getattr(getattr(self, 'script_executor', None), 'is_recording', False)
+        if is_recording:
+            self.script_module.stop_recording()
+        else:
+            self.script_module.start_recording()
 
     def _start_module(self, module_id):
         try:

@@ -3,8 +3,19 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
 
 
+_MODIFIER_NAMES = [
+    (Qt.ControlModifier, "Ctrl"),
+    (Qt.AltModifier, "Alt"),
+    (Qt.ShiftModifier, "Shift"),
+    (Qt.MetaModifier, "Win"),
+]
+
+
 class KeyCaptureWidget(QWidget):
     """触发按键捕获组件
+
+    支持单键和组合键（最多三键，含修饰键）。
+    格式：Ctrl+F1、Alt+Shift+F1、Ctrl+Alt+F1
 
     交互流程：
     1. 默认显示当前按键值 +「修改」+「重置」按钮
@@ -99,6 +110,7 @@ class KeyCaptureWidget(QWidget):
         self.releaseKeyboard()
         self.setFocusPolicy(Qt.NoFocus)
         self._update_display()
+        self.keyChanged.emit(self._key)
 
     def _on_reset(self):
         self._key = ""
@@ -124,7 +136,24 @@ class KeyCaptureWidget(QWidget):
 
     def _resolve_key(self, event: QKeyEvent):
         key = event.key()
+        modifiers = event.modifiers()
 
+        named_key = self._named_key(key)
+        if named_key is None:
+            return None
+
+        mods = []
+        for flag, name in _MODIFIER_NAMES:
+            if modifiers & flag:
+                mods.append(name)
+
+        if not mods:
+            return named_key
+
+        return "+".join(mods + [named_key])
+
+    @staticmethod
+    def _named_key(key):
         key_map = {
             Qt.Key_F1: "F1", Qt.Key_F2: "F2", Qt.Key_F3: "F3", Qt.Key_F4: "F4",
             Qt.Key_F5: "F5", Qt.Key_F6: "F6", Qt.Key_F7: "F7", Qt.Key_F8: "F8",
@@ -141,9 +170,8 @@ class KeyCaptureWidget(QWidget):
 
         if key in key_map:
             return key_map[key]
-        elif Qt.Key_A <= key <= Qt.Key_Z:
+        if Qt.Key_A <= key <= Qt.Key_Z:
             return chr(key)
-        elif Qt.Key_0 <= key <= Qt.Key_9:
+        if Qt.Key_0 <= key <= Qt.Key_9:
             return chr(key)
-        else:
-            return None
+        return None

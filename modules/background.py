@@ -12,7 +12,7 @@ from utils.coordinate import RelativeCoordinate, WindowCoordinate
 from utils.recognition import OCRRecognizer, ImageRecognizer, ColorRecognizer
 from utils.image import _preprocess_image
 from core.priority_lock import get_module_priority
-from core.click_handler import ClickHandler
+from core.click_handler import ClickHandler, execute_combo_key
 from core.config import ConfigVar
 
 # 虚拟点击 WM_ 消息常量
@@ -454,9 +454,7 @@ class BackgroundMonitor:
                 if self.trigger_key:
                     import random
                     hold_delay = random.randint(self.delay_min, self.delay_max) / 1000.0
-                    self.app.input_controller.key_down(self.trigger_key, priority=1)
-                    time.sleep(hold_delay)
-                    self.app.input_controller.key_up(self.trigger_key, priority=1)
+                    execute_combo_key(self.app, self.trigger_key, priority=1, hold_delay=hold_delay)
 
                 quick_switch._restore_foreground_window()
             else:
