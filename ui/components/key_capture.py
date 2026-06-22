@@ -1,10 +1,23 @@
+import datetime
+
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
 
 
+_MODIFIER_NAMES = [
+    (Qt.ControlModifier, "Ctrl"),
+    (Qt.AltModifier, "Alt"),
+    (Qt.ShiftModifier, "Shift"),
+    (Qt.MetaModifier, "Win"),
+]
+
+
 class KeyCaptureWidget(QWidget):
     """触发按键捕获组件
+
+    支持单键和组合键（最多三键，含修饰键）。
+    格式：Ctrl+F1、Alt+Shift+F1、Ctrl+Alt+F1
 
     交互流程：
     1. 默认显示当前按键值 +「修改」+「重置」按钮
@@ -16,11 +29,18 @@ class KeyCaptureWidget(QWidget):
 
     keyChanged = Signal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, logging_manager=None):
         super().__init__(parent)
         self._key = ""
         self._listening = False
+        self._log = logging_manager
         self._setup_ui()
+
+    def _debug(self, msg):
+        if self._log:
+            self._log.debug("KEYCAPTURE", msg)
+        else:
+            print(f"[KEYCAPTURE] {msg}")
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -91,6 +111,7 @@ class KeyCaptureWidget(QWidget):
         self.setFocusPolicy(Qt.StrongFocus)
         self.setFocus()
         self.grabKeyboard()
+        self._debug("开始监听按键")
 
     def _stop_listening(self):
         self._listening = False
@@ -99,6 +120,8 @@ class KeyCaptureWidget(QWidget):
         self.releaseKeyboard()
         self.setFocusPolicy(Qt.NoFocus)
         self._update_display()
+        self._debug(f"停止监听，捕获按键: {self._key!r}")
+        self.keyChanged.emit(self._key)
 
     def _on_reset(self):
         self._key = ""
@@ -113,6 +136,7 @@ class KeyCaptureWidget(QWidget):
             return super().keyPressEvent(event)
 
         key_name = self._resolve_key(event)
+        self._debug(f"监听中捕获按键: raw_key={event.key()} mods={event.modifiers()} resolved={key_name!r}")
         if key_name:
             self._key = key_name
             self._key_label.setText(key_name)
@@ -124,7 +148,24 @@ class KeyCaptureWidget(QWidget):
 
     def _resolve_key(self, event: QKeyEvent):
         key = event.key()
+        modifiers = event.modifiers()
 
+        named_key = self._named_key(key)
+        if named_key is None:
+            return None
+
+        mods = []
+        for flag, name in _MODIFIER_NAMES:
+            if modifiers & flag:
+                mods.append(name)
+
+        if not mods:
+            return named_key
+
+        return "+".join(mods + [named_key])
+
+    @staticmethod
+    def _named_key(key):
         key_map = {
             Qt.Key_F1: "F1", Qt.Key_F2: "F2", Qt.Key_F3: "F3", Qt.Key_F4: "F4",
             Qt.Key_F5: "F5", Qt.Key_F6: "F6", Qt.Key_F7: "F7", Qt.Key_F8: "F8",
@@ -141,9 +182,8 @@ class KeyCaptureWidget(QWidget):
 
         if key in key_map:
             return key_map[key]
-        elif Qt.Key_A <= key <= Qt.Key_Z:
+        if Qt.Key_A <= key <= Qt.Key_Z:
             return chr(key)
-        elif Qt.Key_0 <= key <= Qt.Key_9:
+        if Qt.Key_0 <= key <= Qt.Key_9:
             return chr(key)
-        else:
-            return None
+        return None

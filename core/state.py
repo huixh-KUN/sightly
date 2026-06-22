@@ -22,6 +22,7 @@ class AppState(QObject):
     workspace_changed = Signal(str)
 
     config_loaded = Signal(dict)
+    record_hotkey_triggered = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

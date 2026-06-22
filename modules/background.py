@@ -1,14 +1,4 @@
-from core.config import ConfigVar
-
-
-def _safe_get(group, key, default):
-    """Safe dict.get() that avoids tkinter variable creation when no tk root exists."""
-    if key in group:
-        val = group[key]
-        return val.get() if hasattr(val, 'get') else val
-    return default
-
-
+import ctypes
 import threading
 import time
 from typing import Optional, Dict, Any
@@ -22,7 +12,61 @@ from utils.coordinate import RelativeCoordinate, WindowCoordinate
 from utils.recognition import OCRRecognizer, ImageRecognizer, ColorRecognizer
 from utils.image import _preprocess_image
 from core.priority_lock import get_module_priority
-from core.click_handler import ClickHandler
+from core.click_handler import ClickHandler, execute_combo_key
+from core.config import ConfigVar
+
+# 虚拟点击 WM_ 消息常量
+WM_MOUSEMOVE = 0x0200
+WM_LBUTTONDOWN = 0x0201
+WM_LBUTTONUP = 0x0202
+WM_RBUTTONDOWN = 0x0204
+WM_RBUTTONUP = 0x0205
+WM_MBUTTONDOWN = 0x0207
+WM_MBUTTONUP = 0x0208
+MK_LBUTTON = 0x0001
+MK_RBUTTON = 0x0002
+MK_MBUTTON = 0x0010
+
+_MOUSE_BUTTON_MAP = {
+    "left":   (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON),
+    "right":  (WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON),
+    "middle": (WM_MBUTTONDOWN, WM_MBUTTONUP, MK_MBUTTON),
+}
+
+
+def _find_content_hwnd(parent_hwnd):
+    """查找父窗口中最可能的内容子窗口（递归）"""
+    import ctypes
+    from ctypes import wintypes
+
+    candidates = []
+
+    def enum_proc(hwnd, lparam):
+        if ctypes.windll.user32.IsWindowVisible(hwnd):
+            rect = wintypes.RECT()
+            ctypes.windll.user32.GetClientRect(hwnd, ctypes.byref(rect))
+            w = rect.right
+            h = rect.bottom
+            if w > 50 and h > 50:
+                candidates.append((w * h, hwnd))
+        return True
+
+    callback = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)(enum_proc)
+    ctypes.windll.user32.EnumChildWindows(parent_hwnd, callback, 0)
+
+    if not candidates:
+        return parent_hwnd
+
+    candidates.sort(key=lambda x: -x[0])
+    return candidates[0][1]
+
+
+def _safe_get(group, key, default):
+    """Safe dict.get() that avoids tkinter variable creation when no tk root exists."""
+    if key in group:
+        val = group[key]
+        return val.get() if hasattr(val, 'get') else val
+    return default
 
 class BackgroundMonitor:
     """
@@ -58,6 +102,7 @@ class BackgroundMonitor:
         self.alarm_enabled = False
         
         self.click_offset = 0
+        self.click_mode = "physical"  # "physical" | "virtual"
         self.last_trigger_time = 0
         self._last_text = None  # 缓存上次识别文本，用于日志节流
     
@@ -327,66 +372,95 @@ class BackgroundMonitor:
             except Exception as e:
                 self.app.logging_manager.error("BG", f"播放报警声音失败: {e}")
         
-        # 如果只设置了报警，无需切换窗口
+        # 如果只设置了报警，无需后续操作
         if not self.trigger_click and not self.trigger_key:
             return
-        
-        quick_switch = QuickSwitchBackend(self.app)
-        quick_switch.set_hwnd(self.hwnd)
-        
-        # 保存原窗口并切换到目标窗口
-        quick_switch._save_foreground_window()
-        switch_success = quick_switch._switch_to_target()
-        self.app.logging_manager.debug("BG", f"组{self.group_index} 窗口切换: {switch_success}")
-        
-        if switch_success:
-            # 执行点击操作
-            if self.trigger_click:
+
+        self.app.logging_manager.log_message(
+            f"组{self.group_index} 点击模式: {self.click_mode}, trigger_click={self.trigger_click}, trigger_key={self.trigger_key}")
+
+        # 虚拟点击：向窗口发送鼠标消息，无需切换窗口
+        if self.click_mode == "virtual" and self.trigger_click:
+            try:
+                target_hwnd = _find_content_hwnd(self.hwnd)
                 if click_position:
-                    # 转换为绝对坐标
-                    rect = get_window_rect(self.hwnd)
-                    self.app.logging_manager.debug("BG", f"组{self.group_index} 点击: hwnd={self.hwnd}, rect={rect}, click_pos={click_position}")
-                    if rect:
-                        abs_x = rect[0] + click_position[0]
-                        abs_y = rect[1] + click_position[1]
-                        abs_x, abs_y = ClickHandler._apply_random_offset(abs_x, abs_y, self.click_offset)
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 执行点击: ({abs_x}, {abs_y})")
-                        self.app.input_controller.click(abs_x, abs_y, priority=1)
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 点击执行完成")
-                    else:
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 获取窗口矩形失败")
+                    cx, cy = ClickHandler._apply_random_offset(
+                        click_position[0], click_position[1], self.click_offset
+                    )
                 else:
                     region = self._get_current_region()
                     if region:
-                        click_x = (region[0] + region[2]) // 2
-                        click_y = (region[1] + region[3]) // 2
-                        # 转换为绝对坐标
+                        cx = (region[0] + region[2]) // 2
+                        cy = (region[1] + region[3]) // 2
+                        cx, cy = ClickHandler._apply_random_offset(cx, cy, self.click_offset)
+                    else:
+                        cx, cy = 0, 0
+
+                wm_down, wm_up, mk_flag = _MOUSE_BUTTON_MAP.get("left",
+                    (WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON))
+                lparam = (cy << 16) | (cx & 0xFFFF)
+
+                # 先发鼠标移动（部分窗口依赖）
+                ctypes.windll.user32.SendMessageW(target_hwnd, WM_MOUSEMOVE, 0, lparam)
+                # 发送按下 + 抬起
+                ctypes.windll.user32.SendMessageW(target_hwnd, wm_down, mk_flag, lparam)
+                ctypes.windll.user32.SendMessageW(target_hwnd, wm_up, 0, lparam)
+
+                self.app.logging_manager.log_message(
+                    f"组{self.group_index} 虚拟点击: target_hwnd={target_hwnd}, pos=({cx}, {cy})")
+            except Exception as e:
+                self.app.logging_manager.error("BG",
+                    f"组{self.group_index} 虚拟点击失败: {e}")
+
+        # 物理点击或按键需要窗口切换
+        need_switch = (self.click_mode == "physical" and self.trigger_click) or bool(self.trigger_key)
+        if need_switch:
+            self.app.logging_manager.log_message(
+                f"组{self.group_index} 物理路径: need_switch={need_switch}, click_mode={self.click_mode}")
+            quick_switch = QuickSwitchBackend(self.app)
+            quick_switch.set_hwnd(self.hwnd)
+            quick_switch._save_foreground_window()
+            switch_success = quick_switch._switch_to_target()
+            self.app.logging_manager.debug("BG", f"组{self.group_index} 窗口切换: {switch_success}")
+
+            if switch_success:
+                if self.trigger_click and self.click_mode == "physical":
+                    if click_position:
                         rect = get_window_rect(self.hwnd)
+                        self.app.logging_manager.debug("BG", f"组{self.group_index} 点击: hwnd={self.hwnd}, rect={rect}, click_pos={click_position}")
                         if rect:
-                            abs_x = rect[0] + click_x
-                            abs_y = rect[1] + click_y
+                            abs_x = rect[0] + click_position[0]
+                            abs_y = rect[1] + click_position[1]
                             abs_x, abs_y = ClickHandler._apply_random_offset(abs_x, abs_y, self.click_offset)
-                            # 直接使用输入控制器执行点击
+                            self.app.logging_manager.debug("BG", f"组{self.group_index} 执行点击: ({abs_x}, {abs_y})")
                             self.app.input_controller.click(abs_x, abs_y, priority=1)
-            
-            # 等待0.1秒
-            time.sleep(0.1)
-            
-            # 执行按键操作
-            if self.trigger_key:
-                # 直接使用输入控制器执行按键
-                import random
-                hold_delay = random.randint(self.delay_min, self.delay_max) / 1000.0
-                self.app.input_controller.key_down(self.trigger_key, priority=1)
-                time.sleep(hold_delay)
-                self.app.input_controller.key_up(self.trigger_key, priority=1)
-            
-            # 切换回原窗口
-            quick_switch._restore_foreground_window()
-        else:
-            self.app.logging_manager.error("BG",
-                f"后台监控组{self.group_index + 1}窗口切换失败，跳过操作"
-            )
+                            self.app.logging_manager.debug("BG", f"组{self.group_index} 点击执行完成")
+                        else:
+                            self.app.logging_manager.debug("BG", f"组{self.group_index} 获取窗口矩形失败")
+                    else:
+                        region = self._get_current_region()
+                        if region:
+                            click_x = (region[0] + region[2]) // 2
+                            click_y = (region[1] + region[3]) // 2
+                            rect = get_window_rect(self.hwnd)
+                            if rect:
+                                abs_x = rect[0] + click_x
+                                abs_y = rect[1] + click_y
+                                abs_x, abs_y = ClickHandler._apply_random_offset(abs_x, abs_y, self.click_offset)
+                                self.app.input_controller.click(abs_x, abs_y, priority=1)
+
+                time.sleep(0.1)
+
+                if self.trigger_key:
+                    import random
+                    hold_delay = random.randint(self.delay_min, self.delay_max) / 1000.0
+                    execute_combo_key(self.app, self.trigger_key, priority=1, hold_delay=hold_delay)
+
+                quick_switch._restore_foreground_window()
+            else:
+                self.app.logging_manager.error("BG",
+                    f"后台监控组{self.group_index + 1}窗口切换失败，跳过操作"
+                )
 
 class BackgroundManager:
     """后台监控管理器"""
@@ -529,6 +603,7 @@ class BackgroundManager:
             
             monitor.trigger_click = _safe_get(group, "click_enabled", False)
             monitor.click_offset = int(_safe_get(group, "click_offset", "0"))
+            monitor.click_mode = _safe_get(group, "click_mode", "physical")
             
             monitor.alarm_enabled = _safe_get(group, "alarm", False)
             

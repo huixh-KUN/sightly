@@ -1,5 +1,45 @@
 import time
 import random
+import re
+
+
+_COMBO_MODIFIERS = {"ctrl", "alt", "shift", "win"}
+
+
+def parse_combo_key(combo_str):
+    """解析组合键字符串，返回 (修饰键列表, 主键)
+
+    >>> parse_combo_key("Ctrl+F1")
+    (['ctrl'], 'f1')
+    >>> parse_combo_key("Alt+Shift+F1")
+    (['alt', 'shift'], 'f1')
+    >>> parse_combo_key("F1")
+    ([], 'f1')
+    """
+    parts = combo_str.lower().split("+")
+    mods = [p for p in parts if p in _COMBO_MODIFIERS]
+    main = [p for p in parts if p not in _COMBO_MODIFIERS]
+    main_key = main[0] if main else parts[-1]
+    return mods, main_key
+
+
+def execute_combo_key(app, combo_str, priority=0, hold_delay=0.15):
+    """执行组合键：按顺序按下修饰键+主键，等待，反向释放
+
+    Args:
+        app: 应用实例（含 input_controller）
+        combo_str: 组合键字符串，如 "Ctrl+F1" 或 "F1"
+        priority: 输入优先级
+        hold_delay: 按住延迟（秒）
+    """
+    mods, main_key = parse_combo_key(combo_str)
+    all_keys = mods + [main_key]
+
+    for k in all_keys:
+        app.input_controller.key_down(k, priority=priority)
+    time.sleep(hold_delay)
+    for k in reversed(all_keys):
+        app.input_controller.key_up(k, priority=priority)
 
 
 class ClickHandler:

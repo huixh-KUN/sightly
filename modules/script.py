@@ -306,12 +306,14 @@ class ScriptExecutor(RecorderBase):
             count = int(match.group(3))
             return {"type": command_type, "key": key, "count": count}
 
-        mouse_pattern = re.compile(r'^(Left|Right|Middle)(Down|Up)\s+(\d+)$', re.IGNORECASE)
+        mouse_pattern = re.compile(r'^(Left|Right|Middle)(Down|Up|Click)\s+(\d+)$', re.IGNORECASE)
         match = mouse_pattern.match(line)
         if match:
             button = match.group(1).lower()
             action = match.group(2).lower()
             count = int(match.group(3))
+            if action == "click":
+                return {"type": "click", "button": button, "count": count}
             return {"type": f"mouse_{action}", "button": button, "count": count}
 
         move_pattern = re.compile(r"^MoveTo\s+(\d+)\s*\,\s*(\d+)$", re.IGNORECASE)
@@ -368,6 +370,21 @@ class ScriptExecutor(RecorderBase):
                         self.app.input_controller.mouse_down(button=button, priority=self.PRIORITY)
                     else:
                         self.app.input_controller.mouse_up(button=button, priority=self.PRIORITY)
+            elif command["type"] == "click":
+                button = command["button"]
+                count = int(command["count"])
+                for _ in range(count):
+                    if not self.is_running:
+                        break
+                    while self.is_paused:
+                        time.sleep(0.1)
+                        if not self.is_running:
+                            break
+                    if not self.is_running:
+                        break
+                    self.app.input_controller.mouse_down(button=button, priority=self.PRIORITY)
+                    time.sleep(0.05)
+                    self.app.input_controller.mouse_up(button=button, priority=self.PRIORITY)
             elif command["type"] == "moveto":
                 x = int(command["x"])
                 y = int(command["y"])

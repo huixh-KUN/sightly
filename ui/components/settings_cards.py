@@ -17,9 +17,10 @@ class GeneralSettingsCard(QFrame):
 
     config_changed = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, logging_manager=None):
         super().__init__(parent)
         self.setObjectName("settingsCard")
+        self._log = logging_manager
         self._setup_ui()
 
     def _setup_ui(self):
@@ -41,11 +42,13 @@ class GeneralSettingsCard(QFrame):
         grid.addWidget(self._lang_combo, 0, 1)
 
         grid.addWidget(QLabel("启动快捷键"), 1, 0)
-        self._start_key = KeyCaptureWidget()
+        self._start_key = KeyCaptureWidget(logging_manager=self._log)
+        self._start_key.keyChanged.connect(lambda v: self.config_changed.emit())
         grid.addWidget(self._start_key, 1, 1)
 
         grid.addWidget(QLabel("停止快捷键"), 2, 0)
-        self._stop_key = KeyCaptureWidget()
+        self._stop_key = KeyCaptureWidget(logging_manager=self._log)
+        self._stop_key.keyChanged.connect(lambda v: self.config_changed.emit())
         grid.addWidget(self._stop_key, 2, 1)
 
         layout.addLayout(grid)
