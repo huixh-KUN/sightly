@@ -223,6 +223,10 @@ class BackgroundGroupWidget(GroupCard):
 
         self.click_toggle = Toggle("点击")
         common_row.addWidget(self.click_toggle)
+        self.click_mode_combo = ComboBox(items=["物理点击", "虚拟点击"], width=110)
+        self.click_mode_combo.setEnabled(False)
+        self.click_toggle.stateChanged.connect(self.click_mode_combo.setEnabled)
+        common_row.addWidget(self.click_mode_combo)
         common_row.addWidget(QLabel("偏移"))
         self.offset_spin = QSpinBox()
         self.offset_spin.setRange(0, 200)
@@ -276,6 +280,8 @@ class BackgroundGroupWidget(GroupCard):
         if key:
             self.key_input.set_key(key)
         self.click_toggle.setChecked(cfg.get("click_enabled", False))
+        mode = cfg.get("click_mode", "physical")
+        self.click_mode_combo.setCurrentIndex(0 if mode == "physical" else 1)
         self.alarm_toggle.setChecked(cfg.get("alarm", False))
 
         if self.monitor_type == "ocr":
@@ -333,6 +339,7 @@ class BackgroundGroupWidget(GroupCard):
             "key": ConfigVar(self.key_input.key()),
             "alarm": ConfigVar(self.alarm_toggle.isChecked()),
             "click_enabled": ConfigVar(self.click_toggle.isChecked()),
+            "click_mode": ConfigVar("physical" if self.click_mode_combo.currentIndex() == 0 else "virtual"),
             "click_offset": ConfigVar(str(self.offset_spin.value())),
             "delay_min": ConfigVar("100"),
             "delay_max": ConfigVar("200"),
