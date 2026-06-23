@@ -168,6 +168,37 @@ class AppState(QObject):
                 self._module_states[mid] = enabled
                 self.module_enabled_changed.emit(mid, enabled)
 
+    # ========== 模板持久化 ==========
+
+    def save_template(self, panel_id: str, group_index: int, pixmap_or_path) -> str | None:
+        """保存模板图片到工作空间
+
+        Args:
+            panel_id: 面板标识（如 'image', 'background'）
+            group_index: 组索引（从0开始）
+            pixmap_or_path: QPixmap 或文件路径
+
+        Returns:
+            保存后的文件路径，失败返回 None
+        """
+        if not self._current:
+            return None
+        return self._wm.save_template_image(self._current, panel_id, group_index, pixmap_or_path)
+
+    def get_template_path(self, panel_id: str, group_index: int) -> str | None:
+        """获取工作空间中模板图片的路径
+
+        Args:
+            panel_id: 面板标识
+            group_index: 组索引
+
+        Returns:
+            模板文件路径（存在时），否则 None
+        """
+        if not self._current:
+            return None
+        return self._wm.get_template_path(self._current, panel_id, group_index)
+
     # ========== 持久化 ==========
 
     def _index_path(self):
@@ -183,8 +214,13 @@ class AppState(QObject):
 
     def save_index(self):
         path = self._index_path()
+        data = {}
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        data["last_workspace"] = self._current
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"last_workspace": self._current}, f, indent=2, ensure_ascii=False)
+            json.dump(data, f, indent=2, ensure_ascii=False)
 
     def save_current(self, extra_config=None):
         self._log("STATE", f"save_current, current={self._current!r}")

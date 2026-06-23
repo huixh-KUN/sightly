@@ -461,7 +461,8 @@ class ConfigManager:
         
         if os.path.exists(image_path):
             try:
-                template = cv2.imread(image_path, cv2.IMREAD_COLOR)
+                import numpy as np
+                template = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
                 if template is None:
                     self.app.logging_manager.error("CONFIG", f"[图像检测] 无法读取图像文件: {image_path}")
                     return
@@ -498,7 +499,8 @@ class ConfigManager:
             return
         
         try:
-            template = cv2.imread(image_path, cv2.IMREAD_COLOR)
+            import numpy as np
+            template = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
             if template is None:
                 return
             
