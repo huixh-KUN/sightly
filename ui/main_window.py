@@ -4,9 +4,9 @@ import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QStackedWidget, QFrame,
-    QApplication, QSizePolicy, QSpacerItem
+    QApplication, QSizePolicy, QSpacerItem, QSpinBox
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtGui import QIcon, QFont, QShortcut, QKeySequence
 
 from core.state import AppState
@@ -338,14 +338,20 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("STOP", "_on_stop_all 完成")
 
     def _lock_panels(self, locked):
+        from ui.widgets import set_panel_view_only
         lockable = ['ocr', 'background', 'image', 'timed', 'number', 'settings']
         for pid in lockable:
             panel = self.panels.get(pid)
-            if panel and hasattr(panel, 'set_enabled'):
-                panel.set_enabled(not locked)
+            if panel:
+                set_panel_view_only(panel, locked)
         home = self.panels.get('home')
         if home and hasattr(home, 'set_toggles_enabled'):
             home.set_toggles_enabled(not locked)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Wheel and isinstance(obj, QSpinBox):
+            return True
+        return super().eventFilter(obj, event)
 
     def _on_record_hotkey(self):
         is_recording = getattr(getattr(self, 'script_executor', None), 'is_recording', False)
@@ -485,18 +491,27 @@ class MainWindow(QMainWindow):
 
     def _save_template_images(self, config):
         try:
-            bg_raw = config.get("background", [])
-            bg_list = bg_raw.get("groups", bg_raw) if isinstance(bg_raw, dict) else bg_raw
             if not self.app_state.current:
                 return
+            # 后台监控 image 类型
+            bg_raw = config.get("background", [])
+            bg_list = bg_raw.get("groups", bg_raw) if isinstance(bg_raw, dict) else bg_raw
             for i, g in enumerate(bg_list):
                 if not isinstance(g, dict) or g.get("type") != "image":
                     continue
                 pixmap = g.get("reference_image")
                 if pixmap and hasattr(pixmap, "save") and not pixmap.isNull():
-                    path = self.app_state._wm.save_template_image(self.app_state.current, "background", i, pixmap)
+                    path = self.app_state.save_template("background", i, pixmap)
                     g["reference_image"] = path
                 else:
+                    g.pop("reference_image", None)
+            # 图像检测
+            img_list = config.get("image", [])
+            for i, g in enumerate(img_list):
+                if not isinstance(g, dict):
+                    continue
+                path = g.get("reference_image", "")
+                if path and not os.path.exists(path):
                     g.pop("reference_image", None)
         except Exception as e:
             self.logging_manager.error("CONFIG", f"保存模板图片失败: {e}")
@@ -574,6 +589,7 @@ class MainWindow(QMainWindow):
 
     def run(self):
         self.logging_manager.debug("RUN", "run() 开始执行")
+        QApplication.instance().installEventFilter(self)
         self.load_saved_config()
         self.logging_manager.debug("RUN", "配置加载完成")
         self._navigate_to('home')

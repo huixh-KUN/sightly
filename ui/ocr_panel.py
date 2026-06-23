@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from ui.theme import Colors
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel, TextButton
+from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel, TextButton, ClickableLabel
 from ui.components import ComboBox
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
@@ -106,9 +106,10 @@ class OCRGroupWidget(GroupCard):
 
         # Header row
         header = QHBoxLayout()
-        self.title_label = QLabel(f"识别组 {index + 1}")
-        self.title_label.setObjectName("cardTitle")
-        header.addWidget(self.title_label)
+        self.title_edit = QLineEdit(f"识别组 {index + 1}")
+        self.title_edit.setObjectName("cardTitle")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        header.addWidget(self.title_edit)
 
         header.addStretch()
 
@@ -129,11 +130,13 @@ class OCRGroupWidget(GroupCard):
 
         # Region
         grid.addWidget(QLabel("识别区域"), 0, 0)
-        self.region_label = InfoLabel("未选择")
+        self.region_label = ClickableLabel("未选择")
+        self.region_label.setObjectName("infoText")
         grid.addWidget(self.region_label, 0, 1)
         region_btn = TextButton("选择区域")
         region_btn.clicked.connect(self._select_region)
         grid.addWidget(region_btn, 0, 2)
+        self.region_label.clicked.connect(self._preview_region)
 
         # Keywords
         grid.addWidget(QLabel("关键词"), 1, 0)
@@ -214,6 +217,7 @@ class OCRGroupWidget(GroupCard):
 
     def collect_config(self):
         return {
+            "name": self.title_edit.text(),
             "enabled": ConfigVar(self.toggle.isChecked()),
             "region": self.region,
             "interval": ConfigVar(str(self.interval_spin.value())),
@@ -230,6 +234,9 @@ class OCRGroupWidget(GroupCard):
 
     def set_config(self, cfg):
         self.toggle.setChecked(cfg.get("enabled", False))
+        name = cfg.get("name", "")
+        if name:
+            self.title_edit.setText(name)
         region = cfg.get("region")
         if region:
             self.region = tuple(region)
@@ -257,7 +264,7 @@ class OCRGroupWidget(GroupCard):
 
     def set_title(self, index):
         self.index = index
-        self.title_label.setText(f"识别组 {index + 1}")
+        self.title_edit.setText(f"识别组 {index + 1}")
 
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
@@ -269,3 +276,15 @@ class OCRGroupWidget(GroupCard):
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
         self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500; font-size: 13px;")
+
+    def _preview_region(self):
+        if self.region:
+            from PySide6.QtWidgets import QMessageBox
+            x1, y1, x2, y2 = self.region
+            QMessageBox.information(
+                None, "区域坐标",
+                f"左上: ({x1}, {y1})\n右下: ({x2}, {y2})\n尺寸: {x2-x1} × {y2-y1}"
+            )
+        else:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(None, "提示", "未设置检测区域")

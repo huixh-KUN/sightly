@@ -1,15 +1,19 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QScrollArea, QFrame,
+    QScrollArea, QFrame, QLineEdit,
     QSpinBox, QGridLayout, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal
 
 from ui.theme import Colors
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel, TextButton
+from ui.widgets import (
+    SectionTitle, GroupCard, PrimaryButton,
+    DangerButton, InfoLabel, TextButton, ClickableLabel
+)
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
 from core.config import ConfigVar
+import os
 
 
 class ImagePanel(QWidget):
@@ -103,9 +107,10 @@ class ImageGroupWidget(GroupCard):
         layout.setSpacing(20)
 
         header = QHBoxLayout()
-        self.title_label = QLabel(f"检测组 {index + 1}")
-        self.title_label.setObjectName("cardTitle")
-        header.addWidget(self.title_label)
+        self.title_edit = QLineEdit(f"检测组 {index + 1}")
+        self.title_edit.setObjectName("cardTitle")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
@@ -120,7 +125,8 @@ class ImageGroupWidget(GroupCard):
         grid.setColumnStretch(1, 1)
 
         grid.addWidget(QLabel("检测区域"), 0, 0)
-        self.region_label = InfoLabel("未选择")
+        self.region_label = ClickableLabel("未选择")
+        self.region_label.setObjectName("infoText")
         grid.addWidget(self.region_label, 0, 1)
         region_btn = TextButton("选择区域")
         region_btn.clicked.connect(self._select_region)
@@ -129,7 +135,8 @@ class ImageGroupWidget(GroupCard):
         grid.addWidget(QLabel("模板图像"), 1, 0)
         template_row = QHBoxLayout()
         template_row.setSpacing(8)
-        self.template_label = InfoLabel("未选择")
+        self.template_label = ClickableLabel("未选择")
+        self.template_label.setObjectName("infoText")
         template_row.addWidget(self.template_label, 1)
         template_btn = TextButton("选择图片")
         template_btn.clicked.connect(self._select_template)
@@ -202,20 +209,27 @@ class ImageGroupWidget(GroupCard):
         grid.addLayout(toggles, 5, 0, 1, 3)
 
         layout.addLayout(grid)
+        self._connect_preview()
+
+    def _make_label_blue(self, label):
+        label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
 
     def set_config(self, cfg):
         self.toggle.setChecked(cfg.get("enabled", False))
+        name = cfg.get("name", "")
+        if name:
+            self.title_edit.setText(name)
         region = cfg.get("region")
         if region:
             self.region = tuple(region)
             x1, y1, x2, y2 = self.region
             self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-            self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+            self._make_label_blue(self.region_label)
         ref = cfg.get("reference_image", "")
         if ref and os.path.exists(ref):
             self.template_path = ref
             self.template_label.setText(ref.split("/")[-1].split("\\")[-1])
-            self.template_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+            self._make_label_blue(self.template_label)
         try:
             self.threshold_spin.setValue(int(cfg.get("threshold", 80)))
             self.interval_spin.setValue(int(cfg.get("interval", 5)))
@@ -233,10 +247,11 @@ class ImageGroupWidget(GroupCard):
 
     def set_title(self, index):
         self.index = index
-        self.title_label.setText(f"检测组 {index + 1}")
+        self.title_edit.setText(f"检测组 {index + 1}")
 
     def collect_config(self):
         return {
+            "name": self.title_edit.text(),
             "enabled": ConfigVar(self.toggle.isChecked()),
             "region": self.region,
             "reference_image": self.template_path or "",
@@ -260,14 +275,15 @@ class ImageGroupWidget(GroupCard):
     def _on_region_selected(self, x1, y1, x2, y2):
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-        self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self._make_label_blue(self.region_label)
 
     def _select_template(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择模板图片", "", "Image Files (*.png *.jpg *.bmp)")
         if path:
             self.template_label.setText(path.split("/")[-1].split("\\")[-1])
-            self.template_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
-            self.template_path = path
+            self._make_label_blue(self.template_label)
+            ws_path = self._save_template_to_workspace(path)
+            self.template_path = ws_path or path
 
     def _capture_template(self):
         from ui.components.screenshot import ScreenCaptureOverlay
@@ -276,9 +292,38 @@ class ImageGroupWidget(GroupCard):
         self._capture_overlay.show()
 
     def _on_template_captured(self, pixmap):
-        import os, tempfile
-        tmp = os.path.join(tempfile.gettempdir(), f"sightly_template_{self.index}.png")
-        pixmap.save(tmp)
-        self.template_label.setText(f"截图 ({pixmap.width()}x{pixmap.height()})")
-        self.template_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
-        self.template_path = tmp
+        ws_path = self._save_template_to_workspace(pixmap)
+        if ws_path:
+            self.template_label.setText(f"截图 ({pixmap.width()}x{pixmap.height()})")
+            self._make_label_blue(self.template_label)
+            self.template_path = ws_path
+
+    def _save_template_to_workspace(self, pixmap_or_path):
+        app_state = getattr(self.app, 'app_state', None)
+        if app_state and app_state.current is not None:
+            return app_state.save_template("image", self.index, pixmap_or_path)
+        return None
+
+    def _preview_template(self):
+        if self.template_path and os.path.exists(self.template_path):
+            os.startfile(self.template_path)
+        else:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(None, "提示", "未设置模板图片")
+
+    def _preview_region(self):
+        if self.region:
+            from PySide6.QtWidgets import QMessageBox
+            x1, y1, x2, y2 = self.region
+            QMessageBox.information(
+                None, "区域坐标",
+                f"左上: ({x1}, {y1})\n右下: ({x2}, {y2})\n尺寸: {x2-x1} × {y2-y1}"
+            )
+        else:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(None, "提示", "未设置检测区域")
+
+    # 在 __init__ 中被调用，连接点击事件
+    def _connect_preview(self):
+        self.region_label.clicked.connect(self._preview_region)
+        self.template_label.clicked.connect(self._preview_template)

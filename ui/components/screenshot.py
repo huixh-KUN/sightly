@@ -47,6 +47,8 @@ class ScreenCaptureOverlay(QWidget):
 
         rect = self._normalized_rect()
         if rect.width() > 10 and rect.height() > 10:
+            self.hide()
+            QApplication.processEvents()
             screen = QApplication.primaryScreen()
             pixmap = screen.grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())
             self.region_captured.emit(pixmap)

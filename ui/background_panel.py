@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel, TextButton
+from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel, TextButton, ClickableLabel
 from ui.components import ComboBox
 from ui.components import Toggle
 from ui.components import TemplatePicker, KeyCaptureWidget, WindowSelector
@@ -184,9 +184,11 @@ class BackgroundGroupWidget(GroupCard):
         type_names = {"ocr": "OCR", "image": "图像", "color": "颜色"}
         type_icons = {"ocr": "📝", "image": "🖼️", "color": "🎨"}
         icon = type_icons.get(monitor_type, "📋")
-        self.title_label = QLabel(f"{icon}  组 {index + 1} - {type_names.get(monitor_type, monitor_type)}")
-        self.title_label.setObjectName("cardTitle")
-        header.addWidget(self.title_label)
+        type_label = type_names.get(monitor_type, monitor_type)
+        self.title_edit = QLineEdit(f"{icon}  {type_label} 组 {index + 1}")
+        self.title_edit.setObjectName("cardTitle")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
@@ -202,7 +204,8 @@ class BackgroundGroupWidget(GroupCard):
 
         # Region
         grid.addWidget(QLabel("监控区域"), 0, 0)
-        self.region_label = InfoLabel("未选择")
+        self.region_label = ClickableLabel("未选择")
+        self.region_label.setObjectName("infoText")
         grid.addWidget(self.region_label, 0, 1)
         region_btn = TextButton("选择区域")
         region_btn.clicked.connect(self._select_region)
@@ -311,15 +314,35 @@ class BackgroundGroupWidget(GroupCard):
         grid.addLayout(timing_row, 4, 0, 1, 3)
 
         layout.addLayout(grid)
+        self._connect_preview()
+
+    def _make_label_blue(self, label):
+        label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+
+    def _connect_preview(self):
+        self.region_label.clicked.connect(self._preview_region)
+
+    def _preview_region(self):
+        if self.region:
+            x1, y1, x2, y2 = self.region
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(None, "区域坐标",
+                f"左上: ({x1}, {y1})\n右下: ({x2}, {y2})\n尺寸: {x2-x1} × {y2-y1}")
+        else:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(None, "提示", "未设置监控区域")
 
     def set_config(self, cfg):
         self.toggle.setChecked(cfg.get("enabled", False))
+        name = cfg.get("name", "")
+        if name:
+            self.title_edit.setText(name)
         region = cfg.get("region")
         if region:
             self.region = tuple(region)
             x1, y1, x2, y2 = self.region
             self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-            self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+            self._make_label_blue(self.region_label)
         try:
             self.interval_spin.setValue(int(cfg.get("interval", 3)))
             self.pause_spin.setValue(int(cfg.get("pause", 180)))
@@ -365,7 +388,7 @@ class BackgroundGroupWidget(GroupCard):
         type_names = {"ocr": "OCR", "image": "图像", "color": "颜色"}
         type_icons = {"ocr": "📝", "image": "🖼️", "color": "🎨"}
         icon = type_icons.get(self.monitor_type, "📋")
-        self.title_label.setText(f"{icon}  组 {index + 1} - {type_names.get(self.monitor_type, self.monitor_type)}")
+        self.title_edit.setText(f"{icon}  {type_names.get(self.monitor_type, self.monitor_type)} 组 {index + 1}")
 
     def collect_config(self):
         region_ratio = None
@@ -382,6 +405,7 @@ class BackgroundGroupWidget(GroupCard):
                     self.app.logging_manager.error("BG", f"获取窗口大小失败: {e}")
 
         cfg = {
+            "name": self.title_edit.text(),
             "enabled": ConfigVar(self.toggle.isChecked()),
             "type": self.monitor_type,
             "region": self.region,

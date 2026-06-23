@@ -1,5 +1,5 @@
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QSpinBox, QComboBox, QLineEdit
+from PySide6.QtCore import Qt, Signal
 
 class Card(QFrame):
     def __init__(self, title="", parent=None):
@@ -96,3 +96,28 @@ class Divider(QFrame):
         self.setObjectName("divider")
         self.setFrameShape(QFrame.HLine)
         self.setFrameShadow(QFrame.Sunken)
+
+
+class ClickableLabel(QLabel):
+    clicked = Signal()
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+        super().mousePressEvent(event)
+
+
+def set_panel_view_only(panel, view_only):
+    """将面板设为只读（保留滚动查看，禁用编辑控件）"""
+    for t in (QPushButton, QSpinBox, QComboBox, QLineEdit):
+        for child in panel.findChildren(t):
+            child.setEnabled(not view_only)
+    from ui.components import Toggle
+    for child in panel.findChildren(Toggle):
+        child.setEnabled(not view_only)
+    from ui.components import KeyCaptureWidget
+    for child in panel.findChildren(KeyCaptureWidget):
+        child.setEnabled(not view_only)

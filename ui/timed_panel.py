@@ -1,12 +1,12 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QScrollArea, QFrame,
     QSpinBox, QGridLayout
 )
 from PySide6.QtCore import Qt, Signal
 
 from ui.theme import Colors
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel, TextButton
+from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, Divider, InfoLabel, TextButton, ClickableLabel
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
 from core.config import ConfigVar
@@ -104,9 +104,10 @@ class TimedGroupWidget(GroupCard):
         layout.setSpacing(20)
 
         header = QHBoxLayout()
-        self.title_label = QLabel(f"定时组 {index + 1}")
-        self.title_label.setObjectName("cardTitle")
-        header.addWidget(self.title_label)
+        self.title_edit = QLineEdit(f"定时组 {index + 1}")
+        self.title_edit.setObjectName("cardTitle")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
@@ -171,18 +172,23 @@ class TimedGroupWidget(GroupCard):
 
         pos_row = QHBoxLayout()
         pos_row.setSpacing(12)
-        self.pos_label = InfoLabel("未选择")
+        self.pos_label = ClickableLabel("未选择")
+        self.pos_label.setObjectName("infoText")
         pos_row.addWidget(self.pos_label)
         pos_btn = TextButton("选择位置")
         pos_btn.clicked.connect(self._select_position)
         pos_row.addWidget(pos_btn)
         pos_row.addStretch()
         grid.addLayout(pos_row, 3, 0, 1, 3)
+        self.pos_label.clicked.connect(self._preview_position)
 
         layout.addLayout(grid)
 
     def set_config(self, cfg):
         self.toggle.setChecked(cfg.get("enabled", False))
+        name = cfg.get("name", "")
+        if name:
+            self.title_edit.setText(name)
         try:
             self.interval_spin.setValue(int(cfg.get("interval", 10)))
             self.delay_min_spin.setValue(int(cfg.get("delay_min", 300)))
@@ -203,10 +209,11 @@ class TimedGroupWidget(GroupCard):
 
     def set_title(self, index):
         self.index = index
-        self.title_label.setText(f"定时组 {index + 1}")
+        self.title_edit.setText(f"定时组 {index + 1}")
 
     def collect_config(self):
         return {
+            "name": self.title_edit.text(),
             "enabled": ConfigVar(self.toggle.isChecked()),
             "interval": ConfigVar(str(self.interval_spin.value())),
             "key": ConfigVar(self.key_input.key()),
@@ -231,3 +238,14 @@ class TimedGroupWidget(GroupCard):
         self._pos_y = y
         self.pos_label.setText(f"({x}, {y})")
         self.pos_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+
+    def _preview_position(self):
+        if self._pos_x or self._pos_y:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                None, "位置坐标",
+                f"X: {self._pos_x}\nY: {self._pos_y}"
+            )
+        else:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(None, "提示", "未选择位置")
