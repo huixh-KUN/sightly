@@ -35,11 +35,15 @@ def execute_combo_key(app, combo_str, priority=0, hold_delay=0.15):
     mods, main_key = parse_combo_key(combo_str)
     all_keys = mods + [main_key]
 
+    if hasattr(app, 'logging_manager'):
+        app.logging_manager.debug("INPUT", f"组合键按下: {combo_str} → keys={all_keys}")
     for k in all_keys:
         app.input_controller.key_down(k, priority=priority)
     time.sleep(hold_delay)
     for k in reversed(all_keys):
         app.input_controller.key_up(k, priority=priority)
+    if hasattr(app, 'logging_manager'):
+        app.logging_manager.debug("INPUT", f"组合键释放: {combo_str}")
 
 
 class ClickHandler:
@@ -73,12 +77,17 @@ class ClickHandler:
         Returns:
             bool: 是否执行成功
         """
+        self.app.logging_manager.debug("INPUT",
+            f"execute_click: ({x},{y}), module={module_name}{index+1}, offset={offset_range}")
         if not self._validate_running_state():
+            self.app.logging_manager.debug("INPUT", "execute_click: 运行状态无效，跳过")
             return False
         
         x, y = self._apply_random_offset(x, y, offset_range)
+        self.app.logging_manager.debug("INPUT", f"execute_click: 偏移后 ({x},{y})")
         
         if not self._validate_coordinates(x, y):
+            self.app.logging_manager.debug("INPUT", "execute_click: 坐标无效")
             return False
         
         try:

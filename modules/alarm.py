@@ -75,7 +75,10 @@ class AlarmModule(QObject):
             self.app.logging_manager.error("ALARM", f"Qt播放声音失败: {str(e)}")
 
     def play_alarm_sound(self, alarm_var):
-        if not alarm_var.get():
+        if hasattr(alarm_var, 'get'):
+            if not alarm_var.get():
+                return
+        elif not alarm_var:
             return
         sound_file = self.app.alarm_sound_path.get()
         if not sound_file or not os.path.exists(sound_file):

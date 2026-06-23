@@ -1,17 +1,19 @@
+import asyncio
 import threading
 import time
-from PIL import Image
+from typing import Optional
+
 import imagehash
 
 from PySide6.QtWidgets import QMessageBox
 
 from core.config import safe_group_get
-
 from utils.image import _preprocess_image
 from utils.screenshot import ScreenshotManager
 from utils.recognition import OCRRecognizer
 from core.priority_lock import get_module_priority
 from core.click_handler import ClickHandler
+from core.async_utils import run_in_executor
 
 
 class OCRModule:
@@ -19,23 +21,26 @@ class OCRModule:
     OCR模块，负责文字识别核心逻辑
     优先级: 3 (Number=6 > Timed=5 > Image=4 > OCR=3 > Color=2 > Script=1)
     """
-    
+
     PRIORITY = get_module_priority('ocr')
-    
+
     def __init__(self, app):
         self.app = app
         self.last_recognition_times = {}
         self.last_trigger_times = {}
         self.click_handler = ClickHandler(app)
         self.screenshot_manager = ScreenshotManager()
-        self._last_texts = {}  # 缓存上次识别文本，用于日志节流
-    
+        self._last_texts = {}
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._thread: Optional[threading.Thread] = None
+
     def start_monitoring(self):
-        """开始监控"""
+        """开始监控（异步协程版）"""
         self.app.logging_manager.debug("OCR", "start_monitoring 开始")
         if not self.app.tesseract_available:
             self.app.logging_manager.debug("OCR", "Tesseract OCR引擎未配置")
-            QMessageBox.information(None, "提示", "Tesseract OCR引擎未配置，请在设置中配置Tesseract路径后使用文字识别功能！")
+            QMessageBox.information(None, "提示",
+                "Tesseract OCR引擎未配置，请在设置中配置Tesseract路径后使用文字识别功能！")
             return
 
         has_enabled_group = False
@@ -49,108 +54,94 @@ class OCRModule:
             QMessageBox.warning(None, "警告", "请至少启用一个识别组并选择区域")
             return
 
-        self.app.logging_manager.debug("OCR", f"已启用识别组数量: {len([g for g in self.app.ocr_groups if g['enabled'].get()])}")
-
-        def start_func():
-            self.app.is_running = True
-            self.app.is_paused = False
-            self.ocr_thread = threading.Thread(target=self.ocr_loop, daemon=True)
-            self.app.ocr_thread = self.ocr_thread
-            self.ocr_thread.start()
-            self.app.logging_manager.debug("OCR", "OCR线程已启动")
-            return 1
-
-        self.app.start_module("ocr", start_func)
+        self._thread = threading.Thread(target=self._run_async, daemon=True)
+        self._thread.start()
 
     def stop_monitoring(self):
         """停止监控"""
-        self.app.logging_manager.debug("OCR", "stop_monitoring 开始")
-        self.app.is_running = False
-        if hasattr(self, 'ocr_thread') and self.ocr_thread and self.ocr_thread.is_alive():
-            self.ocr_thread.join(timeout=2)
+        if self._loop and self._loop.is_running():
+            for task in asyncio.all_tasks(loop=self._loop):
+                if not task.done():
+                    task.cancel()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=3)
         self._last_texts.clear()
-        self.app.logging_manager.debug("OCR", "stop_monitoring 完成")
-    
-    def ocr_loop(self):
-        """
-        OCR识别循环
-        """
-        self.app.logging_manager.debug("OCR", "ocr_loop 开始")
-        self.last_recognition_times = {i: 0 for i in range(len(self.app.ocr_groups))}
-        self.last_trigger_times = {i: 0 for i in range(len(self.app.ocr_groups))}
-        
-        last_hashes = {i: None for i in range(len(self.app.ocr_groups))}
-        frame_counts = {i: 0 for i in range(len(self.app.ocr_groups))}
 
-        while True:
-            if not self.app.is_running:
-                self.app.logging_manager.debug("OCR", "ocr_loop 检测到停止信号")
-                break
+    def _run_async(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self._loop = loop
+        try:
+            loop.run_until_complete(self._async_main())
+        finally:
+            loop.close()
+            self._loop = None
+
+    async def _async_main(self):
+        tasks = []
+        for i, group in enumerate(self.app.ocr_groups):
+            if group["enabled"].get() and group["region"]:
+                t = asyncio.create_task(self._ocr_group_loop(i, group))
+                tasks.append(t)
+        if tasks:
             try:
-                min_interval = self._calculate_min_interval()
-                self._wait_for_interval(min_interval)
-
-                if self.app.is_paused:
-                    continue
-
-                current_time = time.time()
-
-                for i, group in enumerate(self.app.ocr_groups):
-                    if self._should_process_group(group, i, current_time):
-                        self.perform_ocr_for_group_optimized(group, i, last_hashes, frame_counts)
-                        self.last_recognition_times[i] = current_time
-            except Exception as e:
-                self.app.logging_manager.error("OCR", f"错误: {str(e)}")
-                self.app.logging_manager.debug("OCR", f"ocr_loop 异常: {e}")
-                time.sleep(5)
-        self.app.logging_manager.debug("OCR", "ocr_loop 结束")
+                await asyncio.gather(*tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                pass
     
-    def _calculate_min_interval(self):
-        enabled_groups = [group for group in self.app.ocr_groups if group["enabled"].get()]
-        if enabled_groups:
-            try:
-                intervals = []
-                for group in enabled_groups:
+    async def _ocr_group_loop(self, group_index, group):
+        """单个OCR组的异步识别循环"""
+        last_hash = None
+        frame_count = 0
+        def _get(v, default=None):
+            return v.get() if hasattr(v, 'get') else (v if v is not None else default)
+        self.app.logging_manager.debug("OCR",
+            f"识别组{group_index+1} 协程开始: keywords={_get(group.get('keywords',''))}")
+        try:
+            while not (self._loop and self._loop.is_closed()):
+                try:
+                    if not _get(group.get("enabled"), False) or not group.get("region"):
+                        await asyncio.sleep(1)
+                        continue
                     try:
-                        interval = int(group["interval"].get())
-                        intervals.append(interval)
+                        pause_duration = int(_get(group.get("pause"), 180))
                     except (ValueError, TypeError):
-                        intervals.append(5)
-                return min(intervals)
-            except (ValueError, TypeError):
-                return 5
-        return 5        
-    
-    def _wait_for_interval(self, interval):
-        for _ in range(interval):
-            if not self.app.is_running:
-                break
-            time.sleep(1)
-    
-    def _should_process_group(self, group, i, current_time):
-        if not group["enabled"].get() or not group["region"]:
-            return False
+                        pause_duration = 180
+                    try:
+                        group_interval = int(_get(group.get("interval"), 5))
+                    except (ValueError, TypeError):
+                        group_interval = 5
 
-        try:
-            pause_duration = int(group["pause"].get())
-        except (ValueError, TypeError):
-            pause_duration = 180
-        try:
-            group_interval = int(group["interval"].get())
-        except (ValueError, TypeError):
-            group_interval = 5
+                    now = time.time()
+                    if now - self.last_trigger_times.get(group_index, 0) < pause_duration:
+                        await asyncio.sleep(1)
+                        continue
+                    if now - self.last_recognition_times.get(group_index, 0) < group_interval:
+                        await asyncio.sleep(1)
+                        continue
 
-        time_since_trigger = current_time - self.last_trigger_times[i]
-        time_since_recognition = current_time - self.last_recognition_times[i]
-        
-        if time_since_trigger < pause_duration:
-            return False
+                    self.app.logging_manager.debug("OCR",
+                        f"识别组{group_index+1} 开始识别: pause={pause_duration}, interval={group_interval}")
+                    last_hash, frame_count = await run_in_executor(
+                        self._do_ocr_group, group, group_index, last_hash, frame_count
+                    )
+                    self.last_recognition_times[group_index] = time.time()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: {str(e)}")
+                    await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 协程取消")
 
-        if time_since_recognition < group_interval:
-            return False
+    def _do_ocr_group(self, group, group_index, last_hash, frame_count):
+        """同步执行单个OCR组的识别（在线程池中运行），返回更新后的 (last_hash, frame_count)"""
+        lh = {group_index: last_hash}
+        fc = {group_index: frame_count}
+        self.perform_ocr_for_group_optimized(group, group_index, lh, fc)
+        return (lh.get(group_index), fc.get(group_index, 0))
 
-        return True
-    
+
     def _validate_ocr_group_input(self, group, group_index):
         if not group:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")

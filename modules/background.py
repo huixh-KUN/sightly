@@ -1,7 +1,10 @@
+import asyncio
 import ctypes
 import threading
 import time
 from typing import Optional, Dict, Any
+
+from core.async_utils import run_in_executor
 
 from utils.window_capture import (
     capture_window_region, find_window_by_title,
@@ -83,8 +86,7 @@ class BackgroundMonitor:
         self.app = app
         self.group_index = group_index
         self.is_running = False
-        self.monitor_thread = None
-        self.stop_event = threading.Event()
+        self._task = None
         
         self.hwnd = None
         self.region = None
@@ -171,31 +173,24 @@ class BackgroundMonitor:
         }
     
     def start_monitoring(self) -> bool:
-        """开始监控"""
+        """开始监控（同步接口，设置启动标志由事件循环创建任务）"""
         if self.is_running:
             return True
-        
         if not self.hwnd:
             return False
-        
         if not self.region and not self.region_ratio:
             return False
-        
-        self.stop_event.clear()
         self.is_running = True
         self.last_trigger_time = 0
-        self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
-        self.monitor_thread.start()
         return True
     
     def stop_monitoring(self) -> None:
         """停止监控"""
         self.is_running = False
-        self.stop_event.set()
-        self._last_text = None  # 清理缓存，确保下次启动时正常输出日志
-        
-        if self.monitor_thread and self.monitor_thread.is_alive():
-            self.monitor_thread.join(timeout=2)
+        self._last_text = None
+        if self._task and not self._task.done():
+            self._task.cancel()
+            self._task = None
     
     def _get_current_region(self) -> Optional[tuple]:
         """获取当前有效的区域坐标（支持分辨率自适应）"""
@@ -206,60 +201,67 @@ class BackgroundMonitor:
         
         return self.region
     
-    def _monitor_loop(self) -> None:
-        """监控主循环"""
-        self.app.logging_manager.debug("BG", f"组{self.group_index} 监控循环开始")
-        for _ in range(int(self.interval)):
-            if not self.is_running or self.stop_event.is_set():
-                return
-            time.sleep(1)
-        
-        self.app.logging_manager.debug("BG", f"组{self.group_index} 开始主循环")
-        while self.is_running and not self.stop_event.is_set():
-            try:
-                current_time = time.time()
-                
-                if current_time - self.last_trigger_time < self.pause:
-                    time.sleep(0.5)
-                    continue
-                
-                region = self._get_current_region()
-                if not region:
-                    self.app.logging_manager.debug("BG", f"组{self.group_index} 无有效区域")
-                    time.sleep(self.interval)
-                    continue
-                
-                image = self._capture_region(region)
-                if image is None:
-                    self.app.logging_manager.debug("BG", f"组{self.group_index} 截图失败")
-                    for _ in range(int(self.interval)):
-                        if not self.is_running or self.stop_event.is_set():
-                            return
-                        time.sleep(1)
-                    continue
-                
-                matched, click_position = self._recognize(image)
-                self.app.logging_manager.debug("BG", f"组{self.group_index} 识别结果: matched={matched}, click={click_position}")
-                
-                if matched:
-                    if click_position and region:
-                        click_position = (
-                            click_position[0] + region[0],
-                            click_position[1] + region[1]
-                        )
-                    self._trigger_action(click_position)
-                    self.last_trigger_time = current_time
-                
-                for _ in range(int(self.interval)):
-                    if not self.is_running or self.stop_event.is_set():
-                        return
-                    time.sleep(1)
-                
-            except Exception as e:
-                self.app.logging_manager.error("BG",
-                    f"后台监控组{self.group_index + 1}错误: {str(e)}"
-                )
-                time.sleep(5)
+    async def _monitor_async(self) -> None:
+        """异步监控主循环"""
+        self.app.logging_manager.debug("BG",
+            f"组{self.group_index} 协程监控开始: type={self.recognition_type}, "
+            f"interval={self.interval}s, pause={self.pause}s")
+        try:
+            await asyncio.sleep(self.interval)
+
+            while self.is_running:
+                try:
+                    current_time = time.time()
+                    if current_time - self.last_trigger_time < self.pause:
+                        await asyncio.sleep(0.5)
+                        continue
+
+                    region = self._get_current_region()
+                    if not region:
+                        self.app.logging_manager.debug("BG", f"组{self.group_index} 无有效区域")
+                        await asyncio.sleep(self.interval)
+                        continue
+
+                    self.app.logging_manager.debug("BG",
+                        f"组{self.group_index} 截图: region={region}, type={self.recognition_type}")
+                    image = await run_in_executor(self._capture_region, region)
+                    if image is None:
+                        self.app.logging_manager.debug("BG", f"组{self.group_index} 截图失败")
+                        await asyncio.sleep(self.interval)
+                        continue
+
+                    self.app.logging_manager.debug("BG",
+                        f"组{self.group_index} 开始识别: type={self.recognition_type}, image={image.size if hasattr(image,'size') else '?'}")
+                    matched, click_position = await run_in_executor(self._recognize, image)
+                    self.app.logging_manager.debug("BG",
+                        f"组{self.group_index} 识别结果: matched={matched}, click={click_position}")
+
+                    if matched:
+                        if click_position and region:
+                            click_position = (
+                                click_position[0] + region[0],
+                                click_position[1] + region[1]
+                            )
+                        self.app.logging_manager.log_message(
+                            f"后台监控组{self.group_index+1} 匹配成功: pos={click_position}")
+                        await run_in_executor(self._trigger_action, click_position)
+                        self.last_trigger_time = current_time
+                    else:
+                        self.app.logging_manager.debug("BG", f"组{self.group_index} 未匹配")
+
+                    await asyncio.sleep(self.interval)
+
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self.app.logging_manager.error("BG",
+                        f"后台监控组{self.group_index + 1}错误: {str(e)}"
+                    )
+                    await asyncio.sleep(5)
+
+        except asyncio.CancelledError:
+            self.app.logging_manager.debug("BG", f"组{self.group_index} 协程被取消")
+            self.is_running = False
     
     def _capture_region(self, region: tuple):
         """截取监控区域"""
@@ -474,6 +476,8 @@ class BackgroundManager:
         self.target_title: Optional[str] = None
         self.window_class: Optional[str] = None
         self.window_process: Optional[str] = None
+        self._loop = None
+        self._async_thread = None
     
     def find_target_window(self, keyword: str) -> tuple:
         """
@@ -585,62 +589,64 @@ class BackgroundManager:
     def stop_group(self, group_index: int) -> None:
         """停止单个监控组"""
         if group_index in self.monitors:
-            self.monitors[group_index].stop_monitoring()
+            monitor = self.monitors[group_index]
+            monitor.stop_monitoring()
+            if self._loop and self._loop.is_running():
+                if monitor._task and not monitor._task.done():
+                    monitor._task.cancel()
     
     def start_all_groups(self) -> int:
         """
-        启动所有启用的监控组
-        
+        启动所有启用的监控组（同步配置 + 异步事件循环）
+
         Returns:
             int: 启动的监控组数量
         """
         if not self.target_hwnd:
             self.app.logging_manager.log_message("请先绑定目标窗口")
             return 0
-        
+
         start_count = 0
-        
         groups = getattr(self.app, 'background_groups', [])
-        self.app.logging_manager.debug("BG", f"开始启动后台监控, 目标窗口: {self.target_hwnd}, 组数: {len(groups)}")
-        
+
+        # 同步配置阶段（在主线程执行）
         for group_index, group in enumerate(groups):
             enabled = _safe_get(group, "enabled", False)
-            self.app.logging_manager.debug("BG", f"组{group_index}: enabled={enabled}, type={group.get('type', '?')}")
             if not enabled:
                 continue
-            
+
             if group_index not in self.monitors:
                 monitor_type = group.get("type", "ocr")
                 self.create_group(group_index, monitor_type)
-            
+
             monitor = self.monitors[group_index]
             monitor.set_window(self.target_hwnd)
-            
+
             region = group.get("region")
             region_ratio = group.get("region_ratio")
             if region:
                 monitor.region = region
             if region_ratio:
                 monitor.region_ratio = region_ratio
-            
+
             if not monitor.region and not monitor.region_ratio:
                 continue
-            
+
             try:
                 monitor.interval = float(_safe_get(group, "interval", "5"))
                 monitor.pause = int(_safe_get(group, "pause", "180"))
             except (ValueError, TypeError):
                 monitor.interval = 5.0
                 monitor.pause = 180
-            
+
             monitor_type = _safe_get(group, "type", "ocr")
             monitor.recognition_type = monitor_type
-            
+
             if monitor_type == "ocr":
                 keywords = _safe_get(group, "keywords", "")
                 language = _safe_get(group, "language", "简体中文")
                 monitor.configure_ocr(keywords, language)
-            
+
             elif monitor_type == "image":
                 template = group.get("template_image")
                 try:
@@ -648,7 +654,7 @@ class BackgroundManager:
                 except (ValueError, TypeError):
                     threshold = 0.8
                 monitor.configure_image(template, threshold)
-            
+
             elif monitor_type == "color":
                 target_color = group.get("target_color")
                 try:
@@ -656,7 +662,7 @@ class BackgroundManager:
                 except (ValueError, TypeError):
                     tolerance = 10
                 monitor.configure_color(target_color, tolerance)
-            
+
             monitor.trigger_key = _safe_get(group, "key", "")
             try:
                 monitor.delay_min = int(_safe_get(group, "delay_min", "100"))
@@ -664,28 +670,63 @@ class BackgroundManager:
             except (ValueError, TypeError):
                 monitor.delay_min = 100
                 monitor.delay_max = 200
-            
+
             monitor.trigger_click = _safe_get(group, "click_enabled", False)
             monitor.click_offset = int(_safe_get(group, "click_offset", "0"))
             monitor.click_mode = _safe_get(group, "click_mode", "physical")
-            
             monitor.alarm_enabled = _safe_get(group, "alarm", False)
-            
-            self.app.logging_manager.debug("BG", f"组{group_index}: region={monitor.region}, click={monitor.trigger_click}, key={monitor.trigger_key}")
-            
+
+            self.app.logging_manager.debug("BG",
+                f"组{group_index}: region={monitor.region}, click={monitor.trigger_click}, key={monitor.trigger_key}")
+
             if monitor.start_monitoring():
                 start_count += 1
-                self.app.logging_manager.debug("BG", f"组{group_index} 启动成功")
-            else:
-                self.app.logging_manager.debug("BG", f"组{group_index} 启动失败: hwnd={monitor.hwnd}, region={monitor.region}, region_ratio={monitor.region_ratio}")
-        
-        self.app.logging_manager.debug("BG", f"启动完成, 共启动 {start_count} 个监控组")
+
+        if start_count == 0:
+            return 0
+
+        # 异步运行阶段（每个模块一个线程 + 事件循环）
+        self._async_thread = threading.Thread(target=self._run_async, daemon=True)
+        self._async_thread.start()
         return start_count
-    
+
+    def _run_async(self):
+        """后台线程：创建事件循环并运行所有监控组协程"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self._loop = loop
+        try:
+            loop.run_until_complete(self._async_main())
+        finally:
+            loop.close()
+            self._loop = None
+
+    async def _async_main(self):
+        """创建所有已启用监控组的协程任务"""
+        tasks = []
+        for idx, monitor in self.monitors.items():
+            if monitor.is_running:
+                t = asyncio.create_task(monitor._monitor_async())
+                monitor._task = t
+                tasks.append(t)
+        if tasks:
+            try:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            except asyncio.CancelledError:
+                pass
+
     def stop_all_groups(self) -> None:
-        """停止所有监控组"""
+        """停止所有监控组（取消协程 + 等待线程退出）"""
         for monitor in self.monitors.values():
             monitor.stop_monitoring()
+
+        if self._loop and self._loop.is_running():
+            for task in asyncio.all_tasks(loop=self._loop):
+                if not task.done():
+                    task.cancel()
+
+        if self._async_thread and self._async_thread.is_alive():
+            self._async_thread.join(timeout=3)
 
     def get_window_info(self) -> Optional[Dict[str, Any]]:
         """获取目标窗口信息"""

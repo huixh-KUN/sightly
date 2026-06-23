@@ -50,7 +50,7 @@ class ScreenshotManager:
                     cls._instance = super().__new__(cls)
         return cls._instance
     
-    def __init__(self, cache_duration=0.1):
+    def __init__(self, cache_duration=0.5):
         if hasattr(self, '_initialized') and self._initialized:
             return
         
@@ -80,7 +80,7 @@ class ScreenshotManager:
             try:
                 self.last_full_screenshot = ImageGrab.grab(all_screens=True)
                 self.last_time = current_time
-                return self.last_full_screenshot.copy()
+                return self.last_full_screenshot
             except Exception:
                 return None
     
