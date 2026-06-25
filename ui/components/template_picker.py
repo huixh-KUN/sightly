@@ -39,7 +39,7 @@ class TemplatePicker(QFrame):
         p_layout.setContentsMargins(2, 2, 2, 2)
         self._preview = QLabel("无模板")
         self._preview.setAlignment(Qt.AlignCenter)
-        self._preview.setStyleSheet("color: #9AA0A6; font-size: 11px;")
+        self._preview.setStyleSheet("font-size: 11px;")
         p_layout.addWidget(self._preview)
         layout.addWidget(preview_container)
 
@@ -67,7 +67,7 @@ class TemplatePicker(QFrame):
         layout.addLayout(btn_panel, 1)
 
         self._info = QLabel("未选择模板")
-        self._info.setStyleSheet("color: #9AA0A6; font-size: 12px;")
+        self._info.setStyleSheet("font-size: 12px;")
         layout.addWidget(self._info)
 
     def _connect_signals(self):
@@ -100,12 +100,12 @@ class TemplatePicker(QFrame):
             name = getattr(self._manager, "_source_path", "截图")
             display = name.split("/")[-1].split("\\")[-1][:20]
             self._info.setText(f"当前: {display}")
-            self._info.setStyleSheet("color: #8AB4F8; font-size: 12px;")
+            self._info.setStyleSheet("font-size: 12px;")
         else:
             self._preview.clear()
             self._preview.setText("无模板")
             self._info.setText("未选择模板")
-            self._info.setStyleSheet("color: #9AA0A6; font-size: 12px;")
+            self._info.setStyleSheet("font-size: 12px;")
 
     def current_template(self):
         return self._manager.current_template()

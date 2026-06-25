@@ -4,13 +4,15 @@ import sys
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QStackedWidget, QFrame,
-    QApplication, QSizePolicy, QSpacerItem, QSpinBox
+    QApplication, QSizePolicy, QSpacerItem, QSpinBox,
+    QStyleFactory,
 )
 from PySide6.QtCore import Qt, QTimer, QEvent
 from PySide6.QtGui import QIcon, QFont, QShortcut, QKeySequence
 
 from core.state import AppState
 from ui.theme import ThemeManager
+from ui.components import Toggle
 from core.config import ConfigManager, strip_configvar, ConfigVar
 from core.logging import LoggingManager
 from input.keyboard import setup_shortcuts
@@ -36,6 +38,7 @@ class MainWindow(QMainWindow):
         self.statusBar().setVisible(False)
 
         QApplication.instance().setStyleSheet(ThemeManager.qss())
+        QApplication.instance().setStyle(QStyleFactory.create("Fusion"))
 
         self.log_file_path = os.path.abspath("logs/sightly.log")
         self.config_file_path = os.path.abspath("config/config.json")
@@ -182,6 +185,12 @@ class MainWindow(QMainWindow):
         h_layout.addWidget(self.status_label)
 
         h_layout.addSpacing(16)
+
+        self.theme_toggle = Toggle("深色" if ThemeManager.is_dark() else "浅色")
+        self.theme_toggle.stateChanged.connect(self._on_theme_toggled)
+        h_layout.addWidget(self.theme_toggle)
+
+        h_layout.addSpacing(8)
 
         parent_layout.addWidget(header)
 
@@ -437,16 +446,27 @@ class MainWindow(QMainWindow):
         else:
             self.logging_manager.debug("CONFIG", "无保存的配置")
 
+    def _on_theme_toggled(self, checked):
+        mode = "light" if checked else "dark"
+        ThemeManager.switch_to(mode)
+        self.theme_toggle._label.setText("浅色" if checked else "深色")
+        self.app_state.save_index(theme=mode)
+
     def load_saved_config(self, workspace_name=None):
         self.logging_manager.debug("CONFIG", f"开始加载保存的配置 (name={workspace_name})")
+        theme = ThemeManager._current
         if workspace_name:
             self.save_config()
             self.app_state.switch_workspace(workspace_name)
         else:
-            loaded = self.app_state.startup_load()
+            loaded, theme = self.app_state.startup_load()
             self.logging_manager.debug("CONFIG", f"startup_load 返回: {loaded!r}")
             if loaded:
                 self.logging_manager.debug("CONFIG", f"工作空间已加载: {loaded}")
+        if theme and theme != ThemeManager._current:
+            ThemeManager.switch_to(theme)
+            self.theme_toggle.setChecked(theme == "light")
+            self.theme_toggle._label.setText("浅色" if theme == "light" else "深色")
 
     def _apply_settings(self, settings_cfg):
         general = settings_cfg.get("general", {})
@@ -511,7 +531,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.logging_manager.error("CLOSE", f"保存配置失败: {e}")
         try:
-            self.app_state.save_index()
+            self.app_state.save_index(theme=ThemeManager._current)
         except Exception as e:
             self.logging_manager.error("CLOSE", f"保存索引失败: {e}")
         self._shutdown_all_modules()

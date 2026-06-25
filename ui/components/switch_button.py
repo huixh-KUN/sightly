@@ -174,7 +174,6 @@ class DemoWindow(QMainWindow):
 
         self.status_label = QLabel("关闭")
         self.status_label.setFont(QFont("Microsoft YaHei", 12))
-        self.status_label.setStyleSheet("color: #888888;")
         row2.addWidget(self.status_label)
         row2.addStretch()
         layout.addLayout(row2)
@@ -183,9 +182,6 @@ class DemoWindow(QMainWindow):
 
     def _on_state_changed(self, checked):
         self.status_label.setText("开启" if checked else "关闭")
-        self.status_label.setStyleSheet(
-            "color: #76C4B6;" if checked else "color: #888888;"
-        )
 
 
 def run_demo():

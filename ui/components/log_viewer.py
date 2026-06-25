@@ -26,13 +26,6 @@ class LogViewer(QWidget):
             QPlainTextEdit {
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 12px;
-                background-color: #1A1A1A;
-                border: none;
-                border-radius: 6px;
-                padding: 8px;
-                color: #E8EAED;
-                selection-background-color: #8AB4F8;
-                selection-color: #202124;
             }
         """)
         layout.addWidget(self.text_edit, 1)

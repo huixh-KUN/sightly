@@ -63,12 +63,6 @@ class PrimaryButton(BaseButton):
         self.setObjectName("primary")
 
 
-class DangerButton(BaseButton):
-    def __init__(self, text="", parent=None):
-        super().__init__(text, parent)
-        self.setObjectName("danger")
-
-
 class SmallButton(BaseButton):
     """小型按钮，用于紧凑空间"""
     def __init__(self, text="", parent=None):
@@ -100,7 +94,7 @@ class StatusIndicator(QFrame):
     def running(self, value):
         self._running = value
         color = "#00e676" if value else "#555577"
-        self.setStyleSheet(f"#statusDot {{ background-color: {color}; border-radius: 5px; min-width: 10px; max-width: 10px; min-height: 10px; max-height: 10px; }}")
+        self.setStyleSheet(f"#statusDot {{ background-color: {color}; }}")
 
 
 class Divider(QFrame):
@@ -344,13 +338,6 @@ class GroupEditWindow(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setWidget(self._editor)
-        scroll.setStyleSheet("""
-            QScrollArea { border: none; background: transparent; }
-            QScrollBar:vertical { background: transparent; width: 6px; border: none; }
-            QScrollBar::handle:vertical { background-color: #3C4043; border-radius: 3px; min-height: 30px; }
-            QScrollBar::handle:vertical:hover { background-color: #5F6368; }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-        """)
         layout.addWidget(scroll)
 
         self._is_running = False

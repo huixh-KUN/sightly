@@ -17,7 +17,6 @@ class Toggle(QWidget):
         layout.setSpacing(8)
         self._switch = SwitchButton()
         self._label = QLabel(text)
-        self._label.setStyleSheet("color: #9AA0A6; font-size: 13px;")
         layout.addWidget(self._switch)
         layout.addWidget(self._label)
 

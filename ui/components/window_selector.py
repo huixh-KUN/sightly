@@ -28,10 +28,6 @@ class WindowSelector(QWidget):
 
         self._preview = QLabel()
         self._preview.setFixedSize(100, 70)
-        self._preview.setStyleSheet(
-            "background-color: #1E1E1E; border: 1px solid #3C4043; "
-            "border-radius: 6px; color: #5F6368; font-size: 11px;"
-        )
         self._preview.setAlignment(Qt.AlignCenter)
         self._preview.setText("预览")
         layout.addWidget(self._preview)
@@ -43,7 +39,6 @@ class WindowSelector(QWidget):
         layout.addWidget(QLabel("目标窗口"))
 
         self._status = QLabel("未选择窗口")
-        self._status.setStyleSheet("color: #9AA0A6; font-size: 13px;")
         layout.addWidget(self._status, 1)
 
         select_btn = QPushButton("选择窗口")
@@ -68,7 +63,7 @@ class WindowSelector(QWidget):
         self._hwnd = hwnd
         self._title = title
         self._status.setText(f"已选择: {title}")
-        self._status.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self._status.setStyleSheet("font-weight: 500;")
         self._capture_preview(hwnd)
 
     def _open_window_list(self):
@@ -94,17 +89,10 @@ class WindowSelector(QWidget):
         dlg_layout.setSpacing(12)
 
         hint = QLabel("双击窗口即可选中")
-        hint.setStyleSheet("color: #9AA0A6; font-size: 12px;")
+        hint.setStyleSheet("font-size: 12px;")
         dlg_layout.addWidget(hint)
 
         list_widget = QListWidget()
-        list_widget.setStyleSheet(
-            "QListWidget { background-color: #1E1E1E; border: 1px solid #3C4043; "
-            "border-radius: 8px; padding: 4px; outline: none; }"
-            "QListWidget::item { padding: 8px 12px; border-radius: 6px; color: #E8EAED; }"
-            "QListWidget::item:selected { background-color: #8AB4F833; color: #8AB4F8; }"
-            "QListWidget::item:hover:!selected { background-color: #2C2C2C; }"
-        )
         for hwnd, title in windows:
             item = QListWidgetItem(f"[{hwnd}] {title}")
             item.setData(Qt.UserRole, (hwnd, title))
@@ -120,7 +108,7 @@ class WindowSelector(QWidget):
         self._hwnd = hwnd
         self._title = title
         self._status.setText(f"已选择: {title}")
-        self._status.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self._status.setStyleSheet("font-weight: 500;")
         self._capture_preview(hwnd)
         self.window_selected.emit(hwnd, title)
         dlg.accept()

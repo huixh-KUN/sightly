@@ -30,7 +30,7 @@ class ModuleCard(QFrame):
         top_row.addWidget(self._icon_label)
 
         self._name_label = QLabel(name)
-        self._name_label.setStyleSheet("color: #E8EAED; font-weight: 500;")
+        self._name_label.setStyleSheet("font-weight: 500;")
         top_row.addWidget(self._name_label, 1)
 
         self._toggle = SwitchButton()
@@ -39,19 +39,15 @@ class ModuleCard(QFrame):
         layout.addLayout(top_row)
 
         self._desc_label = QLabel(desc)
-        self._desc_label.setStyleSheet("color: #9AA0A6;")
         self._desc_label.setWordWrap(True)
         self._desc_label.setMinimumHeight(16)
         layout.addWidget(self._desc_label)
 
         self._status = QLabel("未启动")
-        self._status.setStyleSheet("color: #5F6368;")
         layout.addWidget(self._status)
 
     def set_status(self, enabled):
         if enabled:
             self._status.setText("已启用")
-            self._status.setStyleSheet("color: #81C784;")
         else:
             self._status.setText("未启动")
-            self._status.setStyleSheet("color: #5F6368;")

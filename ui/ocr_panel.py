@@ -5,10 +5,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ui.theme import Colors
 from ui.widgets import (
     SectionTitle, PrimaryButton,
-    DangerButton, TextButton, ClickableLabel,
+    TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
 from ui.components import Toggle
@@ -171,7 +170,7 @@ class OCRGroupWidget(QFrame):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"识别组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
@@ -279,7 +278,7 @@ class OCRGroupWidget(QFrame):
             self.region = tuple(region)
             x1, y1, x2, y2 = self.region
             self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-            self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+            self.region_label.setStyleSheet("font-weight: 500;")
         try:
             self.interval_spin.setValue(int(cfg.get("interval", 3)))
             self.pause_spin.setValue(int(cfg.get("pause", 3)))
@@ -318,7 +317,7 @@ class OCRGroupWidget(QFrame):
     def _on_region_selected(self, x1, y1, x2, y2):
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-        self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500; font-size: 13px;")
+        self.region_label.setStyleSheet("font-weight: 500; font-size: 13px;")
         w = self.window()
         if w and isinstance(w, GroupEditWindow):
             pw = w.parent()

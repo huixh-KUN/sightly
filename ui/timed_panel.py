@@ -5,10 +5,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ui.theme import Colors
 from ui.widgets import (
     SectionTitle, PrimaryButton,
-    DangerButton, TextButton, ClickableLabel,
+    TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
 from ui.components import Toggle
@@ -170,7 +169,7 @@ class TimedGroupWidget(QFrame):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"定时组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
@@ -257,7 +256,7 @@ class TimedGroupWidget(QFrame):
             pass
         if self._pos_x or self._pos_y:
             self.pos_label.setText(f"({self._pos_x}, {self._pos_y})")
-            self.pos_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+            self.pos_label.setStyleSheet("font-weight: 500;")
         key = cfg.get("key", "")
         if key:
             self.key_input.setKey(key)
@@ -300,7 +299,7 @@ class TimedGroupWidget(QFrame):
         self._pos_x = x
         self._pos_y = y
         self.pos_label.setText(f"({x}, {y})")
-        self.pos_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self.pos_label.setStyleSheet("font-weight: 500;")
         w = self.window()
         if w and isinstance(w, GroupEditWindow):
             pw = w.parent()

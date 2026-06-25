@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 
 from ui.widgets import (
-    SectionTitle, PrimaryButton, DangerButton,
+    SectionTitle, PrimaryButton,
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
@@ -263,7 +263,7 @@ class BackgroundGroupWidget(QFrame):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"{icon}  {type_label} 组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
@@ -359,7 +359,7 @@ class BackgroundGroupWidget(QFrame):
         self._connect_preview()
 
     def _make_label_blue(self, label):
-        label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        label.setStyleSheet("font-weight: 500;")
 
     def _connect_preview(self):
         self.region_label.clicked.connect(self._preview_region)
@@ -524,7 +524,7 @@ class BackgroundGroupWidget(QFrame):
                 self.app.logging_manager.error("BG", f"坐标转换失败: {e}")
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-        self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self.region_label.setStyleSheet("font-weight: 500;")
         self._show_windows()
 
     def _on_template_picked(self, pixmap):

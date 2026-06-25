@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from ui.widgets import SectionTitle, PrimaryButton, DangerButton, InfoLabel, TextButton
+from ui.widgets import SectionTitle, PrimaryButton, InfoLabel, TextButton
 from ui.components import LogViewer, ModuleCard, ComboBox
 
 
@@ -51,8 +51,6 @@ class HomePanel(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(32, 28, 32, 28)
@@ -82,7 +80,7 @@ class HomePanel(QWidget):
         self.start_btn.setMinimumWidth(130)
         c_layout.addWidget(self.start_btn)
 
-        self.stop_btn = DangerButton("⏹  全部停止")
+        self.stop_btn = PrimaryButton("⏹  全部停止")
         self.stop_btn.setCursor(Qt.PointingHandCursor)
         self.stop_btn.setFixedHeight(36)
         self.stop_btn.setMinimumWidth(130)

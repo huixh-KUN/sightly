@@ -209,16 +209,18 @@ class AppState(QObject):
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            return data.get("last_workspace")
-        return None
+            return data.get("last_workspace"), data.get("theme", "dark")
+        return None, "dark"
 
-    def save_index(self):
+    def save_index(self, theme=None):
         path = self._index_path()
         data = {}
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         data["last_workspace"] = self._current
+        if theme:
+            data["theme"] = theme
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
@@ -237,22 +239,22 @@ class AppState(QObject):
         return self._wm.save(self._current, config)
 
     def startup_load(self):
-        name = self.load_index()
+        name, theme = self.load_index()
         self._log("STATE", f"startup_load, index_name={name!r}")
         if name:
             ws_list = self.workspace_list
             self._log("STATE", f"可用工作空间: {ws_list}")
             if name in ws_list:
                 self._load_workspace(name)
-                return name
+                return name, theme
             if ws_list:
                 self._load_workspace(ws_list[0])
-                return ws_list[0]
+                return ws_list[0], theme
         else:
             ws_list = self.workspace_list
             self._log("STATE", f"无 index, 可用工作空间: {ws_list}")
             if ws_list:
                 self._load_workspace(ws_list[0])
-                return ws_list[0]
+                return ws_list[0], theme
         self._log("STATE", "无可用工作空间")
-        return None
+        return None, "dark"

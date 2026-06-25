@@ -48,10 +48,6 @@ class KeyCaptureWidget(QWidget):
         layout.setSpacing(6)
 
         self._key_label = QLabel("无")
-        self._key_label.setStyleSheet(
-            "color: #9AA0A6; font-size: 13px; background-color: #1E1E1E; "
-            "border: 1px solid #3C4043; border-radius: 6px; padding: 5px 10px;"
-        )
         layout.addWidget(self._key_label)
 
         self._edit_btn = QPushButton("修改")
@@ -76,18 +72,8 @@ class KeyCaptureWidget(QWidget):
     def _update_display(self):
         if self._key:
             self._key_label.setText(self._key)
-            self._key_label.setStyleSheet(
-                "color: #8AB4F8; font-size: 13px; font-weight: 500; "
-                "background-color: #1E1E1E; border: 1px solid #8AB4F8; "
-                "border-radius: 6px; padding: 5px 10px;"
-            )
         else:
             self._key_label.setText("无")
-            self._key_label.setStyleSheet(
-                "color: #9AA0A6; font-size: 13px; "
-                "background-color: #1E1E1E; border: 1px solid #3C4043; "
-                "border-radius: 6px; padding: 5px 10px;"
-            )
 
     def _on_edit_clicked(self):
         if not self._listening:
@@ -98,16 +84,7 @@ class KeyCaptureWidget(QWidget):
     def _start_listening(self):
         self._listening = True
         self._edit_btn.setText("确定")
-        self._edit_btn.setStyleSheet(
-            "background-color: #8AB4F8; color: #202124; border: none; "
-            "border-radius: 6px; font-weight: 500;"
-        )
         self._key_label.setText("请按键...")
-        self._key_label.setStyleSheet(
-            "color: #FDD663; font-size: 13px; font-weight: 500; "
-            "background-color: #2C2C2C; border: 2px solid #8AB4F8; "
-            "border-radius: 6px; padding: 5px 10px;"
-        )
         self.setFocusPolicy(Qt.StrongFocus)
         self.setFocus()
         self.grabKeyboard()
@@ -116,7 +93,6 @@ class KeyCaptureWidget(QWidget):
     def _stop_listening(self):
         self._listening = False
         self._edit_btn.setText("修改")
-        self._edit_btn.setStyleSheet("")
         self.releaseKeyboard()
         self.setFocusPolicy(Qt.NoFocus)
         self._update_display()
@@ -140,11 +116,6 @@ class KeyCaptureWidget(QWidget):
         if key_name:
             self._key = key_name
             self._key_label.setText(key_name)
-            self._key_label.setStyleSheet(
-                "color: #8AB4F8; font-size: 13px; font-weight: 500; "
-                "background-color: #1E1E1E; border: 2px solid #8AB4F8; "
-                "border-radius: 6px; padding: 5px 10px;"
-            )
 
     def _resolve_key(self, event: QKeyEvent):
         key = event.key()

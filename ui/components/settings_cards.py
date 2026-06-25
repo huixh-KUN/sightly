@@ -105,7 +105,7 @@ class AlarmSettingsCard(QFrame):
         row.setSpacing(12)
         row.addWidget(QLabel("警报音效"))
         self._sound_path = QLabel(os.path.basename(self._sound_file))
-        self._sound_path.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self._sound_path.setStyleSheet("font-weight: 500;")
         row.addWidget(self._sound_path, 1)
         browse_btn = QPushButton("浏览")
         browse_btn.setCursor(Qt.PointingHandCursor)
@@ -127,7 +127,7 @@ class AlarmSettingsCard(QFrame):
         )
         if path:
             self._sound_path.setText(path.split("/")[-1].split("\\")[-1])
-            self._sound_path.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+            self._sound_path.setStyleSheet("font-weight: 500;")
             self._sound_file = path
             self.config_changed.emit()
 
@@ -138,7 +138,7 @@ class AlarmSettingsCard(QFrame):
         if "sound_path" in cfg and cfg["sound_path"]:
             self._sound_file = cfg["sound_path"]
             self._sound_path.setText(cfg["sound_path"].split("/")[-1].split("\\")[-1])
-            self._sound_path.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+            self._sound_path.setStyleSheet("font-weight: 500;")
 
 
 class AboutCard(QFrame):
@@ -161,7 +161,6 @@ class AboutCard(QFrame):
         row = QHBoxLayout()
         row.setSpacing(12)
         info = QLabel("灵眸 Sightly - 屏幕自动化识别系统")
-        info.setStyleSheet("color: #9AA0A6;")
         row.addWidget(info)
         row.addStretch()
         about_btn = QPushButton("关于灵眸")
@@ -188,7 +187,6 @@ class AboutCard(QFrame):
 
         version = QLabel("版本: 0.0.1")
         version.setAlignment(Qt.AlignCenter)
-        version.setStyleSheet("color: #9AA0A6;")
         layout.addWidget(version)
 
         layout.addSpacing(8)
@@ -214,7 +212,7 @@ class AboutCard(QFrame):
             lbl = QLabel(t)
             lbl.setWordWrap(True)
             lbl.setAlignment(Qt.AlignCenter)
-            lbl.setStyleSheet("color: #9AA0A6; font-size: 13px;")
+            lbl.setStyleSheet("font-size: 13px;")
             layout.addWidget(lbl)
 
         layout.addStretch()

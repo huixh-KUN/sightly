@@ -8,10 +8,6 @@ class ConfigCard(QFrame):
     def __init__(self, icon="", title="", header_widget=None, parent=None):
         super().__init__(parent)
         self.setObjectName("configCard")
-        self.setStyleSheet("""
-            #configCard { background-color: #1E1E1E; border: 1px solid #3C4043; border-radius: 10px; }
-            #cardHeader { font-size: 14px; font-weight: 500; color: #E8EAED; }
-        """)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)

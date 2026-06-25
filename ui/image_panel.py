@@ -5,10 +5,9 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 
-from ui.theme import Colors
 from ui.widgets import (
     SectionTitle, PrimaryButton,
-    DangerButton, TextButton, ClickableLabel,
+    TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
 from ui.components import Toggle
@@ -172,7 +171,7 @@ class ImageGroupWidget(QFrame):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"检测组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
@@ -272,7 +271,7 @@ class ImageGroupWidget(QFrame):
         self._connect_preview()
 
     def _make_label_blue(self, label):
-        label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        label.setStyleSheet("font-weight: 500;")
 
     def set_config(self, cfg):
         self.toggle.setChecked(cfg.get("enabled", False))
