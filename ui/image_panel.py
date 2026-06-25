@@ -7,8 +7,9 @@ from PySide6.QtCore import Qt, Signal
 
 from ui.theme import Colors
 from ui.widgets import (
-    SectionTitle, GroupCard, PrimaryButton,
-    DangerButton, InfoLabel, TextButton, ClickableLabel
+    SectionTitle, PrimaryButton,
+    DangerButton, TextButton, ClickableLabel,
+    GroupListItem, GroupEditWindow,
 )
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
@@ -20,16 +21,20 @@ class ImagePanel(QWidget):
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
-        self.groups = []
+        self.groups_data = []
+        self.list_items = []
+        self._view_only = False
+        self._edit_window = None
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 28, 32, 28)
-        layout.setSpacing(20)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         header = QHBoxLayout()
         header.setSpacing(16)
+        header.setContentsMargins(32, 28, 32, 16)
 
         title_col = QVBoxLayout()
         title_col.setSpacing(4)
@@ -52,8 +57,8 @@ class ImagePanel(QWidget):
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(scroll_content)
-        self.scroll_layout.setContentsMargins(0, 0, 0, 0)
-        self.scroll_layout.setSpacing(12)
+        self.scroll_layout.setContentsMargins(32, 0, 32, 28)
+        self.scroll_layout.setSpacing(6)
         self.scroll_layout.addStretch()
         self.scroll.setWidget(scroll_content)
         layout.addWidget(self.scroll, 1)
@@ -61,38 +66,96 @@ class ImagePanel(QWidget):
         self.add_group()
 
     def add_group(self):
-        idx = len(self.groups)
-        group = ImageGroupWidget(self.app, idx)
-        self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, group)
-        self.groups.append(group)
-        group.delete_requested.connect(lambda: self._delete_group(group))
+        idx = len(self.groups_data)
+        default = self._default_config(idx)
+        self.groups_data.append(default)
+        self._add_list_item(idx, default)
 
-    def _delete_group(self, group):
-        if group in self.groups:
-            self.groups.remove(group)
-            self.scroll_layout.removeWidget(group)
-            group.setParent(None)
-            group.deleteLater()
+    def _default_config(self, idx):
+        return {
+            "name": f"检测组 {idx + 1}",
+            "enabled": True,
+            "region": None,
+            "reference_image": "",
+            "threshold": "80",
+            "interval": "5",
+            "pause": "180",
+            "key": "",
+            "delay_min": "300",
+            "delay_max": "500",
+            "alarm": False,
+            "click": False,
+            "click_offset": "0",
+        }
+
+    def _add_list_item(self, idx, data):
+        item = GroupListItem(idx, "image", parent=self)
+        item.set_data(data)
+        item.toggled.connect(self._on_toggle)
+        item.double_clicked.connect(self._open_edit)
+        item.delete_clicked.connect(self._delete_group)
+        self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, item)
+        self.list_items.append(item)
+
+    def _delete_group(self, idx):
+        if 0 <= idx < len(self.list_items):
+            item = self.list_items.pop(idx)
+            self.scroll_layout.removeWidget(item)
+            item.setParent(None)
+            item.deleteLater()
+            self.groups_data.pop(idx)
             self._renumber()
 
     def _renumber(self):
-        for i, g in enumerate(self.groups):
-            g.set_title(i)
+        for i, item in enumerate(self.list_items):
+            item.set_index(i)
+            item.set_data(self.groups_data[i])
+
+    def _on_toggle(self, idx, state):
+        if 0 <= idx < len(self.groups_data):
+            self.groups_data[idx]["enabled"] = bool(state)
+
+    def _open_edit(self, idx):
+        if self._view_only:
+            return
+        if self._edit_window:
+            self._edit_window.close()
+            self._edit_window = None
+        if 0 <= idx < len(self.groups_data):
+            self._edit_window = GroupEditWindow(
+                self.app, self.groups_data[idx], idx, "image", panel=self
+            )
+            self._edit_window.show()
+
+    def _on_edit_window_closed(self, idx, editor):
+        if 0 <= idx < len(self.groups_data):
+            cfg = editor.collect_config()
+            plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+            self.groups_data[idx] = plain
+            if idx < len(self.list_items):
+                self.list_items[idx].set_data(plain)
+        self._edit_window = None
 
     def set_enabled(self, enabled):
-        super().setEnabled(enabled)
+        self._view_only = not enabled
 
     def collect_config(self):
-        return [g.collect_config() for g in self.groups]
+        return [{k: ConfigVar(v) for k, v in g.items()} for g in self.groups_data]
 
     def set_config(self, config_list):
-        for g in self.groups[:]:
-            self._delete_group(g)
+        for item in self.list_items:
+            self.scroll_layout.removeWidget(item)
+            item.deleteLater()
+        self.list_items.clear()
+        self.groups_data.clear()
         for cfg in config_list:
+            self.groups_data.append(dict(cfg))
+            self._add_list_item(len(self.list_items), cfg)
+        if not self.list_items:
             self.add_group()
-            self.groups[-1].set_config(cfg)
 
-class ImageGroupWidget(GroupCard):
+
+class ImageGroupWidget(QFrame):
     delete_requested = Signal()
 
     def __init__(self, app, index, parent=None):
@@ -104,7 +167,7 @@ class ImageGroupWidget(GroupCard):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(20)
+        layout.setSpacing(16)
 
         header = QHBoxLayout()
         self.title_edit = QLineEdit(f"检测组 {index + 1}")
@@ -115,13 +178,13 @@ class ImageGroupWidget(GroupCard):
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
         del_btn = DangerButton("删除")
+        del_btn.setObjectName("dangerAction")
         del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.clicked.connect(self.delete_requested.emit)
         header.addWidget(del_btn)
         layout.addLayout(header)
 
         grid = QGridLayout()
-        grid.setSpacing(16)
+        grid.setSpacing(12)
         grid.setColumnStretch(1, 1)
 
         grid.addWidget(QLabel("检测区域"), 0, 0)
@@ -129,6 +192,7 @@ class ImageGroupWidget(GroupCard):
         self.region_label.setObjectName("infoText")
         grid.addWidget(self.region_label, 0, 1)
         region_btn = TextButton("选择区域")
+        region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
         grid.addWidget(region_btn, 0, 2)
 
@@ -139,9 +203,11 @@ class ImageGroupWidget(GroupCard):
         self.template_label.setObjectName("infoText")
         template_row.addWidget(self.template_label, 1)
         template_btn = TextButton("选择图片")
+        template_btn.setObjectName("templateAction")
         template_btn.clicked.connect(self._select_template)
         template_row.addWidget(template_btn)
         screenshot_btn = TextButton("截图")
+        screenshot_btn.setObjectName("templateAction")
         screenshot_btn.clicked.connect(self._capture_template)
         template_row.addWidget(screenshot_btn)
         grid.addLayout(template_row, 1, 1, 1, 2)
@@ -153,12 +219,14 @@ class ImageGroupWidget(GroupCard):
         self.threshold_spin.setRange(50, 100)
         self.threshold_spin.setValue(80)
         self.threshold_spin.setSuffix("%")
+        self.threshold_spin.setFixedWidth(70)
         row2.addWidget(self.threshold_spin)
         row2.addWidget(QLabel("检测间隔"))
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 99)
         self.interval_spin.setValue(5)
         self.interval_spin.setSuffix(" 秒")
+        self.interval_spin.setFixedWidth(70)
         row2.addWidget(self.interval_spin)
         row2.addStretch()
         grid.addLayout(row2, 2, 0, 1, 3)
@@ -168,28 +236,31 @@ class ImageGroupWidget(GroupCard):
         self.pause_spin.setRange(0, 999)
         self.pause_spin.setValue(180)
         self.pause_spin.setSuffix(" 秒")
+        self.pause_spin.setFixedWidth(90)
         grid.addWidget(self.pause_spin, 3, 1)
 
-        key_row = QHBoxLayout()
-        key_row.setSpacing(12)
-        key_row.addWidget(QLabel("触发按键"))
+        grid.addWidget(QLabel("触发按键"), 4, 0)
         self.key_input = KeyCaptureWidget()
-        key_row.addWidget(self.key_input, 1)
-        key_row.addWidget(QLabel("按键时长"))
+        grid.addWidget(self.key_input, 4, 1)
+
+        key_params = QHBoxLayout()
+        key_params.setSpacing(8)
+        key_params.addWidget(QLabel("按键时长"))
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 9999)
         self.delay_min_spin.setValue(300)
         self.delay_min_spin.setSuffix(" ms")
         self.delay_min_spin.setFixedWidth(80)
-        key_row.addWidget(self.delay_min_spin)
-        key_row.addWidget(QLabel("~"))
+        key_params.addWidget(self.delay_min_spin)
+        key_params.addWidget(QLabel("~"))
         self.delay_max_spin = QSpinBox()
         self.delay_max_spin.setRange(0, 9999)
         self.delay_max_spin.setValue(500)
         self.delay_max_spin.setSuffix(" ms")
         self.delay_max_spin.setFixedWidth(80)
-        key_row.addWidget(self.delay_max_spin)
-        grid.addLayout(key_row, 4, 0, 1, 3)
+        key_params.addWidget(self.delay_max_spin)
+        key_params.addStretch()
+        grid.addLayout(key_params, 5, 0, 1, 3)
 
         toggles = QHBoxLayout()
         toggles.setSpacing(24)
@@ -206,7 +277,7 @@ class ImageGroupWidget(GroupCard):
         self.alarm_toggle = Toggle("警报提醒")
         toggles.addWidget(self.alarm_toggle)
         toggles.addStretch()
-        grid.addLayout(toggles, 5, 0, 1, 3)
+        grid.addLayout(toggles, 6, 0, 1, 3)
 
         layout.addLayout(grid)
         self._connect_preview()
@@ -241,7 +312,7 @@ class ImageGroupWidget(GroupCard):
             pass
         key = cfg.get("key", "")
         if key:
-            self.key_input.set_key(key)
+            self.key_input.setKey(key)
         self.click_toggle.setChecked(cfg.get("click", False))
         self.alarm_toggle.setChecked(cfg.get("alarm", False))
 
@@ -266,16 +337,36 @@ class ImageGroupWidget(GroupCard):
             "click_offset": ConfigVar(str(self.offset_spin.value())),
         }
 
+    def _hide_windows(self):
+        w = self.window()
+        if w and isinstance(w, GroupEditWindow):
+            w.hide()
+            from PySide6.QtWidgets import QWidget
+            pw = w.parent()
+            if isinstance(pw, QWidget):
+                pw.hide()
+
+    def _show_windows(self):
+        w = self.window()
+        if w and isinstance(w, GroupEditWindow):
+            from PySide6.QtWidgets import QWidget
+            pw = w.parent()
+            if isinstance(pw, QWidget):
+                pw.show()
+            w.show()
+
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
         self.overlay = RegionOverlay("image")
         self.overlay.region_selected.connect(self._on_region_selected)
+        self._hide_windows()
         self.overlay.show()
 
     def _on_region_selected(self, x1, y1, x2, y2):
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
         self._make_label_blue(self.region_label)
+        self._show_windows()
 
     def _select_template(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择模板图片", "", "Image Files (*.png *.jpg *.bmp)")
@@ -289,6 +380,7 @@ class ImageGroupWidget(GroupCard):
         from ui.components.screenshot import ScreenCaptureOverlay
         self._capture_overlay = ScreenCaptureOverlay()
         self._capture_overlay.region_captured.connect(self._on_template_captured)
+        self._hide_windows()
         self._capture_overlay.show()
 
     def _on_template_captured(self, pixmap):
@@ -297,6 +389,7 @@ class ImageGroupWidget(GroupCard):
             self.template_label.setText(f"截图 ({pixmap.width()}x{pixmap.height()})")
             self._make_label_blue(self.template_label)
             self.template_path = ws_path
+        self._show_windows()
 
     def _save_template_to_workspace(self, pixmap_or_path):
         app_state = getattr(self.app, 'app_state', None)
@@ -323,7 +416,6 @@ class ImageGroupWidget(GroupCard):
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(None, "提示", "未设置检测区域")
 
-    # 在 __init__ 中被调用，连接点击事件
     def _connect_preview(self):
         self.region_label.clicked.connect(self._preview_region)
         self.template_label.clicked.connect(self._preview_template)

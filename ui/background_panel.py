@@ -9,7 +9,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QPixmap
 
-from ui.widgets import SectionTitle, GroupCard, PrimaryButton, DangerButton, InfoLabel, TextButton, ClickableLabel
+from ui.widgets import (
+    SectionTitle, PrimaryButton, DangerButton,
+    TextButton, ClickableLabel,
+    GroupListItem, GroupEditWindow,
+)
 from ui.components import ComboBox
 from ui.components import Toggle
 from ui.components import TemplatePicker, KeyCaptureWidget, WindowSelector
@@ -20,16 +24,20 @@ class BackgroundPanel(QWidget):
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
-        self.groups = []
+        self.groups_data = []
+        self.list_items = []
+        self._view_only = False
+        self._edit_window = None
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 28, 32, 28)
-        layout.setSpacing(20)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         header = QHBoxLayout()
         header.setSpacing(16)
+        header.setContentsMargins(32, 28, 32, 16)
 
         title_col = QVBoxLayout()
         title_col.setSpacing(4)
@@ -57,67 +65,138 @@ class BackgroundPanel(QWidget):
 
         layout.addLayout(header)
 
+        window_outer = QWidget()
+        window_outer_layout = QHBoxLayout(window_outer)
+        window_outer_layout.setContentsMargins(32, 0, 32, 0)
+
         window_card = QFrame()
         window_card.setObjectName("windowCard")
         w_layout = QHBoxLayout(window_card)
-        w_layout.setContentsMargins(20, 16, 20, 16)
+        w_layout.setContentsMargins(16, 12, 16, 12)
         w_layout.setSpacing(12)
 
         self._window_selector = WindowSelector()
         self._window_selector.window_selected.connect(self._on_window_selected)
         w_layout.addWidget(self._window_selector)
 
-        layout.addWidget(window_card)
+        window_outer_layout.addWidget(window_card)
+        layout.addWidget(window_outer)
+
+        layout.addSpacing(12)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll_content = QWidget()
         self.scroll_layout = QVBoxLayout(scroll_content)
-        self.scroll_layout.setContentsMargins(0, 0, 0, 0)
-        self.scroll_layout.setSpacing(12)
+        self.scroll_layout.setContentsMargins(32, 0, 32, 28)
+        self.scroll_layout.setSpacing(6)
         self.scroll_layout.addStretch()
         self.scroll.setWidget(scroll_content)
         layout.addWidget(self.scroll, 1)
 
     def add_group(self, monitor_type="ocr"):
-        idx = len(self.groups)
-        group = BackgroundGroupWidget(self.app, idx, monitor_type)
-        self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, group)
-        self.groups.append(group)
-        group.delete_requested.connect(lambda: self._delete_group(group))
+        idx = len(self.groups_data)
+        default = self._default_config(idx, monitor_type)
+        self.groups_data.append(default)
+        self._add_list_item(idx, default, monitor_type)
 
-    def _delete_group(self, group):
-        if group in self.groups:
-            self.groups.remove(group)
-            self.scroll_layout.removeWidget(group)
-            group.setParent(None)
-            group.deleteLater()
+    def _default_config(self, idx, monitor_type):
+        cfg = {
+            "name": f"组 {idx + 1}",
+            "enabled": True,
+            "type": monitor_type,
+            "region": None,
+            "region_ratio": None,
+            "key": "",
+            "alarm": False,
+            "click_enabled": False,
+            "click_mode": "physical",
+            "click_offset": "0",
+            "delay_min": "100",
+            "delay_max": "200",
+            "interval": "3",
+            "pause": "180",
+        }
+        if monitor_type == "ocr":
+            cfg["keywords"] = ""
+            cfg["language"] = "简体中文"
+        elif monitor_type == "image":
+            cfg["threshold"] = "80"
+            cfg["reference_image"] = ""
+        elif monitor_type == "color":
+            cfg["target_color"] = None
+            cfg["tolerance"] = "30"
+        return cfg
+
+    def _add_list_item(self, idx, data, monitor_type):
+        item = GroupListItem(idx, monitor_type, parent=self)
+        item.set_data(data)
+        item.toggled.connect(self._on_toggle)
+        item.double_clicked.connect(self._open_edit)
+        item.delete_clicked.connect(self._delete_group)
+        self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, item)
+        self.list_items.append(item)
+
+    def _delete_group(self, idx):
+        if 0 <= idx < len(self.list_items):
+            item = self.list_items.pop(idx)
+            self.scroll_layout.removeWidget(item)
+            item.setParent(None)
+            item.deleteLater()
+            self.groups_data.pop(idx)
             self._renumber()
 
     def _renumber(self):
-        for i, g in enumerate(self.groups):
-            g.set_title(i)
+        for i, item in enumerate(self.list_items):
+            item.set_index(i)
+            item.set_data(self.groups_data[i])
+
+    def _on_toggle(self, idx, state):
+        if 0 <= idx < len(self.groups_data):
+            self.groups_data[idx]["enabled"] = bool(state)
+
+    def _open_edit(self, idx):
+        if self._view_only:
+            return
+        if self._edit_window:
+            self._edit_window.close()
+            self._edit_window = None
+        if 0 <= idx < len(self.groups_data):
+            data = self.groups_data[idx]
+            mt = data.get("type", "ocr")
+            bg_type = f"{mt}_bg"
+            self._edit_window = GroupEditWindow(
+                self.app, data, idx, bg_type, panel=self
+            )
+            self._edit_window.show()
+
+    def _on_edit_window_closed(self, idx, editor):
+        if 0 <= idx < len(self.groups_data):
+            cfg = editor.collect_config()
+            plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+            self.groups_data[idx] = plain
+            if idx < len(self.list_items):
+                self.list_items[idx].set_data(plain)
+        self._edit_window = None
 
     def set_enabled(self, enabled):
-        super().setEnabled(enabled)
+        self._view_only = not enabled
 
     def collect_config(self):
         bg_manager = getattr(self.app, 'background_manager', None)
         window_info = bg_manager.window_info() if bg_manager else {}
-
         return {
             "window_class": window_info.get("window_class"),
             "window_process": window_info.get("window_process"),
             "window_title": window_info.get("window_title"),
-            "groups": [g.collect_config() for g in self.groups],
+            "groups": [{k: ConfigVar(v) for k, v in g.items()} for g in self.groups_data],
         }
 
     def set_config(self, config):
         if hasattr(self.app, 'logging_manager'):
-            self.app.logging_manager.debug("BG", f"set_config 收到: type={type(config).__name__}, {str(config)[:200]}")
+            self.app.logging_manager.debug("BG", f"set_config 收到: type={type(config).__name__}")
 
-        # 兼容旧版 list 格式
         if isinstance(config, list):
             groups = config
             first = groups[0] if groups else {}
@@ -130,13 +209,12 @@ class BackgroundPanel(QWidget):
             wt = config.get("window_title")
             groups = config.get("groups", [])
 
-        if hasattr(self.app, 'logging_manager'):
-            self.app.logging_manager.debug("BG", f"set_config: wc={wc}, wp={wp}, groups={len(groups)}项")
+        for item in self.list_items:
+            self.scroll_layout.removeWidget(item)
+            item.deleteLater()
+        self.list_items.clear()
+        self.groups_data.clear()
 
-        for g in self.groups[:]:
-            self._delete_group(g)
-
-        # 自动重连窗口
         if (wc or wt) and hasattr(self.app, 'background_manager'):
             self.app.logging_manager.log_message(
                 f"尝试自动重连窗口: class={wc}, process={wp}, title={wt}"
@@ -144,9 +222,7 @@ class BackgroundPanel(QWidget):
             ok = self.app.background_manager.auto_reconnect(wc, wp, wt)
             if ok:
                 title = self.app.background_manager.target_title or ""
-                self.app.logging_manager.log_message(
-                    f"自动重连成功: {title}"
-                )
+                self.app.logging_manager.log_message(f"自动重连成功: {title}")
                 self._window_selector.set_window_by_hwnd(
                     self.app.background_manager.target_hwnd
                 )
@@ -157,14 +233,14 @@ class BackgroundPanel(QWidget):
 
         for cfg in groups:
             mon_type = cfg.get("type", "ocr")
-            self.add_group(mon_type)
-            self.groups[-1].set_config(cfg)
+            self.groups_data.append(dict(cfg))
+            self._add_list_item(len(self.list_items), cfg, mon_type)
 
     def _on_window_selected(self, hwnd, title):
         self.app.background_manager.set_target_window(hwnd)
 
 
-class BackgroundGroupWidget(GroupCard):
+class BackgroundGroupWidget(QFrame):
     delete_requested = Signal()
 
     def __init__(self, app, index, monitor_type="ocr", parent=None):
@@ -174,12 +250,12 @@ class BackgroundGroupWidget(GroupCard):
         self.monitor_type = monitor_type
         self.region = None
         self.region_ratio = None
+        self.template_pixmap = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(20)
+        layout.setSpacing(16)
 
-        # Header
         header = QHBoxLayout()
         type_names = {"ocr": "OCR", "image": "图像", "color": "颜色"}
         type_icons = {"ocr": "📝", "image": "🖼️", "color": "🎨"}
@@ -193,32 +269,29 @@ class BackgroundGroupWidget(GroupCard):
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
         del_btn = DangerButton("删除")
+        del_btn.setObjectName("dangerAction")
         del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.clicked.connect(self.delete_requested.emit)
         header.addWidget(del_btn)
         layout.addLayout(header)
 
         grid = QGridLayout()
-        grid.setSpacing(16)
+        grid.setSpacing(12)
         grid.setColumnStretch(1, 1)
 
-        # Region
         grid.addWidget(QLabel("监控区域"), 0, 0)
         self.region_label = ClickableLabel("未选择")
         self.region_label.setObjectName("infoText")
         grid.addWidget(self.region_label, 0, 1)
         region_btn = TextButton("选择区域")
+        region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
         grid.addWidget(region_btn, 0, 2)
 
         if monitor_type == "ocr":
-            # Keywords
             grid.addWidget(QLabel("关键词:"), 1, 0)
             self.keywords_input = QLineEdit()
             self.keywords_input.setPlaceholderText("多个关键词用 | 分隔")
             grid.addWidget(self.keywords_input, 1, 1, 1, 2)
-
-            # Language
             lang_row = QHBoxLayout()
             lang_row.setSpacing(16)
             lang_row.addWidget(QLabel("语言"))
@@ -232,7 +305,6 @@ class BackgroundGroupWidget(GroupCard):
             self.template_picker = TemplatePicker()
             self.template_picker.template_selected.connect(self._on_template_picked)
             grid.addWidget(self.template_picker, 1, 1, 1, 2)
-
             img_row = QHBoxLayout()
             img_row.setSpacing(16)
             img_row.addWidget(QLabel("匹配阈值"))
@@ -252,10 +324,10 @@ class BackgroundGroupWidget(GroupCard):
             self.color_hex.setMaxLength(7)
             color_layout.addWidget(self.color_hex)
             color_btn = TextButton("取色")
+            color_btn.setObjectName("templateAction")
             color_btn.clicked.connect(self._pick_color)
             color_layout.addWidget(color_btn)
             grid.addLayout(color_layout, 1, 1, 1, 2)
-
             color_row = QHBoxLayout()
             color_row.setSpacing(16)
             color_row.addWidget(QLabel("容差"))
@@ -266,14 +338,11 @@ class BackgroundGroupWidget(GroupCard):
             color_row.addStretch()
             grid.addLayout(color_row, 2, 0, 1, 3)
 
-        # Common fields
         common_row = QHBoxLayout()
         common_row.setSpacing(12)
-
         common_row.addWidget(QLabel("触发按键"))
         self.key_input = KeyCaptureWidget()
         common_row.addWidget(self.key_input, 1)
-
         self.click_toggle = Toggle("点击")
         common_row.addWidget(self.click_toggle)
         self.click_mode_combo = ComboBox(items=["物理点击", "虚拟点击"], width=110)
@@ -286,16 +355,12 @@ class BackgroundGroupWidget(GroupCard):
         self.offset_spin.setValue(0)
         self.offset_spin.setSuffix("px")
         self.offset_spin.setFixedWidth(70)
-        self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
         common_row.addWidget(self.offset_spin)
-
         self.alarm_toggle = Toggle("报警")
         common_row.addWidget(self.alarm_toggle)
-
         common_row.addStretch()
         grid.addLayout(common_row, 3, 0, 1, 3)
 
-        # Interval and pause
         timing_row = QHBoxLayout()
         timing_row.setSpacing(12)
         timing_row.addWidget(QLabel("间隔(秒)"))
@@ -351,7 +416,7 @@ class BackgroundGroupWidget(GroupCard):
             pass
         key = cfg.get("key", "")
         if key:
-            self.key_input.set_key(key)
+            self.key_input.setKey(key)
         self.click_toggle.setChecked(cfg.get("click_enabled", False))
         mode = cfg.get("click_mode", "physical")
         self.click_mode_combo.setCurrentIndex(0 if mode == "physical" else 1)
@@ -442,8 +507,27 @@ class BackgroundGroupWidget(GroupCard):
             cfg["tolerance"] = ConfigVar(str(self.tolerance_spin.value()))
         return cfg
 
+    def _hide_windows(self):
+        w = self.window()
+        if w and isinstance(w, GroupEditWindow):
+            w.hide()
+            from PySide6.QtWidgets import QWidget as QW
+            pw = w.parent()
+            if isinstance(pw, QW):
+                pw.hide()
+
+    def _show_windows(self):
+        w = self.window()
+        if w and isinstance(w, GroupEditWindow):
+            from PySide6.QtWidgets import QWidget as QW
+            pw = w.parent()
+            if isinstance(pw, QW):
+                pw.show()
+            w.show()
+
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
+        self._hide_windows()
         self.overlay = RegionOverlay("bg")
         self.overlay.region_selected.connect(self._on_region_selected)
         self.overlay.show()
@@ -464,6 +548,7 @@ class BackgroundGroupWidget(GroupCard):
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
         self.region_label.setStyleSheet("color: #8AB4F8; font-weight: 500;")
+        self._show_windows()
 
     def _on_template_picked(self, pixmap):
         if pixmap and not pixmap.isNull():

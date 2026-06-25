@@ -93,6 +93,15 @@ Card, #card, #settingsCard, #windowCard { background-color: #1E1E1E; border: 1px
 Card:hover, #card:hover, #settingsCard:hover, #windowCard:hover { background-color: #252525; }
 GroupCard, #groupCard { background-color: #2C2C2C; border: none; border-radius: 12px; }
 GroupCard:hover, #groupCard:hover { background-color: #333333; }
+#groupListItem { background-color: #1E1E1E; border: 1px solid #3C4043; border-radius: 8px; }
+#groupListItem:hover { background-color: #252525; border-color: #5F6368; }
+#groupListItem #groupIcon { min-width: 22px; max-width: 22px; }
+#groupListItem #groupName { font-size: 14px; font-weight: 500; color: #E8EAED; }
+#groupListItem #groupParams { color: #9AA0A6; font-size: 13px; }
+#groupListItem #groupTemplate { color: #8AB4F8; font-size: 12px; }
+#groupListItem #groupRegion { color: #8AB4F8; font-size: 12px; }
+#groupListItem #groupDetail { color: #9AA0A6; font-size: 12px; }
+#groupListItem #groupToggle { min-width: 80px; }
 #moduleCard { background-color: #333333; border: 1px solid #3C4043; border-radius: 10px; }
 #moduleCard:hover { background-color: #3A3A3A; }
 #sectionTitle { font-size: 20px; font-weight: 500; color: #E8EAED; letter-spacing: -0.3px; padding-bottom: 4px; }
@@ -197,6 +206,15 @@ Card, #card, #settingsCard, #windowCard { background-color: #F5F5F5; border: 1px
 Card:hover, #card:hover, #settingsCard:hover, #windowCard:hover { background-color: #EEEEEE; }
 GroupCard, #groupCard { background-color: #FFFFFF; border: none; border-radius: 12px; }
 GroupCard:hover, #groupCard:hover { background-color: #F5F5F5; }
+#groupListItem { background-color: #F5F5F5; border: 1px solid #E0E0E0; border-radius: 8px; }
+#groupListItem:hover { background-color: #EEEEEE; border-color: #C0C0C0; }
+#groupListItem #groupIcon { min-width: 22px; max-width: 22px; }
+#groupListItem #groupName { font-size: 14px; font-weight: 500; color: #212121; }
+#groupListItem #groupParams { color: #757575; font-size: 13px; }
+#groupListItem #groupTemplate { color: #1976D2; font-size: 12px; }
+#groupListItem #groupRegion { color: #1976D2; font-size: 12px; }
+#groupListItem #groupDetail { color: #757575; font-size: 12px; }
+#groupListItem #groupToggle { min-width: 80px; }
 #moduleCard { background-color: #FFFFFF; border: 1px solid #E0E0E0; border-radius: 10px; }
 #moduleCard:hover { background-color: #F5F5F5; }
 #sectionTitle { font-size: 20px; font-weight: 500; color: #212121; letter-spacing: -0.3px; padding-bottom: 4px; }
