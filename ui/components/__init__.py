@@ -1,3 +1,4 @@
+from ui.components.config_card import ConfigCard
 from ui.components.switch_button import SwitchButton
 from ui.components.module_card import ModuleCard
 from ui.components.screenshot import ScreenCaptureOverlay

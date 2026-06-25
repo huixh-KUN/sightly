@@ -309,8 +309,8 @@ class GroupEditWindow(QWidget):
     def __init__(self, app, group_data: dict, group_index: int, group_type: str, panel=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"编辑 - {group_data.get('name', f'组 {group_index+1}')}")
-        self.setMinimumSize(520, 400)
-        self.resize(520, 500)
+        self.setMinimumSize(640, 500)
+        self.resize(680, 600)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self._app = app
         self._group_index = group_index
@@ -342,8 +342,15 @@ class GroupEditWindow(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setWidget(self._editor)
+        scroll.setStyleSheet("""
+            QScrollArea { border: none; background: transparent; }
+            QScrollBar:vertical { background: transparent; width: 6px; border: none; }
+            QScrollBar::handle:vertical { background-color: #3C4043; border-radius: 3px; min-height: 30px; }
+            QScrollBar::handle:vertical:hover { background-color: #5F6368; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+        """)
         layout.addWidget(scroll)
 
         self._is_running = False

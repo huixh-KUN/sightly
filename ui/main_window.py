@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
         self.resize(1050, 700)
         self.statusBar().setVisible(False)
 
-        self.setStyleSheet(ThemeManager.qss())
+        QApplication.instance().setStyleSheet(ThemeManager.qss())
 
         self.log_file_path = os.path.abspath("logs/sightly.log")
         self.config_file_path = os.path.abspath("config/config.json")

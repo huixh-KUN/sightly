@@ -14,6 +14,7 @@ from ui.widgets import (
 from ui.components import Toggle
 from ui.components import ComboBox
 from ui.components import KeyCaptureWidget
+from ui.components import ConfigCard
 from core.config import ConfigVar
 
 
@@ -156,7 +157,6 @@ class OCRPanel(QWidget):
 
 
 class OCRGroupWidget(QFrame):
-    delete_requested = Signal()
 
     def __init__(self, app, index, parent=None):
         super().__init__(parent)
@@ -165,103 +165,92 @@ class OCRGroupWidget(QFrame):
         self.region = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
         header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"识别组 {index + 1}")
-        self.title_edit.setObjectName("cardTitle")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
-        del_btn = DangerButton("删除")
-        del_btn.setObjectName("dangerAction")
-        del_btn.setCursor(Qt.PointingHandCursor)
-        header.addWidget(del_btn)
         layout.addLayout(header)
 
-        grid = QGridLayout()
-        grid.setSpacing(12)
-        grid.setColumnStretch(1, 1)
-
-        grid.addWidget(QLabel("识别区域"), 0, 0)
+        # 📍 区域
+        region_card = ConfigCard("📍", "区域")
+        region_row = QHBoxLayout()
         self.region_label = ClickableLabel("未选择")
         self.region_label.setObjectName("infoText")
-        grid.addWidget(self.region_label, 0, 1)
+        region_row.addWidget(self.region_label, 1)
         region_btn = TextButton("选择区域")
         region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
-        grid.addWidget(region_btn, 0, 2)
+        region_row.addWidget(region_btn)
         self.region_label.clicked.connect(self._preview_region)
+        region_card.add_widget_row(region_row)
+        layout.addWidget(region_card)
 
-        grid.addWidget(QLabel("关键词"), 1, 0)
-        self.keywords_input = QLineEdit()
-        self.keywords_input.setPlaceholderText("多个关键词用 , 分隔")
-        grid.addWidget(self.keywords_input, 1, 1, 1, 2)
-
-        row2 = QHBoxLayout()
-        row2.setSpacing(16)
-        row2.addWidget(QLabel("语言"))
-        self.lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"])
-        row2.addWidget(self.lang_combo)
-        row2.addSpacing(8)
-        row2.addWidget(QLabel("间隔(秒)"))
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(1, 999)
-        self.interval_spin.setValue(3)
-        self.interval_spin.setFixedWidth(70)
-        row2.addWidget(self.interval_spin)
-        row2.addStretch()
-        grid.addLayout(row2, 2, 0, 1, 3)
-
-        row3 = QHBoxLayout()
-        row3.setSpacing(16)
-        row3.addWidget(QLabel("暂停(秒)"))
-        self.pause_spin = QSpinBox()
-        self.pause_spin.setRange(0, 999)
-        self.pause_spin.setValue(3)
-        self.pause_spin.setFixedWidth(70)
-        row3.addWidget(self.pause_spin)
-        row3.addSpacing(8)
-        row3.addWidget(QLabel("延迟(秒)"))
+        # ⚙️ 触发
+        trigger_card = ConfigCard("⚙️", "触发")
+        self.key_input = KeyCaptureWidget()
+        trigger_card.add_row("按键", self.key_input)
+        delay_row = QHBoxLayout()
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 10)
         self.delay_min_spin.setValue(1)
         self.delay_min_spin.setFixedWidth(70)
-        row3.addWidget(self.delay_min_spin)
-        row3.addWidget(QLabel("~"))
+        delay_row.addWidget(self.delay_min_spin)
+        delay_row.addWidget(QLabel("~"))
         self.delay_max_spin = QSpinBox()
         self.delay_max_spin.setRange(0, 10)
         self.delay_max_spin.setValue(3)
         self.delay_max_spin.setFixedWidth(70)
-        row3.addWidget(self.delay_max_spin)
-        row3.addStretch()
-        grid.addLayout(row3, 3, 0, 1, 3)
-
-        grid.addWidget(QLabel("触发按键"), 4, 0)
-        self.key_input = KeyCaptureWidget()
-        grid.addWidget(self.key_input, 4, 1)
-
-        toggles = QHBoxLayout()
-        toggles.setSpacing(24)
-        self.click_toggle = Toggle("识别后点击")
-        toggles.addWidget(self.click_toggle)
-        toggles.addWidget(QLabel("偏移"))
+        delay_row.addWidget(self.delay_max_spin)
+        delay_row.addStretch()
+        trigger_card.add_row("延迟(秒)", delay_row)
+        click_row = QHBoxLayout()
+        self.click_toggle = Toggle("点击")
+        click_row.addWidget(self.click_toggle)
+        click_row.addWidget(QLabel("偏移"))
         self.offset_spin = QSpinBox()
         self.offset_spin.setRange(0, 200)
         self.offset_spin.setValue(0)
         self.offset_spin.setSuffix("px")
         self.offset_spin.setFixedWidth(70)
         self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
-        toggles.addWidget(self.offset_spin)
-        self.alarm_toggle = Toggle("触发时响铃")
-        toggles.addWidget(self.alarm_toggle)
-        toggles.addStretch()
-        grid.addLayout(toggles, 5, 0, 1, 3)
+        click_row.addWidget(self.offset_spin)
+        click_row.addStretch()
+        trigger_card.add_widget_row(click_row)
+        layout.addWidget(trigger_card)
 
-        layout.addLayout(grid)
+        # 🔔 报警
+        alarm_card = ConfigCard("🔔", "报警")
+        self.alarm_toggle = Toggle("触发时响铃")
+        alarm_card.set_content(self.alarm_toggle)
+        layout.addWidget(alarm_card)
+
+        # 🎯 匹配
+        match_card = ConfigCard("🎯", "匹配")
+        self.keywords_input = QLineEdit()
+        self.keywords_input.setPlaceholderText("多个关键词用 , 分隔")
+        match_card.add_row("关键词", self.keywords_input)
+        self.lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"])
+        match_card.add_row("语言", self.lang_combo)
+        self.interval_spin = QSpinBox()
+        self.interval_spin.setRange(1, 999)
+        self.interval_spin.setValue(3)
+        self.interval_spin.setFixedWidth(70)
+        match_card.add_row("间隔(秒)", self.interval_spin)
+        self.pause_spin = QSpinBox()
+        self.pause_spin.setRange(0, 999)
+        self.pause_spin.setValue(3)
+        self.pause_spin.setFixedWidth(70)
+        match_card.add_row("暂停(秒)", self.pause_spin)
+        layout.addWidget(match_card)
+
+        layout.addStretch()
 
     def collect_config(self):
         return {

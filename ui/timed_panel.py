@@ -13,6 +13,7 @@ from ui.widgets import (
 )
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
+from ui.components import ConfigCard
 from core.config import ConfigVar
 
 
@@ -154,7 +155,6 @@ class TimedPanel(QWidget):
 
 
 class TimedGroupWidget(QFrame):
-    delete_requested = Signal()
 
     def __init__(self, app, index, parent=None):
         super().__init__(parent)
@@ -164,79 +164,63 @@ class TimedGroupWidget(QFrame):
         self._pos_y = 0
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
         header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"定时组 {index + 1}")
-        self.title_edit.setObjectName("cardTitle")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
-        del_btn = DangerButton("删除")
-        del_btn.setObjectName("dangerAction")
-        del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.clicked.connect(self.delete_requested.emit)
-        header.addWidget(del_btn)
         layout.addLayout(header)
 
-        grid = QGridLayout()
-        grid.setSpacing(12)
-        grid.setColumnStretch(1, 1)
-
-        grid.addWidget(QLabel("执行间隔"), 0, 0)
-        row1 = QHBoxLayout()
+        # ⚙️ 触发
+        trigger_card = ConfigCard("⚙️", "触发")
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 9999)
         self.interval_spin.setValue(10)
         self.interval_spin.setSuffix(" 秒")
         self.interval_spin.setFixedWidth(120)
-        row1.addWidget(self.interval_spin)
-        row1.addStretch()
-        grid.addLayout(row1, 0, 1, 1, 2)
-
-        key_row = QHBoxLayout()
-        key_row.setSpacing(12)
-        key_row.addWidget(QLabel("触发按键"))
+        trigger_card.add_row("执行间隔", self.interval_spin)
         self.key_input = KeyCaptureWidget()
-        key_row.addWidget(self.key_input, 1)
-        key_row.addWidget(QLabel("按键时长"))
+        trigger_card.add_row("按键", self.key_input)
+        delay_row = QHBoxLayout()
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 9999)
         self.delay_min_spin.setValue(300)
         self.delay_min_spin.setSuffix(" ms")
         self.delay_min_spin.setFixedWidth(80)
-        key_row.addWidget(self.delay_min_spin)
-        key_row.addWidget(QLabel("~"))
+        delay_row.addWidget(self.delay_min_spin)
+        delay_row.addWidget(QLabel("~"))
         self.delay_max_spin = QSpinBox()
         self.delay_max_spin.setRange(0, 9999)
         self.delay_max_spin.setValue(500)
         self.delay_max_spin.setSuffix(" ms")
         self.delay_max_spin.setFixedWidth(80)
-        key_row.addWidget(self.delay_max_spin)
-        grid.addLayout(key_row, 1, 0, 1, 3)
-
-        toggles = QHBoxLayout()
-        toggles.setSpacing(24)
+        delay_row.addWidget(self.delay_max_spin)
+        delay_row.addStretch()
+        trigger_card.add_row("按键时长", delay_row)
+        click_row = QHBoxLayout()
         self.click_toggle = Toggle("点击触发")
-        toggles.addWidget(self.click_toggle)
-        toggles.addWidget(QLabel("偏移"))
+        click_row.addWidget(self.click_toggle)
+        click_row.addWidget(QLabel("偏移"))
         self.offset_spin = QSpinBox()
         self.offset_spin.setRange(0, 200)
         self.offset_spin.setValue(0)
         self.offset_spin.setSuffix("px")
         self.offset_spin.setFixedWidth(70)
         self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
-        toggles.addWidget(self.offset_spin)
-        self.alarm_toggle = Toggle("警报提醒")
-        toggles.addWidget(self.alarm_toggle)
-        toggles.addStretch()
-        grid.addLayout(toggles, 2, 0, 1, 3)
+        click_row.addWidget(self.offset_spin)
+        click_row.addStretch()
+        trigger_card.add_widget_row(click_row)
+        layout.addWidget(trigger_card)
 
+        # 📍 位置
+        pos_card = ConfigCard("📍", "位置")
         pos_row = QHBoxLayout()
-        pos_row.setSpacing(12)
         self.pos_label = ClickableLabel("未选择")
         self.pos_label.setObjectName("infoText")
         pos_row.addWidget(self.pos_label)
@@ -245,10 +229,17 @@ class TimedGroupWidget(QFrame):
         pos_btn.clicked.connect(self._select_position)
         pos_row.addWidget(pos_btn)
         pos_row.addStretch()
-        grid.addLayout(pos_row, 3, 0, 1, 3)
+        pos_card.add_widget_row(pos_row)
         self.pos_label.clicked.connect(self._preview_position)
+        layout.addWidget(pos_card)
 
-        layout.addLayout(grid)
+        # 🔔 报警
+        alarm_card = ConfigCard("🔔", "报警")
+        self.alarm_toggle = Toggle("触发时响铃")
+        alarm_card.set_content(self.alarm_toggle)
+        layout.addWidget(alarm_card)
+
+        layout.addStretch()
 
     def set_config(self, cfg):
         self.toggle.setChecked(cfg.get("enabled", False))

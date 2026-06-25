@@ -16,7 +16,7 @@ from ui.widgets import (
 )
 from ui.components import ComboBox
 from ui.components import Toggle
-from ui.components import TemplatePicker, KeyCaptureWidget, WindowSelector
+from ui.components import TemplatePicker, KeyCaptureWidget, WindowSelector, ConfigCard
 from core.config import ConfigVar
 
 
@@ -241,7 +241,6 @@ class BackgroundPanel(QWidget):
 
 
 class BackgroundGroupWidget(QFrame):
-    delete_requested = Signal()
 
     def __init__(self, app, index, monitor_type="ocr", parent=None):
         super().__init__(parent)
@@ -253,132 +252,110 @@ class BackgroundGroupWidget(QFrame):
         self.template_pixmap = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
-        header = QHBoxLayout()
         type_names = {"ocr": "OCR", "image": "图像", "color": "颜色"}
         type_icons = {"ocr": "📝", "image": "🖼️", "color": "🎨"}
         icon = type_icons.get(monitor_type, "📋")
         type_label = type_names.get(monitor_type, monitor_type)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"{icon}  {type_label} 组 {index + 1}")
-        self.title_edit.setObjectName("cardTitle")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
-        del_btn = DangerButton("删除")
-        del_btn.setObjectName("dangerAction")
-        del_btn.setCursor(Qt.PointingHandCursor)
-        header.addWidget(del_btn)
         layout.addLayout(header)
 
-        grid = QGridLayout()
-        grid.setSpacing(12)
-        grid.setColumnStretch(1, 1)
-
-        grid.addWidget(QLabel("监控区域"), 0, 0)
+        # 📍 区域
+        region_card = ConfigCard("📍", "区域")
+        region_row = QHBoxLayout()
         self.region_label = ClickableLabel("未选择")
         self.region_label.setObjectName("infoText")
-        grid.addWidget(self.region_label, 0, 1)
+        region_row.addWidget(self.region_label, 1)
         region_btn = TextButton("选择区域")
         region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
-        grid.addWidget(region_btn, 0, 2)
+        region_row.addWidget(region_btn)
+        region_card.add_widget_row(region_row)
+        layout.addWidget(region_card)
 
+        # 🎯 检测
+        detect_card = ConfigCard("🎯", "检测")
         if monitor_type == "ocr":
-            grid.addWidget(QLabel("关键词:"), 1, 0)
             self.keywords_input = QLineEdit()
             self.keywords_input.setPlaceholderText("多个关键词用 | 分隔")
-            grid.addWidget(self.keywords_input, 1, 1, 1, 2)
-            lang_row = QHBoxLayout()
-            lang_row.setSpacing(16)
-            lang_row.addWidget(QLabel("语言"))
+            detect_card.add_row("关键词", self.keywords_input)
             self.lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"])
-            lang_row.addWidget(self.lang_combo)
-            lang_row.addStretch()
-            grid.addLayout(lang_row, 2, 0, 1, 3)
-
+            detect_card.add_row("语言", self.lang_combo)
         elif monitor_type == "image":
-            grid.addWidget(QLabel("模板图像"), 1, 0)
             self.template_picker = TemplatePicker()
             self.template_picker.template_selected.connect(self._on_template_picked)
-            grid.addWidget(self.template_picker, 1, 1, 1, 2)
-            img_row = QHBoxLayout()
-            img_row.setSpacing(16)
-            img_row.addWidget(QLabel("匹配阈值"))
+            detect_card.add_widget_row(self.template_picker)
             self.threshold_spin = QSpinBox()
             self.threshold_spin.setRange(50, 100)
             self.threshold_spin.setValue(80)
             self.threshold_spin.setSuffix("%")
-            img_row.addWidget(self.threshold_spin)
-            img_row.addStretch()
-            grid.addLayout(img_row, 2, 0, 1, 3)
-
+            detect_card.add_row("匹配阈值", self.threshold_spin)
         elif monitor_type == "color":
-            grid.addWidget(QLabel("目标颜色"), 1, 0)
-            color_layout = QHBoxLayout()
+            color_row = QHBoxLayout()
             self.color_hex = QLineEdit()
             self.color_hex.setPlaceholderText("#RRGGBB")
             self.color_hex.setMaxLength(7)
-            color_layout.addWidget(self.color_hex)
+            color_row.addWidget(self.color_hex)
             color_btn = TextButton("取色")
             color_btn.setObjectName("templateAction")
             color_btn.clicked.connect(self._pick_color)
-            color_layout.addWidget(color_btn)
-            grid.addLayout(color_layout, 1, 1, 1, 2)
-            color_row = QHBoxLayout()
-            color_row.setSpacing(16)
-            color_row.addWidget(QLabel("容差"))
+            color_row.addWidget(color_btn)
+            detect_card.add_widget_row(color_row)
             self.tolerance_spin = QSpinBox()
             self.tolerance_spin.setRange(0, 255)
             self.tolerance_spin.setValue(30)
-            color_row.addWidget(self.tolerance_spin)
-            color_row.addStretch()
-            grid.addLayout(color_row, 2, 0, 1, 3)
+            detect_card.add_row("容差", self.tolerance_spin)
+        layout.addWidget(detect_card)
 
-        common_row = QHBoxLayout()
-        common_row.setSpacing(12)
-        common_row.addWidget(QLabel("触发按键"))
+        # ⚙️ 触发
+        trigger_card = ConfigCard("⚙️", "触发")
         self.key_input = KeyCaptureWidget()
-        common_row.addWidget(self.key_input, 1)
+        trigger_card.add_row("按键", self.key_input)
+        click_row = QHBoxLayout()
         self.click_toggle = Toggle("点击")
-        common_row.addWidget(self.click_toggle)
+        click_row.addWidget(self.click_toggle)
         self.click_mode_combo = ComboBox(items=["物理点击", "虚拟点击"], width=110)
         self.click_mode_combo.setEnabled(False)
         self.click_toggle.stateChanged.connect(self.click_mode_combo.setEnabled)
-        common_row.addWidget(self.click_mode_combo)
-        common_row.addWidget(QLabel("偏移"))
+        click_row.addWidget(self.click_mode_combo)
+        click_row.addWidget(QLabel("偏移"))
         self.offset_spin = QSpinBox()
         self.offset_spin.setRange(0, 200)
         self.offset_spin.setValue(0)
         self.offset_spin.setSuffix("px")
         self.offset_spin.setFixedWidth(70)
-        common_row.addWidget(self.offset_spin)
-        self.alarm_toggle = Toggle("报警")
-        common_row.addWidget(self.alarm_toggle)
-        common_row.addStretch()
-        grid.addLayout(common_row, 3, 0, 1, 3)
-
-        timing_row = QHBoxLayout()
-        timing_row.setSpacing(12)
-        timing_row.addWidget(QLabel("间隔(秒)"))
+        click_row.addWidget(self.offset_spin)
+        click_row.addStretch()
+        trigger_card.add_widget_row(click_row)
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 99)
         self.interval_spin.setValue(3)
         self.interval_spin.setFixedWidth(70)
-        timing_row.addWidget(self.interval_spin)
-        timing_row.addWidget(QLabel("暂停(秒)"))
+        trigger_card.add_row("间隔(秒)", self.interval_spin)
         self.pause_spin = QSpinBox()
         self.pause_spin.setRange(0, 9999)
         self.pause_spin.setValue(180)
         self.pause_spin.setFixedWidth(70)
-        timing_row.addWidget(self.pause_spin)
-        timing_row.addStretch()
-        grid.addLayout(timing_row, 4, 0, 1, 3)
+        trigger_card.add_row("暂停(秒)", self.pause_spin)
+        layout.addWidget(trigger_card)
 
-        layout.addLayout(grid)
+        # 🔔 报警
+        alarm_card = ConfigCard("🔔", "报警")
+        self.alarm_toggle = Toggle("触发时报警")
+        alarm_card.set_content(self.alarm_toggle)
+        layout.addWidget(alarm_card)
+
+        layout.addStretch()
         self._connect_preview()
 
     def _make_label_blue(self, label):

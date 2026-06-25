@@ -13,6 +13,7 @@ from ui.widgets import (
 )
 from ui.components import Toggle
 from ui.components import KeyCaptureWidget
+from ui.components import ConfigCard
 from core.config import ConfigVar
 
 
@@ -151,7 +152,6 @@ class NumberPanel(QWidget):
 
 
 class NumberGroupWidget(QFrame):
-    delete_requested = Signal()
 
     def __init__(self, app, index, parent=None):
         super().__init__(parent)
@@ -160,79 +160,74 @@ class NumberGroupWidget(QFrame):
         self.region = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
 
         header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
         self.title_edit = QLineEdit(f"识别组 {index + 1}")
-        self.title_edit.setObjectName("cardTitle")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none;")
+        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600; background: transparent; border: none; color: #E8EAED;")
         header.addWidget(self.title_edit)
         header.addStretch()
         self.toggle = Toggle("启用")
         header.addWidget(self.toggle)
-        del_btn = DangerButton("删除")
-        del_btn.setObjectName("dangerAction")
-        del_btn.setCursor(Qt.PointingHandCursor)
-        del_btn.clicked.connect(self.delete_requested.emit)
-        header.addWidget(del_btn)
         layout.addLayout(header)
 
-        grid = QGridLayout()
-        grid.setSpacing(12)
-        grid.setColumnStretch(1, 1)
-
-        grid.addWidget(QLabel("识别区域"), 0, 0)
+        # 📍 区域
+        region_card = ConfigCard("📍", "区域")
+        region_row = QHBoxLayout()
         self.region_label = ClickableLabel("未选择")
         self.region_label.setObjectName("infoText")
-        grid.addWidget(self.region_label, 0, 1)
+        region_row.addWidget(self.region_label, 1)
         region_btn = TextButton("选择区域")
         region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
-        grid.addWidget(region_btn, 0, 2)
+        region_row.addWidget(region_btn)
+        region_card.add_widget_row(region_row)
         self.region_label.clicked.connect(self._preview_region)
+        layout.addWidget(region_card)
 
-        grid.addWidget(QLabel("变化阈值"), 1, 0)
+        # ⚙️ 触发
+        trigger_card = ConfigCard("⚙️", "触发")
         self.threshold_spin = QSpinBox()
         self.threshold_spin.setRange(1, 9999)
         self.threshold_spin.setValue(500)
         self.threshold_spin.setSuffix(" 数值")
-        grid.addWidget(self.threshold_spin, 1, 1)
-
-        grid.addWidget(QLabel("置信度阈值"), 2, 0)
+        trigger_card.add_row("变化阈值", self.threshold_spin)
         self.confidence_spin = QDoubleSpinBox()
         self.confidence_spin.setRange(0.0, 1.0)
         self.confidence_spin.setSingleStep(0.05)
         self.confidence_spin.setValue(0.3)
         self.confidence_spin.setDecimals(2)
         self.confidence_spin.setToolTip("OCR 置信度低于此值的结果被丢弃（0=关闭）")
-        grid.addWidget(self.confidence_spin, 2, 1)
-
-        key_row = QHBoxLayout()
-        key_row.setSpacing(12)
-        key_row.addWidget(QLabel("触发按键"))
+        trigger_card.add_row("置信度", self.confidence_spin)
         self.key_input = KeyCaptureWidget()
-        key_row.addWidget(self.key_input, 1)
-        key_row.addWidget(QLabel("按键时长"))
+        trigger_card.add_row("按键", self.key_input)
+        delay_row = QHBoxLayout()
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 9999)
         self.delay_min_spin.setValue(100)
         self.delay_min_spin.setSuffix(" ms")
         self.delay_min_spin.setFixedWidth(80)
-        key_row.addWidget(self.delay_min_spin)
-        key_row.addWidget(QLabel("~"))
+        delay_row.addWidget(self.delay_min_spin)
+        delay_row.addWidget(QLabel("~"))
         self.delay_max_spin = QSpinBox()
         self.delay_max_spin.setRange(0, 9999)
         self.delay_max_spin.setValue(200)
         self.delay_max_spin.setSuffix(" ms")
         self.delay_max_spin.setFixedWidth(80)
-        key_row.addWidget(self.delay_max_spin)
-        grid.addLayout(key_row, 3, 0, 1, 3)
+        delay_row.addWidget(self.delay_max_spin)
+        delay_row.addStretch()
+        trigger_card.add_row("按键时长", delay_row)
+        layout.addWidget(trigger_card)
 
-        self.alarm_toggle = Toggle("警报提醒")
-        grid.addWidget(self.alarm_toggle, 4, 1, 1, 2)
+        # 🔔 报警
+        alarm_card = ConfigCard("🔔", "报警")
+        self.alarm_toggle = Toggle("触发时响铃")
+        alarm_card.set_content(self.alarm_toggle)
+        layout.addWidget(alarm_card)
 
-        layout.addLayout(grid)
+        layout.addStretch()
 
     def set_config(self, cfg):
         self.toggle.setChecked(cfg.get("enabled", False))
