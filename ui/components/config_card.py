@@ -18,9 +18,9 @@ class ConfigCard(QFrame):
         layout.setSpacing(0)
 
         header = QHBoxLayout()
-        self._title_label = QLabel(f"{icon} {title}")
-        self._title_label.setObjectName("cardHeader")
-        header.addWidget(self._title_label)
+        title_label = QLabel(f"{icon} {title}")
+        title_label.setObjectName("cardHeader")
+        header.addWidget(title_label)
         header.addStretch()
         if header_widget:
             header.addWidget(header_widget)
@@ -39,9 +39,6 @@ class ConfigCard(QFrame):
 
     def set_content(self, widget):
         self._content_layout.addWidget(widget)
-
-    def add_layout(self, layout):
-        self._content_layout.addLayout(layout)
 
     def add_row(self, label, widget):
         lbl = QLabel(label)
