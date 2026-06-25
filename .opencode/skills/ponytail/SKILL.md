@@ -1,15 +1,11 @@
 ---
 name: ponytail
 description: >
-  Forces the laziest solution that actually works, simplest, shortest, most
-  minimal. Channels a senior dev who has seen everything: question whether the
-  task needs to exist at all (YAGNI), reach for the standard library before
-  custom code, native platform features before dependencies, one line before
-  fifty. Supports intensity levels: lite, full (default), ultra. Use whenever
-  the user says "ponytail", "be lazy", "lazy mode", "simplest solution",
-  "minimal solution", "yagni", "do less", or "shortest path", and whenever
-  they complain about over-engineering, bloat, boilerplate, or unnecessary
-  dependencies.
+  强制使用最精简的可行方案。模拟经验丰富的高级开发者思维：先问这功能真
+  的需要吗（YAGNI），优先用标准库、原生平台特性、已有依赖，一行能搞定
+  就写一行，最后才写完整实现。支持级别：lite（轻度）、full（默认完全）、
+  ultra（极致精简）。当用户说"精简""懒人模式""最短方案""不要过度设计"
+  "删掉不必要的代码"时触发。
 argument-hint: "[lite|full|ultra]"
 license: MIT
 ---

@@ -5,7 +5,6 @@ import re
 from PySide6.QtWidgets import QMessageBox
 from PySide6.QtCore import QTimer
 
-from modules.recorder import RecorderBase
 from core.priority_lock import get_module_priority
 
 
@@ -132,11 +131,12 @@ class ScriptModule:
             self.app.alarm_module.play_stop_sound()
 
 
-class ScriptExecutor(RecorderBase):
+class ScriptExecutor:
     PRIORITY = get_module_priority('script')
 
     def __init__(self, app):
-        super().__init__(app)
+        self.app = app
+        self.resources = []
         self.is_running = False
         self.is_paused = False
         self.execution_thread = None
@@ -146,6 +146,17 @@ class ScriptExecutor(RecorderBase):
         self.last_event_time = None
         self.recording_grace_period = False
         self.core_graphics_available = False
+
+    def register_resource(self, resource, cleanup_func):
+        self.resources.append((resource, cleanup_func))
+
+    def cleanup_resources(self):
+        for resource, cleanup_func in reversed(self.resources):
+            try:
+                cleanup_func(resource)
+            except Exception as e:
+                self.app.logging_manager.error("SCRIPT", f"资源清理失败: {e}")
+        self.resources.clear()
 
     def _optimize_delay(self, command, next_command=None):
         if command["type"] != "delay" or not next_command:

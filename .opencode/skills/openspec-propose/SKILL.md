@@ -80,7 +80,17 @@ When ready to implement, run /opsx-apply
       - Use **AskUserQuestion tool** to clarify
       - Then continue with creation
 
-5. **Show final status**
+5. **Validate the change**
+   ```bash
+   openspec validate --changes --json
+   ```
+   - Find your change in the `items` array and check `valid`
+   - If `valid: false`, fix each `issues[].message`:
+     - **`must contain SHALL or MUST`**: Add `SHALL` or `MUST` keyword to the requirement description (e.g. `系统 SHALL 显示列表项`). This is required even in Chinese specs — mix Chinese with `SHALL`/`MUST` English keyword.
+     - **`no deltas found`**: Ensure the change has a `specs/<capability>/spec.md` file with proper delta format (`## ADDED/MODIFIED/REMOVED/RENAMED Requirements`).
+     - Fix the artifacts and re-run validation until `valid: true`.
+
+6. **Show final status**
    ```bash
    openspec status --change "<name>"
    ```
@@ -90,6 +100,7 @@ When ready to implement, run /opsx-apply
 After completing all artifacts, summarize:
 - Change name and location
 - List of artifacts created with brief descriptions
+- Validation passed: "All artifacts validated successfully!"
 - What's ready: "All artifacts created! Ready for implementation."
 - Prompt: "Run `/opsx-apply` or ask me to implement to start working on the tasks."
 
@@ -109,3 +120,5 @@ After completing all artifacts, summarize:
 - If context is critically unclear, ask the user - but prefer making reasonable decisions to keep momentum
 - If a change with that name already exists, ask if user wants to continue it or create a new one
 - Verify each artifact file exists after writing before proceeding to next
+- **Spec files MUST use `SHALL`/`MUST` keywords** in every requirement description, even if the surrounding text is Chinese. Example: `系统 SHALL 支持导出 CSV 格式`. This is required by OpenSpec validation.
+- **Run `openspec validate --changes --json` after all artifacts are done** and fix any issues before declaring success.

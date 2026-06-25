@@ -4,7 +4,20 @@ PyAutoGUI输入控制器实现
 """
 import pyautogui
 from .base import BaseInputController
-from .key_mapping import get_pyautogui_key
+
+_KEY_MAP = {
+    'alt_l': 'altleft', 'alt_r': 'altright',
+    'control_l': 'ctrlleft', 'control_r': 'ctrlright',
+    'shift_l': 'shiftleft', 'shift_r': 'shiftright',
+    'win_l': 'winleft', 'win_r': 'winright',
+    'super_l': 'winleft', 'super_r': 'winright',
+    'meta_l': 'winleft', 'meta_r': 'winright',
+    'return': 'enter', 'prior': 'pageup', 'next': 'pagedown',
+    'caps_lock': 'capslock', 'num_lock': 'numlock',
+    'scroll_lock': 'scrolllock', 'print_screen': 'printscreen',
+    'page_up': 'pageup', 'page_down': 'pagedown',
+}
+def _map_key(k): return _KEY_MAP.get(k.lower(), k.lower())
 
 
 class PyAutoGUIInput(BaseInputController):
@@ -33,7 +46,7 @@ class PyAutoGUIInput(BaseInputController):
     
     def key_down(self, key: str, priority: int = 0) -> bool:
         try:
-            mapped_key = get_pyautogui_key(key)
+            mapped_key = _map_key(key)
             pyautogui.keyDown(mapped_key)
             self._log(f"执行: 按下 {key} (映射: {mapped_key})")
             return True
@@ -46,7 +59,7 @@ class PyAutoGUIInput(BaseInputController):
     
     def key_up(self, key: str, priority: int = 0) -> bool:
         try:
-            mapped_key = get_pyautogui_key(key)
+            mapped_key = _map_key(key)
             pyautogui.keyUp(mapped_key)
             self._log(f"执行: 抬起 {key} (映射: {mapped_key})")
             return True
@@ -59,7 +72,7 @@ class PyAutoGUIInput(BaseInputController):
     
     def press_key(self, key: str, delay: float = 0, priority: int = 0) -> bool:
         try:
-            mapped_key = get_pyautogui_key(key)
+            mapped_key = _map_key(key)
             pyautogui.press(mapped_key, interval=delay)
             self._log(f"执行按键: {key} (映射: {mapped_key})")
             return True

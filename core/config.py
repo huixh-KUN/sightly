@@ -2,7 +2,6 @@ import json
 import os
 import datetime
 
-from ui.utils import update_group_style  # old tkinter config load path
 
 
 class ConfigVar:
@@ -71,89 +70,47 @@ class ConfigManager:
         self.config_file_path = app.config_file_path
     
     def read_config(self):
-        """读取配置文件
-        Returns:
-            dict or None: 如果成功读取则返回配置字典，否则返回None
-        """
         if not os.path.exists(self.config_file_path):
             return None
-        
         try:
             with open(self.config_file_path, 'r', encoding='utf-8') as f:
                 config = json.load(f)
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(f"开始加载配置: {self.config_file_path}")
-                self.app.logging_manager.debug("CONFIG", f"配置文件读取成功: {self.config_file_path}")
-            else:
-                print(f"开始加载配置: {self.config_file_path}")
+            self.app.logging_manager.log_message(f"开始加载配置: {self.config_file_path}")
+            self.app.logging_manager.debug("CONFIG", f"配置文件读取成功: {self.config_file_path}")
             return config
         except json.JSONDecodeError as e:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.error("CONFIG", f"配置文件格式错误: {self.config_file_path}，错误详情: {str(e)}")
-                self.app.logging_manager.debug("CONFIG", f"JSON解析失败: {e}")
-            else:
-                print(f"配置文件格式错误: {self.config_file_path}，错误详情: {str(e)}")
+            self.app.logging_manager.error("CONFIG", f"配置文件格式错误: {self.config_file_path}，错误详情: {str(e)}")
+            self.app.logging_manager.debug("CONFIG", f"JSON解析失败: {e}")
         except PermissionError:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.error("CONFIG", f"没有权限读取配置文件: {self.config_file_path}")
-                self.app.logging_manager.debug("CONFIG", f"权限错误: 无法读取 {self.config_file_path}")
-            else:
-                print(f"没有权限读取配置文件: {self.config_file_path}")
+            self.app.logging_manager.error("CONFIG", f"没有权限读取配置文件: {self.config_file_path}")
+            self.app.logging_manager.debug("CONFIG", f"权限错误: 无法读取 {self.config_file_path}")
         except IOError as e:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.error("CONFIG", f"配置文件IO错误: {str(e)}")
-                self.app.logging_manager.debug("CONFIG", f"IO错误: {e}")
-            else:
-                print(f"配置文件IO错误: {str(e)}")
+            self.app.logging_manager.error("CONFIG", f"配置文件IO错误: {str(e)}")
+            self.app.logging_manager.debug("CONFIG", f"IO错误: {e}")
         except Exception as e:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.error("CONFIG", f"配置加载错误: {str(e)}")
-                self.app.logging_manager.debug("CONFIG", f"未知错误: {e}")
-            else:
-                print(f"配置加载错误: {str(e)}")
+            self.app.logging_manager.error("CONFIG", f"配置加载错误: {str(e)}")
+            self.app.logging_manager.debug("CONFIG", f"未知错误: {e}")
         return None
     
     def save_config(self, config):
-        """保存配置到文件
-        Args:
-            config: 配置字典
-        Returns:
-            bool: 如果保存成功则返回True，否则返回False
-        """
         try:
-            # 确保配置文件目录存在
             os.makedirs(os.path.dirname(self.config_file_path), exist_ok=True)
-
-            # 写入配置文件，使用更紧凑的格式
             with open(self.config_file_path, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2, ensure_ascii=False, default=str)
-
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message("配置已保存")
-                self.app.logging_manager.debug("CONFIG", f"配置保存成功: {self.config_file_path}")
-            else:
-                print("配置已保存")
+            self.app.logging_manager.log_message("配置已保存")
+            self.app.logging_manager.debug("CONFIG", f"配置保存成功: {self.config_file_path}")
             return True
         except PermissionError:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.error("CONFIG", f"没有权限写入配置文件: {self.config_file_path}")
-                self.app.logging_manager.debug("CONFIG", f"权限错误: 无法写入 {self.config_file_path}")
-            else:
-                print(f"没有权限写入配置文件: {self.config_file_path}")
+            self.app.logging_manager.error("CONFIG", f"没有权限写入配置文件: {self.config_file_path}")
+            self.app.logging_manager.debug("CONFIG", f"权限错误: 无法写入 {self.config_file_path}")
             return False
         except IOError as e:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.error("CONFIG", f"配置文件IO错误: {str(e)}")
-                self.app.logging_manager.debug("CONFIG", f"IO错误: {e}")
-            else:
-                print(f"配置文件IO错误: {str(e)}")
+            self.app.logging_manager.error("CONFIG", f"配置文件IO错误: {str(e)}")
+            self.app.logging_manager.debug("CONFIG", f"IO错误: {e}")
             return False
         except Exception as e:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.error("CONFIG", f"配置保存错误: {str(e)}")
-                self.app.logging_manager.debug("CONFIG", f"未知错误: {e}")
-            else:
-                print(f"配置保存错误: {str(e)}")
+            self.app.logging_manager.error("CONFIG", f"配置保存错误: {str(e)}")
+            self.app.logging_manager.debug("CONFIG", f"未知错误: {e}")
             return False
     
     def get_config_value(self, config, key_path, default=None):
@@ -256,8 +213,6 @@ class ConfigManager:
                             if key in self.app.ocr_groups[i]:
                                 if key == 'enabled':
                                     self.app.ocr_groups[i][key].set(value)
-                                    group_frame = self.app.ocr_groups[i]['frame']
-                                    update_group_style(group_frame, value)
                                 elif key == 'region' and value is not None:
                                     try:
                                         region = tuple(value)
@@ -291,8 +246,6 @@ class ConfigManager:
                             if key in self.app.timed_groups[i]:
                                 if key == 'enabled':
                                     self.app.timed_groups[i][key].set(value)
-                                    group_frame = self.app.timed_groups[i]['frame']
-                                    update_group_style(group_frame, value)
                                 elif hasattr(self.app.timed_groups[i][key], 'set'):
                                     self.app.timed_groups[i][key].set(value)
                         
@@ -322,8 +275,6 @@ class ConfigManager:
                             if key in self.app.number_regions[i]:
                                 if key == 'enabled':
                                     self.app.number_regions[i][key].set(value)
-                                    group_frame = self.app.number_regions[i]['frame']
-                                    update_group_style(group_frame, value)
                                 elif key == 'region' and value is not None:
                                     try:
                                         region = tuple(value)
@@ -356,8 +307,6 @@ class ConfigManager:
                             if key in self.app.image_groups[i]:
                                 if key == 'enabled':
                                     self.app.image_groups[i][key].set(value)
-                                    group_frame = self.app.image_groups[i]['frame']
-                                    update_group_style(group_frame, value)
                                 elif key == 'region' and value is not None:
                                     try:
                                         region = tuple(value)
@@ -476,9 +425,6 @@ class ConfigManager:
                 self.app.logging_manager.log_message(f"[图像检测] 检测组{group_index + 1}已加载模板: {image_path}")
                 self.app.logging_manager.log_message(f"[图像检测] 模板尺寸: {w}x{h}")
                 
-                from ui.utils import update_image_preview
-                group = self.app.image_groups[group_index]
-                update_image_preview(group["image_preview"], group.get("preview_container"), image_path)
             except Exception as e:
                 self.app.logging_manager.error("CONFIG", f"[图像检测] 加载参考图像失败: {str(e)}")
     
@@ -998,145 +944,6 @@ class ConfigManager:
         if hasattr(self.app, 'tesseract_path_var'):
             self.app.tesseract_path_var.set(self.app.tesseract_path)
     
-    def setup_config_listeners(self):
-        """为配置变量添加监听器，自动保存配置"""
-        def immediate_save(*args):
-            self.defer_save_config()
-
-        def setup_group_listeners(group):
-            group["enabled"].trace_add("write", immediate_save)
-            group["interval"].trace_add("write", immediate_save)
-            if hasattr(group.get("key"), "trace_add"):
-                group["key"].trace_add("write", immediate_save)
-            group["delay_min"].trace_add("write", immediate_save)
-            group["delay_max"].trace_add("write", immediate_save)
-            group["alarm"].trace_add("write", immediate_save)
-            group["click_enabled"].trace_add("write", immediate_save)
-
-        for group in self.app.timed_groups:
-            setup_group_listeners(group)
-
-        self.app._setup_group_listeners = setup_group_listeners
-
-        def setup_region_listeners(region_config):
-            region_config["enabled"].trace_add("write", immediate_save)
-            region_config["threshold"].trace_add("write", immediate_save)
-            if hasattr(region_config.get("key"), "trace_add"):
-                region_config["key"].trace_add("write", immediate_save)
-            region_config["delay_min"].trace_add("write", immediate_save)
-            region_config["delay_max"].trace_add("write", immediate_save)
-            region_config["alarm"].trace_add("write", immediate_save)
-
-        for region_config in self.app.number_regions:
-            setup_region_listeners(region_config)
-
-        self.app._setup_region_listeners = setup_region_listeners
-
-        def setup_ocr_group_listeners(group):
-            group["enabled"].trace_add("write", immediate_save)
-            group["interval"].trace_add("write", immediate_save)
-            group["pause"].trace_add("write", immediate_save)
-            if hasattr(group.get("key"), "trace_add"):
-                group["key"].trace_add("write", immediate_save)
-            group["delay_min"].trace_add("write", immediate_save)
-            group["delay_max"].trace_add("write", immediate_save)
-            group["alarm"].trace_add("write", immediate_save)
-            group["keywords"].trace_add("write", immediate_save)
-            group["language"].trace_add("write", immediate_save)
-            group["click"].trace_add("write", immediate_save)
-
-        for group in self.app.ocr_groups:
-            setup_ocr_group_listeners(group)
-
-        self.app._setup_ocr_group_listeners = setup_ocr_group_listeners
-
-        def setup_image_group_listeners(group):
-            group["enabled"].trace_add("write", immediate_save)
-            group["threshold"].trace_add("write", immediate_save)
-            group["interval"].trace_add("write", immediate_save)
-            group["pause"].trace_add("write", immediate_save)
-            if hasattr(group.get("key"), "trace_add"):
-                group["key"].trace_add("write", immediate_save)
-            group["delay_min"].trace_add("write", immediate_save)
-            group["delay_max"].trace_add("write", immediate_save)
-            group["alarm"].trace_add("write", immediate_save)
-            group["click"].trace_add("write", immediate_save)
-
-        for group in self.app.image_groups:
-            setup_image_group_listeners(group)
-
-        self.app._setup_image_group_listeners = setup_image_group_listeners
-
-        def setup_background_group_listeners(group):
-            group["enabled"].trace_add("write", immediate_save)
-            group["interval"].trace_add("write", immediate_save)
-            group["pause"].trace_add("write", immediate_save)
-            if hasattr(group.get("key"), "trace_add"):
-                group["key"].trace_add("write", immediate_save)
-            group["delay_min"].trace_add("write", immediate_save)
-            group["delay_max"].trace_add("write", immediate_save)
-            group["click_enabled"].trace_add("write", immediate_save)
-            group["alarm"].trace_add("write", immediate_save)
-            if group.get("type") == "ocr":
-                if hasattr(group.get("keywords"), "trace_add"):
-                    group["keywords"].trace_add("write", immediate_save)
-                if hasattr(group.get("language"), "trace_add"):
-                    group["language"].trace_add("write", immediate_save)
-            elif group.get("type") == "image":
-                if hasattr(group.get("threshold"), "trace_add"):
-                    group["threshold"].trace_add("write", immediate_save)
-            elif group.get("type") == "color":
-                if hasattr(group.get("tolerance"), "trace_add"):
-                    group["tolerance"].trace_add("write", immediate_save)
-
-        for group in self.app.background_groups:
-            setup_background_group_listeners(group)
-
-        self.app._setup_background_group_listeners = setup_background_group_listeners
-
-        if hasattr(self.app, 'module_check_vars'):
-            for module, var in self.app.module_check_vars.items():
-                var.trace_add("write", immediate_save)
-
-        if hasattr(self.app, 'start_shortcut_var'):
-            self.app.start_shortcut_var.trace_add("write", lambda *args: (immediate_save(), self.app.setup_shortcuts()))
-        if hasattr(self.app, 'stop_shortcut_var'):
-            self.app.stop_shortcut_var.trace_add("write", lambda *args: (immediate_save(), self.app.setup_shortcuts()))
-
-        if hasattr(self.app, 'script_text'):
-            def on_script_change(event):
-                if self.app.script_text.edit_modified():
-                    immediate_save()
-                    self.app.script_text.edit_modified(False)
-            self.app.script_text.bind("<<Modified>>", on_script_change)
-            self.app.script_text.edit_modified(False)
-
-        if hasattr(self.app, 'color_commands'):
-            def on_color_commands_change(event):
-                if self.app.color_commands.edit_modified():
-                    immediate_save()
-                    self.app.color_commands.edit_modified(False)
-            self.app.color_commands.bind("<<Modified>>", on_color_commands_change)
-            self.app.color_commands.edit_modified(False)
-
-        if hasattr(self.app, 'color_enabled'):
-            self.app.color_enabled.trace_add("write", immediate_save)
-
-        if hasattr(self.app, 'tolerance_var'):
-            self.app.tolerance_var.trace_add("write", immediate_save)
-
-        if hasattr(self.app, 'interval_var'):
-            self.app.interval_var.trace_add("write", immediate_save)
-        
-        if hasattr(self.app, 'delay_var'):
-            self.app.delay_var.trace_add("write", immediate_save)
-        
-        if hasattr(self.app, 'combo_key_delay'):
-            self.app.combo_key_delay.trace_add("write", immediate_save)
-        
-        if hasattr(self.app, 'combo_after_delay'):
-            self.app.combo_after_delay.trace_add("write", immediate_save)
-
     def clear_ocr_groups(self):
         """清空所有OCR组"""
         for group in self.app.ocr_groups:
@@ -1149,8 +956,6 @@ class ConfigManager:
             group: OCR组配置字典
             group_config: 从配置文件读取的组配置
         """
-        from ui.utils import update_group_style
-
         def set_key_value(val):
             if hasattr(group['key'], 'set'):
                 group['key'].set(val)
@@ -1189,11 +994,7 @@ class ConfigManager:
             group: OCR组配置字典
             enabled: 是否启用
         """
-        from ui.utils import update_group_style
-
         group['enabled'].set(enabled)
-        group_frame = group['frame']
-        update_group_style(group_frame, enabled)
 
     def load_region_config(self, group, region):
         """加载区域配置

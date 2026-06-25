@@ -1,11 +1,9 @@
 ---
 name: ponytail-gain
 description: >
-  Show ponytail's measured impact as a compact scoreboard: less code, less
-  cost, more speed, from the benchmark medians. One-shot display, not a
-  persistent mode, and not a per-repo number. Trigger: /ponytail-gain,
-  "ponytail gain", "what does ponytail save", "show ponytail impact",
-  "ponytail scoreboard".
+  显示 ponytail 的基准测试效果面板：代码量减少、成本降低、速度提升。
+  一次输出，不做持久化。当用户说 "ponytail 效果""省了多少""性能对
+  比" 或调用 /ponytail-gain 时触发。
 ---
 
 # Ponytail Gain

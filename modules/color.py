@@ -138,9 +138,6 @@ class ColorRecognitionManager:
                 except Exception as e:
                     self.app.logging_manager.error("COLOR", f"更新颜色显示失败: {e}")
 
-        from ui.utils import create_color_picker
-        create_color_picker(self.app, on_color_selected, self.app.logging_manager.log_message)
-
     def start_color_recognition(self):
         if not self.color_recognition:
             self.color_recognition = ColorRecognition(self.app)

@@ -25,10 +25,6 @@ from ui.script_panel import ScriptPanel
 from ui.settings_panel import SettingsPanel
 
 from input.controller import InputController
-from core.threading import ThreadManager
-from core.events import EventManager
-from core.platform import PlatformAdapter
-from core.controller import ModuleController
 
 
 class MainWindow(QMainWindow):
@@ -99,15 +95,9 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("INIT", "LoggingManager 初始化完成")
         self.input_controller = InputController(self)
         self.logging_manager.debug("INIT", "InputController 初始化完成")
-        self.thread_manager = ThreadManager(self)
-        self.logging_manager.debug("INIT", "ThreadManager 初始化完成")
-        self.event_manager = EventManager(self)
-        self.logging_manager.debug("INIT", "EventManager 初始化完成")
         self.config_manager = ConfigManager(self)
         self.logging_manager.debug("INIT", "ConfigManager 初始化完成")
         self._migrate_old_config()
-        self.platform_adapter = PlatformAdapter(self)
-        self.logging_manager.debug("INIT", "PlatformAdapter 初始化完成")
 
         from modules.ocr import OCRModule as _OCR
         from modules.timed import TimedModule as _Timed
@@ -145,9 +135,6 @@ class MainWindow(QMainWindow):
             'image': self.image_manager,
             'background': self.background_manager,
         }
-
-        self.module_controller = ModuleController(self)
-        self.logging_manager.debug("INIT", "ModuleController 初始化完成")
 
         self.app_state.register_module("ocr", "文字识别", "监控屏幕文字，匹配关键词触发", "📝")
         self.app_state.register_module("timed", "定时功能", "按设定间隔自动执行按键操作", "⏱")
@@ -567,11 +554,6 @@ class MainWindow(QMainWindow):
                 self.background_manager.stop_all_groups()
             except Exception as e:
                 self.logging_manager.error("CLOSE", f"停止 background_manager 失败: {e}")
-        if hasattr(self, 'event_manager'):
-            try:
-                self.event_manager.stop_event_thread()
-            except Exception as e:
-                self.logging_manager.error("CLOSE", f"停止 event_manager 失败: {e}")
         if hasattr(self, 'global_listener') and self.global_listener:
             try:
                 self.global_listener.stop()

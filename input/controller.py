@@ -9,7 +9,6 @@ import time
 from typing import Optional
 
 from core.priority_lock import PriorityLock
-from .key_mapping import KEY_NAME_MAPPING, get_pyautogui_key, get_dd_code
 
 
 USE_DD_INPUT = os.environ.get('SIGHTLY_USE_DD', '0') == '1'
@@ -219,16 +218,3 @@ class InputController:
                 return self._impl.mouse_move(x, y)
             return False
 
-
-def create_input_controller(app=None, method: str = None) -> InputController:
-    """
-    创建输入控制器的工厂函数
-    
-    Args:
-        app: 应用实例
-        method: 输入方式，可选 'pyautogui' 或 'dd'
-    
-    Returns:
-        InputController实例
-    """
-    return InputController(app=app, method=method)
