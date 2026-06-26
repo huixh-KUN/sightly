@@ -97,7 +97,7 @@ class HomePanel(QWidget):
         ws_layout.setSpacing(12)
 
         ws_layout.addWidget(QLabel("工作空间"))
-        self.ws_combo = ComboBox()
+        self.ws_combo = ComboBox(expand=True)
         self._refresh_ws_list()
         ws_layout.addWidget(self.ws_combo, 1)
 

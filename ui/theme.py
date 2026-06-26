@@ -21,6 +21,13 @@ class _DarkColors:
     SCROLLBAR_BG = "#1E1E1E"
     SCROLLBAR_FG = "#3C4043"
     HEADER_BG = "#1A1A1A"
+    SWITCH_TRACK_OFF = "#5F6368"
+    SWITCH_TRACK_ON = "#8AB4F8"
+    SWITCH_TRACK_DISABLED = "#3C4043"
+    SWITCH_KNOB = "#FFFFFF"
+    SWITCH_KNOB_DISABLED = "#9AA0A6"
+    SWITCH_KNOB_SHADOW_ALPHA = 36
+    SWITCH_KNOB_BORDER = None
 
     QSS = """
 QMainWindow, QWidget {
@@ -93,17 +100,33 @@ QListWidget::item:hover:!selected { background-color: #2C2C2C; }
 QSplitter::handle { background-color: #3C4043; width: 1px; }
 Card, #card, #settingsCard, #windowCard, #configCard { background-color: #1E1E1E; border: 1px solid #3C4043; border-radius: 12px; }
 Card:hover, #card:hover, #settingsCard:hover, #windowCard:hover, #configCard:hover { background-color: #252525; }
+#configCard #configCardRow, #configCard #fieldsRow, #configCard #fieldGroup, #configCard #spinRangeRow { background: transparent; }
+#keyCaptureRoot { background: transparent; }
+#keyCaptureRoot QPushButton#keyCaptureBtn { background-color: #2C2C2C; color: #E8EAED; border: 1px solid #5F6368; border-radius: 6px; padding: 0 4px; font-size: 13px; font-weight: 500; min-width: 56px; max-width: 56px; min-height: 32px; max-height: 32px; }
+#keyCaptureRoot QPushButton#keyCaptureBtn:hover { background-color: #353535; border-color: #8AB4F8; color: #E8EAED; }
+#keyCaptureRoot QPushButton#keyCaptureBtn:pressed { background-color: #1E1E1E; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureActive="true"] { background-color: #8AB4F8; color: #202124; border-color: #8AB4F8; font-weight: 600; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureActive="true"]:hover { background-color: #A8C7FA; border-color: #A8C7FA; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureRole="reset"] { color: #9AA0A6; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureRole="reset"]:hover { color: #F28B82; border-color: #F28B82; background-color: #F28B8218; }
+#settingsCard QLabel#rowLabel { color: #9AA0A6; font-size: 13px; }
+#rowLabel { color: #9AA0A6; font-size: 13px; }
 GroupCard, #groupCard { background-color: #2C2C2C; border: none; border-radius: 12px; }
 GroupCard:hover, #groupCard:hover { background-color: #333333; }
-#groupListItem { background-color: #1E1E1E; border: 1px solid #3C4043; border-radius: 8px; }
+#groupListItem { background-color: #1E1E1E; border: 1px solid #3C4043; border-radius: 12px; }
 #groupListItem:hover { background-color: #252525; border-color: #5F6368; }
-#groupListItem #groupIcon { min-width: 22px; max-width: 22px; }
-#groupListItem #groupName { font-size: 14px; font-weight: 500; color: #E8EAED; }
-#groupListItem #groupParams { color: #9AA0A6; font-size: 13px; }
+#groupListItem[groupActive="false"] { background-color: #1A1A1A; }
+#groupListItem[groupActive="false"] #groupName { color: #9AA0A6; }
+#groupStatusStrip { border: none; margin: 12px 0 12px 0; }
+#groupIconBadge { background-color: #2C2C2C; border: 1px solid #3C4043; border-radius: 10px; min-width: 40px; max-width: 40px; min-height: 40px; max-height: 40px; }
+#groupListItem #groupIcon { font-size: 18px; min-width: 40px; max-width: 40px; }
+#groupListItem #groupName { font-size: 15px; font-weight: 600; color: #E8EAED; }
+#groupListItem #groupParams { color: #9AA0A6; font-size: 12px; }
 #groupListItem #groupTemplate { color: #8AB4F8; font-size: 12px; }
 #groupListItem #groupRegion { color: #8AB4F8; font-size: 12px; }
 #groupListItem #groupDetail { color: #9AA0A6; font-size: 12px; }
-#groupListItem #groupToggle { min-width: 80px; }
+#groupMetaDot { color: #5F6368; font-size: 12px; padding: 0 6px; background: transparent; }
+#groupActionDock { background: transparent; }
 #moduleCard { background-color: #333333; border: 1px solid #3C4043; border-radius: 10px; }
 #moduleCard:hover { background-color: #3A3A3A; }
 #sectionTitle { font-size: 20px; font-weight: 500; color: #E8EAED; letter-spacing: -0.3px; padding-bottom: 4px; }
@@ -115,6 +138,20 @@ GroupCard:hover, #groupCard:hover { background-color: #333333; }
 #windowIcon { font-size: 16px; }
 #sidebarSeparator { background-color: #3C4043; max-height: 1px; margin: 8px 16px; }
 #divider { background-color: #3C4043; max-height: 1px; margin: 4px 0; }
+#groupEditWindow { background-color: #121212; }
+#groupEditScroll { border: none; background: transparent; }
+#groupEditBody { background: transparent; }
+#groupEditHeader { background: transparent; border-bottom: 1px solid #3C4043; padding-bottom: 4px; margin-bottom: 4px; }
+#groupEditHint { font-size: 12px; color: #9AA0A6; font-weight: 500; }
+#groupEditTitle { font-size: 18px; font-weight: 600; padding: 10px 14px; border: 1px solid #3C4043; border-radius: 10px; background-color: #1A1A1A; }
+#groupEditTitle:focus { border-color: #8AB4F8; }
+#valueChip { background-color: #1A1A1A; border: 1px solid #3C4043; border-radius: 8px; }
+#valueChip:hover { border-color: #5F6368; background-color: #222222; }
+#keyChip { background-color: #1A1A1A; border: 1px solid #3C4043; border-radius: 8px; min-height: 32px; max-height: 32px; }
+#keyChipValue { color: #E8EAED; font-size: 13px; font-weight: 500; }
+QPushButton#compactBtn { padding: 4px 8px; font-size: 13px; min-width: 0; border-radius: 6px; }
+#rangeSep { color: #9AA0A6; font-size: 13px; }
+#inlineFieldLabel { color: #9AA0A6; font-size: 13px; }
 """
 
 
@@ -137,6 +174,13 @@ class _LightColors:
     SCROLLBAR_BG = "#F5F5F5"
     SCROLLBAR_FG = "#C0C0C0"
     HEADER_BG = "#FAFAFA"
+    SWITCH_TRACK_OFF = "#BDBDBD"
+    SWITCH_TRACK_ON = "#1976D2"
+    SWITCH_TRACK_DISABLED = "#E0E0E0"
+    SWITCH_KNOB = "#FFFFFF"
+    SWITCH_KNOB_DISABLED = "#F5F5F5"
+    SWITCH_KNOB_SHADOW_ALPHA = 22
+    SWITCH_KNOB_BORDER = "#00000014"
 
     QSS = """
 QMainWindow, QWidget {
@@ -210,17 +254,33 @@ QListWidget::item:hover:!selected { background-color: #E8E8E8; }
 QSplitter::handle { background-color: #D0D0D0; width: 1px; }
 Card, #card, #settingsCard, #windowCard, #configCard { background-color: #F0F0F0; border: 1px solid #D0D0D0; border-radius: 12px; }
 Card:hover, #card:hover, #settingsCard:hover, #windowCard:hover, #configCard:hover { background-color: #E8E8E8; }
+#configCard #configCardRow, #configCard #fieldsRow, #configCard #fieldGroup, #configCard #spinRangeRow { background: transparent; }
+#keyCaptureRoot { background: transparent; }
+#keyCaptureRoot QPushButton#keyCaptureBtn { background-color: #FFFFFF; color: #212121; border: 1px solid #9E9E9E; border-radius: 6px; padding: 0 4px; font-size: 13px; font-weight: 500; min-width: 56px; max-width: 56px; min-height: 32px; max-height: 32px; }
+#keyCaptureRoot QPushButton#keyCaptureBtn:hover { background-color: #F5F5F5; border-color: #1976D2; color: #212121; }
+#keyCaptureRoot QPushButton#keyCaptureBtn:pressed { background-color: #EEEEEE; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureActive="true"] { background-color: #1976D2; color: #FFFFFF; border-color: #1976D2; font-weight: 600; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureActive="true"]:hover { background-color: #1565C0; border-color: #1565C0; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureRole="reset"] { color: #757575; }
+#keyCaptureRoot QPushButton#keyCaptureBtn[keyCaptureRole="reset"]:hover { color: #E53935; border-color: #E53935; background-color: #E5393514; }
+#settingsCard QLabel#rowLabel { color: #757575; font-size: 13px; }
+#rowLabel { color: #9AA0A6; font-size: 13px; }
 GroupCard, #groupCard { background-color: #F5F5F5; border: none; border-radius: 12px; }
 GroupCard:hover, #groupCard:hover { background-color: #EDEDED; }
-#groupListItem { background-color: #F0F0F0; border: 1px solid #D0D0D0; border-radius: 8px; }
+#groupListItem { background-color: #F0F0F0; border: 1px solid #D0D0D0; border-radius: 12px; }
 #groupListItem:hover { background-color: #E8E8E8; border-color: #C0C0C0; }
-#groupListItem #groupIcon { min-width: 22px; max-width: 22px; }
-#groupListItem #groupName { font-size: 14px; font-weight: 500; color: #212121; }
-#groupListItem #groupParams { color: #757575; font-size: 13px; }
+#groupListItem[groupActive="false"] { background-color: #ECECEC; }
+#groupListItem[groupActive="false"] #groupName { color: #9E9E9E; }
+#groupStatusStrip { border: none; margin: 12px 0 12px 0; }
+#groupIconBadge { background-color: #FFFFFF; border: 1px solid #D0D0D0; border-radius: 10px; min-width: 40px; max-width: 40px; min-height: 40px; max-height: 40px; }
+#groupListItem #groupIcon { font-size: 18px; min-width: 40px; max-width: 40px; }
+#groupListItem #groupName { font-size: 15px; font-weight: 600; color: #212121; }
+#groupListItem #groupParams { color: #757575; font-size: 12px; }
 #groupListItem #groupTemplate { color: #1976D2; font-size: 12px; }
 #groupListItem #groupRegion { color: #1976D2; font-size: 12px; }
 #groupListItem #groupDetail { color: #757575; font-size: 12px; }
-#groupListItem #groupToggle { min-width: 80px; }
+#groupMetaDot { color: #BDBDBD; font-size: 12px; padding: 0 6px; background: transparent; }
+#groupActionDock { background: transparent; }
 #moduleCard { background-color: #F5F5F5; border: 1px solid #D0D0D0; border-radius: 10px; }
 #moduleCard:hover { background-color: #EDEDED; }
 #sectionTitle { font-size: 20px; font-weight: 500; color: #212121; letter-spacing: -0.3px; padding-bottom: 4px; }
@@ -232,6 +292,21 @@ GroupCard:hover, #groupCard:hover { background-color: #EDEDED; }
 #windowIcon { font-size: 16px; }
 #sidebarSeparator { background-color: #E0E0E0; max-height: 1px; margin: 8px 16px; }
 #divider { background-color: #E0E0E0; max-height: 1px; margin: 4px 0; }
+#groupEditWindow { background-color: #F0F0F0; }
+#groupEditScroll { border: none; background: transparent; }
+#groupEditBody { background: transparent; }
+#groupEditHeader { background: transparent; border-bottom: 1px solid #D0D0D0; padding-bottom: 4px; margin-bottom: 4px; }
+#groupEditHint { font-size: 12px; color: #757575; font-weight: 500; }
+#groupEditTitle { font-size: 18px; font-weight: 600; padding: 10px 14px; border: 1px solid #D0D0D0; border-radius: 10px; background-color: #FFFFFF; }
+#groupEditTitle:focus { border-color: #1976D2; }
+#valueChip { background-color: #FFFFFF; border: 1px solid #D0D0D0; border-radius: 8px; }
+#valueChip:hover { border-color: #B0B0B0; background-color: #FAFAFA; }
+#keyChip { background-color: #FFFFFF; border: 1px solid #D0D0D0; border-radius: 8px; min-height: 32px; max-height: 32px; }
+#keyChipValue { color: #212121; font-size: 13px; font-weight: 500; }
+QPushButton#compactBtn { padding: 4px 8px; font-size: 13px; min-width: 0; border-radius: 6px; }
+#rangeSep { color: #757575; font-size: 13px; }
+#inlineFieldLabel { color: #757575; font-size: 13px; }
+#rowLabel { color: #757575; font-size: 13px; }
 """
 
 
@@ -241,6 +316,7 @@ class ThemeManager:
         "dark": _DarkColors,
         "light": _LightColors,
     }
+    _switch_callbacks = []
 
     @classmethod
     def current(cls):
@@ -251,6 +327,18 @@ class ThemeManager:
         return cls.current().QSS
 
     @classmethod
+    def on_switch(cls, callback):
+        if callback not in cls._switch_callbacks:
+            cls._switch_callbacks.append(callback)
+
+    @classmethod
+    def off_switch(cls, callback):
+        try:
+            cls._switch_callbacks.remove(callback)
+        except ValueError:
+            pass
+
+    @classmethod
     def switch_to(cls, mode):
         if mode not in cls._themes:
             return
@@ -258,6 +346,11 @@ class ThemeManager:
         app = QApplication.instance()
         if app:
             app.setStyleSheet(cls.qss())
+        for cb in list(cls._switch_callbacks):
+            try:
+                cb(mode)
+            except RuntimeError:
+                cls.off_switch(cb)
 
     @classmethod
     def is_dark(cls):

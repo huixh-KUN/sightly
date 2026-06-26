@@ -1,6 +1,6 @@
 import datetime
 
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QFrame, QSizePolicy
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QKeyEvent
 
@@ -14,18 +14,7 @@ _MODIFIER_NAMES = [
 
 
 class KeyCaptureWidget(QWidget):
-    """触发按键捕获组件
-
-    支持单键和组合键（最多三键，含修饰键）。
-    格式：Ctrl+F1、Alt+Shift+F1、Ctrl+Alt+F1
-
-    交互流程：
-    1. 默认显示当前按键值 +「修改」+「重置」按钮
-    2. 点击「修改」→ 按钮变「确定」，组件进入监听模式，捕获用户按下的键
-    3. 按下任意键自动回显到标签上
-    4. 点击「确定」保存并退出监听模式
-    5. 点击「重置」清空按键值（不触发任何按键）
-    """
+    """触发按键捕获：键值展示条 + 右侧紧凑操作按钮。"""
 
     keyChanged = Signal(str)
 
@@ -43,24 +32,45 @@ class KeyCaptureWidget(QWidget):
             print(f"[KEYCAPTURE] {msg}")
 
     def _setup_ui(self):
+        self.setObjectName("keyCaptureRoot")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self._btn_width = 56
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
+        layout.setSpacing(4)
 
+        self._chip = QFrame()
+        self._chip.setObjectName("keyChip")
+        self._chip.setFixedSize(88, 32)
+        chip_layout = QHBoxLayout(self._chip)
+        chip_layout.setContentsMargins(10, 0, 10, 0)
+        chip_layout.setSpacing(0)
         self._key_label = QLabel("无")
-        layout.addWidget(self._key_label)
+        self._key_label.setObjectName("keyChipValue")
+        self._key_label.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        chip_layout.addWidget(self._key_label, 0)
+        layout.addWidget(self._chip, 0)
 
         self._edit_btn = QPushButton("修改")
+        self._edit_btn.setObjectName("keyCaptureBtn")
+        self._edit_btn.setProperty("keyCaptureRole", "edit")
+        self._edit_btn.setProperty("keyCaptureActive", "false")
         self._edit_btn.setCursor(Qt.PointingHandCursor)
-        self._edit_btn.setFixedHeight(28)
+        self._edit_btn.setFixedSize(self._btn_width, 32)
         self._edit_btn.clicked.connect(self._on_edit_clicked)
         layout.addWidget(self._edit_btn)
 
         self._reset_btn = QPushButton("重置")
+        self._reset_btn.setObjectName("keyCaptureBtn")
+        self._reset_btn.setProperty("keyCaptureRole", "reset")
         self._reset_btn.setCursor(Qt.PointingHandCursor)
-        self._reset_btn.setFixedHeight(28)
+        self._reset_btn.setFixedSize(self._btn_width, 32)
         self._reset_btn.clicked.connect(self._on_reset)
         layout.addWidget(self._reset_btn)
+
+        self.setFixedWidth(88 + 4 + self._btn_width + 4 + self._btn_width)
 
     def key(self):
         return self._key
@@ -70,10 +80,9 @@ class KeyCaptureWidget(QWidget):
         self._update_display()
 
     def _update_display(self):
-        if self._key:
-            self._key_label.setText(self._key)
-        else:
-            self._key_label.setText("无")
+        if self._listening:
+            return
+        self._key_label.setText(self._key if self._key else "无")
 
     def _on_edit_clicked(self):
         if not self._listening:
@@ -81,10 +90,16 @@ class KeyCaptureWidget(QWidget):
         else:
             self._stop_listening()
 
+    def _refresh_edit_btn_style(self):
+        self._edit_btn.style().unpolish(self._edit_btn)
+        self._edit_btn.style().polish(self._edit_btn)
+
     def _start_listening(self):
         self._listening = True
         self._edit_btn.setText("确定")
-        self._key_label.setText("请按键...")
+        self._edit_btn.setProperty("keyCaptureActive", "true")
+        self._refresh_edit_btn_style()
+        self._key_label.setText("请按键…")
         self.setFocusPolicy(Qt.StrongFocus)
         self.setFocus()
         self.grabKeyboard()
@@ -93,6 +108,8 @@ class KeyCaptureWidget(QWidget):
     def _stop_listening(self):
         self._listening = False
         self._edit_btn.setText("修改")
+        self._edit_btn.setProperty("keyCaptureActive", "false")
+        self._refresh_edit_btn_style()
         self.releaseKeyboard()
         self.setFocusPolicy(Qt.NoFocus)
         self._update_display()
@@ -112,7 +129,10 @@ class KeyCaptureWidget(QWidget):
             return super().keyPressEvent(event)
 
         key_name = self._resolve_key(event)
-        self._debug(f"监听中捕获按键: raw_key={event.key()} mods={event.modifiers()} resolved={key_name!r}")
+        self._debug(
+            f"监听中捕获按键: raw_key={event.key()} mods={event.modifiers()} "
+            f"resolved={key_name!r}"
+        )
         if key_name:
             self._key = key_name
             self._key_label.setText(key_name)

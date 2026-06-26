@@ -36,17 +36,25 @@ class GeneralSettingsCard(QFrame):
         grid.setSpacing(12)
         grid.setColumnStretch(1, 1)
 
-        grid.addWidget(QLabel("界面语言"), 0, 0)
-        self._lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"])
+        def _row_label(text):
+            lbl = QLabel(text)
+            lbl.setObjectName("rowLabel")
+            return lbl
+
+        grid.addWidget(_row_label("界面语言"), 0, 0)
+        self._lang_combo = ComboBox(
+            items=["简体中文", "繁体中文", "英文"],
+            width=ComboBox.suggest_width(["简体中文", "繁体中文", "英文"]),
+        )
         self._lang_combo.currentIndexChanged.connect(lambda idx: self.config_changed.emit())
         grid.addWidget(self._lang_combo, 0, 1)
 
-        grid.addWidget(QLabel("启动快捷键"), 1, 0)
+        grid.addWidget(_row_label("启动快捷键"), 1, 0)
         self._start_key = KeyCaptureWidget(logging_manager=self._log)
         self._start_key.keyChanged.connect(lambda v: self.config_changed.emit())
         grid.addWidget(self._start_key, 1, 1)
 
-        grid.addWidget(QLabel("停止快捷键"), 2, 0)
+        grid.addWidget(_row_label("停止快捷键"), 2, 0)
         self._stop_key = KeyCaptureWidget(logging_manager=self._log)
         self._stop_key.keyChanged.connect(lambda v: self.config_changed.emit())
         grid.addWidget(self._stop_key, 2, 1)

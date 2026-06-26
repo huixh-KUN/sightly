@@ -1,4 +1,7 @@
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QSpinBox, QComboBox, QLineEdit, QWidget, QScrollArea, QGridLayout
+from PySide6.QtWidgets import (
+    QFrame, QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QSpinBox, QComboBox,
+    QLineEdit, QWidget, QScrollArea, QGridLayout, QDialog,
+)
 from PySide6.QtCore import Qt, Signal, QEvent
 
 class Card(QFrame):
@@ -127,6 +130,7 @@ class GroupListItem(QFrame):
     double_clicked = Signal(int)
     toggled = Signal(int, bool)
     delete_clicked = Signal(int)
+    test_requested = Signal(int)
     preview_requested = Signal(str)
 
     def __init__(self, index, group_type="image", parent=None):
@@ -137,60 +141,116 @@ class GroupListItem(QFrame):
         self._data = {}
         self._template_path = ""
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 10, 16, 10)
-        layout.setSpacing(4)
+        outer = QHBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        row1 = QHBoxLayout()
-        row1.setSpacing(10)
+        self._status_strip = QFrame()
+        self._status_strip.setObjectName("groupStatusStrip")
+        self._status_strip.setFixedWidth(2)
+        outer.addWidget(self._status_strip)
 
+        body = QHBoxLayout()
+        body.setContentsMargins(14, 12, 14, 12)
+        body.setSpacing(12)
+
+        self._icon_badge = QFrame()
+        self._icon_badge.setObjectName("groupIconBadge")
+        badge_layout = QHBoxLayout(self._icon_badge)
+        badge_layout.setContentsMargins(0, 0, 0, 0)
         self.icon_label = QLabel(_GROUP_ICONS.get(group_type, "📋"))
         self.icon_label.setObjectName("groupIcon")
-        row1.addWidget(self.icon_label)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        badge_layout.addWidget(self.icon_label)
+        body.addWidget(self._icon_badge, 0, Qt.AlignmentFlag.AlignTop)
+
+        content = QVBoxLayout()
+        content.setSpacing(4)
 
         self.name_label = QLabel("组")
         self.name_label.setObjectName("groupName")
-        row1.addWidget(self.name_label)
+        content.addWidget(self.name_label)
+
+        meta = QHBoxLayout()
+        meta.setSpacing(0)
+
+        self.params_label = QLabel("")
+        self.params_label.setObjectName("groupParams")
+        meta.addWidget(self.params_label)
+
+        self._dot_region = QLabel("·")
+        self._dot_region.setObjectName("groupMetaDot")
+        meta.addWidget(self._dot_region)
 
         self.region_label = ClickableLabel("")
         self.region_label.setObjectName("groupRegion")
         self.region_label.clicked.connect(self._preview_region)
-        row1.addWidget(self.region_label)
+        meta.addWidget(self.region_label)
+
+        self._dot_template = QLabel("·")
+        self._dot_template.setObjectName("groupMetaDot")
+        meta.addWidget(self._dot_template)
 
         self.template_label = ClickableLabel("")
         self.template_label.setObjectName("groupTemplate")
         self.template_label.clicked.connect(self._preview_template)
-        row1.addWidget(self.template_label)
+        meta.addWidget(self.template_label)
 
-        row1.addStretch()
-
-        from ui.components import Toggle
-        self.toggle = Toggle("")
-        self.toggle.setObjectName("groupToggle")
-        self.toggle.stateChanged.connect(self._on_toggle)
-        row1.addWidget(self.toggle)
-
-        self._delete_btn = SmallButton("删除")
-        self._delete_btn.setObjectName("dangerAction")
-        self._delete_btn.clicked.connect(lambda: self.delete_clicked.emit(self._index))
-        row1.addWidget(self._delete_btn)
-
-        layout.addLayout(row1)
-
-        row2 = QHBoxLayout()
-        row2.setSpacing(16)
-
-        self.params_label = QLabel("")
-        self.params_label.setObjectName("groupParams")
-        row2.addWidget(self.params_label)
+        self._dot_detail = QLabel("·")
+        self._dot_detail.setObjectName("groupMetaDot")
+        meta.addWidget(self._dot_detail)
 
         self.detail_label = QLabel("")
         self.detail_label.setObjectName("groupDetail")
-        row2.addWidget(self.detail_label, 1)
+        meta.addWidget(self.detail_label, 1)
+        content.addLayout(meta)
 
-        row2.addStretch()
+        body.addLayout(content, 1)
 
-        layout.addLayout(row2)
+        from ui.components.group_action_bar import GroupActionBar
+        self.actions = GroupActionBar()
+        self.actions.test_clicked.connect(lambda: self.test_requested.emit(self._index))
+        self.actions.edit_clicked.connect(lambda: self.double_clicked.emit(self._index))
+        self.actions.delete_clicked.connect(self._confirm_delete)
+        self.actions.toggled.connect(self._on_toggle)
+        body.addWidget(self.actions, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        outer.addLayout(body, 1)
+        self.toggle = self.actions
+        self._update_active_style(True)
+
+    def _update_active_style(self, enabled):
+        from ui.theme import ThemeManager
+        c = ThemeManager.current()
+        color = c.PRIMARY if enabled else c.BORDER
+        self._status_strip.setStyleSheet(
+            f"#groupStatusStrip {{ background-color: {color}; border: none; "
+            f"border-top-left-radius: 11px; border-bottom-left-radius: 11px; }}"
+        )
+        self.setProperty("groupActive", "true" if enabled else "false")
+        self.style().unpolish(self)
+        self.style().polish(self)
+
+    def _set_meta_field(self, label, _dot_before, text):
+        label.setText(text)
+        label.setVisible(bool(text))
+
+    def _sync_meta_dots(self):
+        ordered = [
+            (self.params_label, None),
+            (self.region_label, self._dot_region),
+            (self.template_label, self._dot_template),
+            (self.detail_label, self._dot_detail),
+        ]
+        prev_visible = False
+        for label, dot in ordered:
+            if not label.isVisible():
+                if dot is not None:
+                    dot.setVisible(False)
+                continue
+            if dot is not None:
+                dot.setVisible(prev_visible)
+            prev_visible = True
 
     def set_index(self, index):
         self._index = index
@@ -199,7 +259,20 @@ class GroupListItem(QFrame):
         return self._index
 
     def _on_toggle(self, state):
+        self._update_active_style(state)
         self.toggled.emit(self._index, state)
+
+    def _confirm_delete(self):
+        from ui.components import ConfirmDialog
+        dlg = ConfirmDialog(
+            title="删除确认",
+            message=f"确定要删除「{self._data.get('name', f'组 {self._index+1}')}」吗？此操作不可恢复。",
+            confirm_text="删除",
+            cancel_text="取消",
+            parent=self
+        )
+        if dlg.exec():
+            self.delete_clicked.emit(self._index)
 
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -212,10 +285,18 @@ class GroupListItem(QFrame):
         self.name_label.setText(name)
 
         params, region, template, details = self._format_display(data)
-        self.params_label.setText(params)
-        self.region_label.setText(region)
-        self.template_label.setText(template)
-        self.detail_label.setText(details)
+        self._set_meta_field(self.params_label, None, params)
+        self._set_meta_field(self.region_label, self._dot_region, region)
+        self._set_meta_field(self.template_label, self._dot_template, template)
+        self._set_meta_field(self.detail_label, self._dot_detail, details)
+        self._sync_meta_dots()
+
+        enabled = data.get("enabled", True)
+        switch = self.actions.switch
+        switch.blockSignals(True)
+        self.actions.setChecked(enabled)
+        switch.blockSignals(False)
+        self._update_active_style(enabled)
 
     def _preview_template(self):
         if self._template_path:
@@ -246,7 +327,7 @@ class GroupListItem(QFrame):
             if ref:
                 self._template_path = ref
                 fname = ref.split("/")[-1].split("\\")[-1]
-                template = f"📷 {fname}"
+                template = fname
         elif t == "ocr":
             kw = data.get("keywords", "")
             if kw:
@@ -297,21 +378,28 @@ class GroupListItem(QFrame):
         return params, region, template, details
 
 
-class GroupEditWindow(QWidget):
+class GroupEditWindow(QDialog):
     config_changed = Signal(int, dict)
 
     def __init__(self, group_data: dict, group_index: int, group_type: str, panel=None, parent=None,
                  logging_manager=None, target_hwnd=0, app_state=None):
         super().__init__(parent)
+        self.setObjectName("groupEditWindow")
         self.setWindowTitle(f"编辑 - {group_data.get('name', f'组 {group_index+1}')}")
-        self.setMinimumSize(640, 500)
-        self.resize(680, 600)
+        self.setMinimumSize(580, 480)
+        self.resize(640, 640)
         self.setAttribute(Qt.WA_DeleteOnClose)
+        self.setWindowModality(Qt.ApplicationModal)
+        self.setModal(True)
         self._group_index = group_index
         self._panel = panel
+        self._capture_suspended = False
+        self._saved_modality = Qt.ApplicationModal
+        self._owner_was_visible = False
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
 
         if group_type == "image":
             from ui.image_panel import ImageGroupWidget
@@ -333,10 +421,13 @@ class GroupEditWindow(QWidget):
             raise ValueError(f"Unknown group type: {group_type}")
 
         self._editor.set_config(group_data)
+        self._editor.setObjectName("groupEditBody")
 
         scroll = QScrollArea()
+        scroll.setObjectName("groupEditScroll")
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.NoFrame)
         scroll.setWidget(self._editor)
         layout.addWidget(scroll)
 
@@ -347,26 +438,68 @@ class GroupEditWindow(QWidget):
         from ui.widgets import set_panel_view_only
         set_panel_view_only(self._editor, running)
 
+    def suspend_for_capture(self):
+        """全屏选区/截图时暂时解除模态并隐藏窗口。"""
+        if self._capture_suspended:
+            return
+        self._capture_suspended = True
+        self._saved_modality = self.windowModality()
+        self.setWindowModality(Qt.NonModal)
+        self.hide()
+        owner = self.parentWidget()
+        self._owner_was_visible = owner.isVisible() if owner else False
+        if owner:
+            owner.hide()
+
+    def resume_after_capture(self):
+        """全屏操作结束后恢复模态编辑框。"""
+        if not self._capture_suspended:
+            return
+        self._capture_suspended = False
+        owner = self.parentWidget()
+        if owner and self._owner_was_visible:
+            owner.show()
+        self.setWindowModality(self._saved_modality)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
     def closeEvent(self, event):
         if self._panel and hasattr(self._panel, '_on_edit_window_closed'):
             self._panel._on_edit_window_closed(self._group_index, self._editor)
         super().closeEvent(event)
 
 
+def suspend_group_edit_capture(host_widget):
+    w = host_widget.window()
+    if isinstance(w, GroupEditWindow):
+        w.suspend_for_capture()
+
+
+def resume_group_edit_capture(host_widget):
+    w = host_widget.window()
+    if isinstance(w, GroupEditWindow):
+        w.resume_after_capture()
+
+
 def set_panel_view_only(panel, view_only):
     """将面板设为只读（保留滚动查看，禁用编辑控件）"""
-    if not view_only:
-        return
-    for t in (QSpinBox, QComboBox, QLineEdit):
+    from ui.components.combo_box import ComboBox
+    for t in (QSpinBox, QComboBox, QLineEdit, ComboBox):
         for child in panel.findChildren(t):
-            child.setEnabled(False)
+            child.setEnabled(not view_only)
     for child in panel.findChildren(QPushButton):
         name = child.objectName()
-        if name in ("regionAction", "templateAction", "dangerAction"):
-            continue
-        child.setEnabled(False)
+        if name in ("regionAction", "templateAction", "dangerAction", "testBtn"):
+            child.setEnabled(True)
+        else:
+            child.setEnabled(not view_only)
+    for child in panel.findChildren(QWidget):
+        name = child.objectName()
+        if name in ("testBtn", "dangerAction"):
+            child.setEnabled(True)
     from ui.components import KeyCaptureWidget
     for child in panel.findChildren(KeyCaptureWidget):
-        child.setEnabled(False)
+        child.setEnabled(not view_only)
     for child in panel.findChildren(GroupEditWindow):
-        child.set_running(True)
+        child.set_running(view_only)
