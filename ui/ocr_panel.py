@@ -10,14 +10,18 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import Toggle
+from ui.components import SwitchButton
 from ui.components import ComboBox
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
+from ui.components import GroupEditHeader, ValueChip
+from ui.components.form_rows import spin_range_row
 from core.config import ConfigVar
 
 
 class OCRPanel(QWidget):
+    test_group_requested = Signal(int)
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
@@ -94,6 +98,7 @@ class OCRPanel(QWidget):
         item.toggled.connect(self._on_toggle)
         item.double_clicked.connect(self._open_edit)
         item.delete_clicked.connect(self._delete_group)
+        item.test_requested.connect(self._test_group)
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, item)
         self.list_items.append(item)
 
@@ -105,6 +110,9 @@ class OCRPanel(QWidget):
             item.deleteLater()
             self.groups_data.pop(idx)
             self._renumber()
+
+    def _test_group(self, idx):
+        self.test_group_requested.emit(idx)
 
     def _renumber(self):
         for i, item in enumerate(self.list_items):
@@ -123,14 +131,17 @@ class OCRPanel(QWidget):
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
-                self.groups_data[idx], idx, "ocr", panel=self
+                self.groups_data[idx], idx, "ocr", panel=self,
+                parent=self.window(),
             )
-            self._edit_window.show()
+            self._edit_window.exec()
+            self._edit_window = None
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
             cfg = editor.collect_config()
             plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+            plain["enabled"] = self.groups_data[idx].get("enabled", True)
             self.groups_data[idx] = plain
             if idx < len(self.list_items):
                 self.list_items[idx].set_data(plain)
@@ -161,99 +172,92 @@ class OCRGroupWidget(QFrame):
         super().__init__(parent)
         self.index = index
         self.region = None
+        self._enabled = True
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(4, 4, 4, 16)
+        layout.setSpacing(14)
 
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        self.title_edit = QLineEdit(f"识别组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
-        header.addWidget(self.title_edit)
-        header.addStretch()
-        self.toggle = Toggle("启用")
-        header.addWidget(self.toggle)
-        layout.addLayout(header)
+        self.header = GroupEditHeader(f"识别组 {index + 1}")
+        self.header.title_edit.setText(f"识别组 {index + 1}")
+        layout.addWidget(self.header)
 
         # 📍 区域
         region_card = ConfigCard("📍", "区域")
-        region_row = QHBoxLayout()
-        self.region_label = ClickableLabel("未选择")
-        self.region_label.setObjectName("infoText")
-        region_row.addWidget(self.region_label, 1)
+        self.region_chip = ValueChip("未选择")
         region_btn = TextButton("选择区域")
         region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
-        region_row.addWidget(region_btn)
-        self.region_label.clicked.connect(self._preview_region)
-        region_card.add_widget_row(region_row)
+        region_card.add_action_row("", self.region_chip, region_btn)
+        self.region_chip.label.clicked.connect(self._preview_region)
         layout.addWidget(region_card)
-
-        # ⚙️ 触发
-        trigger_card = ConfigCard("⚙️", "触发")
-        self.key_input = KeyCaptureWidget()
-        trigger_card.add_row("按键", self.key_input)
-        delay_row = QHBoxLayout()
-        self.delay_min_spin = QSpinBox()
-        self.delay_min_spin.setRange(0, 10)
-        self.delay_min_spin.setValue(1)
-        self.delay_min_spin.setFixedWidth(70)
-        delay_row.addWidget(self.delay_min_spin)
-        delay_row.addWidget(QLabel("~"))
-        self.delay_max_spin = QSpinBox()
-        self.delay_max_spin.setRange(0, 10)
-        self.delay_max_spin.setValue(3)
-        self.delay_max_spin.setFixedWidth(70)
-        delay_row.addWidget(self.delay_max_spin)
-        delay_row.addStretch()
-        trigger_card.add_row("延迟(秒)", delay_row)
-        click_row = QHBoxLayout()
-        self.click_toggle = Toggle("点击")
-        click_row.addWidget(self.click_toggle)
-        click_row.addWidget(QLabel("偏移"))
-        self.offset_spin = QSpinBox()
-        self.offset_spin.setRange(0, 200)
-        self.offset_spin.setValue(0)
-        self.offset_spin.setSuffix("px")
-        self.offset_spin.setFixedWidth(70)
-        self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
-        click_row.addWidget(self.offset_spin)
-        click_row.addStretch()
-        trigger_card.add_widget_row(click_row)
-        layout.addWidget(trigger_card)
-
-        # 🔔 报警
-        alarm_card = ConfigCard("🔔", "报警")
-        self.alarm_toggle = Toggle("触发时响铃")
-        alarm_card.set_content(self.alarm_toggle)
-        layout.addWidget(alarm_card)
 
         # 🎯 匹配
         match_card = ConfigCard("🎯", "匹配")
         self.keywords_input = QLineEdit()
         self.keywords_input.setPlaceholderText("多个关键词用 , 分隔")
-        match_card.add_row("关键词", self.keywords_input)
-        self.lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"])
-        match_card.add_row("语言", self.lang_combo)
+        match_card.add_row("关键词", self.keywords_input, stretch=1)
+        self.lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"], width=100)
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 999)
         self.interval_spin.setValue(3)
-        self.interval_spin.setFixedWidth(70)
-        match_card.add_row("间隔(秒)", self.interval_spin)
+        self.interval_spin.setSuffix(" 秒")
+        self.interval_spin.setFixedWidth(58)
         self.pause_spin = QSpinBox()
         self.pause_spin.setRange(0, 999)
         self.pause_spin.setValue(3)
-        self.pause_spin.setFixedWidth(70)
-        match_card.add_row("暂停(秒)", self.pause_spin)
+        self.pause_spin.setSuffix(" 秒")
+        self.pause_spin.setFixedWidth(58)
+        match_card.add_segments_row(
+            "语言",
+            ("", self.lang_combo),
+            ("间隔", self.interval_spin),
+            ("暂停", self.pause_spin),
+        )
         layout.addWidget(match_card)
+
+        # ⚙️ 触发
+        trigger_card = ConfigCard("⚙️", "触发")
+        self.key_input = KeyCaptureWidget()
+        self.delay_min_spin = QSpinBox()
+        self.delay_min_spin.setRange(0, 10)
+        self.delay_min_spin.setValue(1)
+        self.delay_min_spin.setSuffix(" 秒")
+        self.delay_min_spin.setFixedWidth(56)
+        self.delay_max_spin = QSpinBox()
+        self.delay_max_spin.setRange(0, 10)
+        self.delay_max_spin.setValue(3)
+        self.delay_max_spin.setSuffix(" 秒")
+        self.delay_max_spin.setFixedWidth(56)
+        self.click_toggle = SwitchButton(compact=True)
+        self.offset_spin = QSpinBox()
+        self.offset_spin.setRange(0, 200)
+        self.offset_spin.setValue(0)
+        self.offset_spin.setSuffix(" px")
+        self.offset_spin.setFixedWidth(58)
+        self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
+        self.alarm_toggle = SwitchButton(compact=True)
+        trigger_card.add_segments_row(
+            "按键",
+            ("", self.key_input),
+            ("延迟", spin_range_row(self.delay_min_spin, self.delay_max_spin)),
+        )
+        trigger_card.add_segments_row(
+            "偏移",
+            ("", self.offset_spin),
+            ("是否点击", self.click_toggle),
+            ("是否报警", self.alarm_toggle),
+        )
+        self.click_toggle.stateChanged.connect(self.offset_spin.setEnabled)
+        self.offset_spin.setEnabled(self.click_toggle.isChecked())
+        layout.addWidget(trigger_card)
 
         layout.addStretch()
 
     def collect_config(self):
         return {
-            "name": self.title_edit.text(),
-            "enabled": ConfigVar(self.toggle.isChecked()),
+            "name": self.header.title_edit.text(),
+            "enabled": ConfigVar(self._enabled),
             "region": self.region,
             "interval": ConfigVar(str(self.interval_spin.value())),
             "pause": ConfigVar(str(self.pause_spin.value())),
@@ -268,16 +272,15 @@ class OCRGroupWidget(QFrame):
         }
 
     def set_config(self, cfg):
-        self.toggle.setChecked(cfg.get("enabled", False))
+        self._enabled = cfg.get("enabled", True)
         name = cfg.get("name", "")
         if name:
-            self.title_edit.setText(name)
+            self.header.title_edit.setText(name)
         region = cfg.get("region")
         if region:
             self.region = tuple(region)
             x1, y1, x2, y2 = self.region
-            self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-            self.region_label.setStyleSheet("font-weight: 500;")
+            self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
         try:
             self.interval_spin.setValue(int(cfg.get("interval", 3)))
             self.pause_spin.setValue(int(cfg.get("pause", 3)))
@@ -299,30 +302,21 @@ class OCRGroupWidget(QFrame):
 
     def set_title(self, index):
         self.index = index
-        self.title_edit.setText(f"识别组 {index + 1}")
+        self.header.title_edit.setText(f"识别组 {index + 1}")
 
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
         self.overlay = RegionOverlay("ocr")
         self.overlay.region_selected.connect(self._on_region_selected)
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            w.hide()
-            pw = w.parent()
-            if pw:
-                pw.hide()
+        from ui.widgets import suspend_group_edit_capture, resume_group_edit_capture
+        suspend_group_edit_capture(self)
         self.overlay.show()
 
     def _on_region_selected(self, x1, y1, x2, y2):
         self.region = (x1, y1, x2, y2)
-        self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-        self.region_label.setStyleSheet("font-weight: 500; font-size: 13px;")
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            pw = w.parent()
-            if pw:
-                pw.show()
-            w.show()
+        self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
+        from ui.widgets import resume_group_edit_capture
+        resume_group_edit_capture(self)
 
     def _preview_region(self):
         if self.region:

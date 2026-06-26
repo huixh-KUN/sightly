@@ -10,14 +10,18 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import Toggle
+from ui.components import SwitchButton
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
+from ui.components import GroupEditHeader, ValueChip
+from ui.components.form_rows import spin_range_row
 from core.config import ConfigVar
 import os
 
 
 class ImagePanel(QWidget):
+    test_group_requested = Signal(int)
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
@@ -94,6 +98,7 @@ class ImagePanel(QWidget):
         item.toggled.connect(self._on_toggle)
         item.double_clicked.connect(self._open_edit)
         item.delete_clicked.connect(self._delete_group)
+        item.test_requested.connect(self._test_group)
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, item)
         self.list_items.append(item)
 
@@ -105,6 +110,9 @@ class ImagePanel(QWidget):
             item.deleteLater()
             self.groups_data.pop(idx)
             self._renumber()
+
+    def _test_group(self, idx):
+        self.test_group_requested.emit(idx)
 
     def _renumber(self):
         for i, item in enumerate(self.list_items):
@@ -125,13 +133,16 @@ class ImagePanel(QWidget):
             self._edit_window = GroupEditWindow(
                 self.groups_data[idx], idx, "image", panel=self,
                 app_state=self.app.app_state,
+                parent=self.window(),
             )
-            self._edit_window.show()
+            self._edit_window.exec()
+            self._edit_window = None
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
             cfg = editor.collect_config()
             plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+            plain["enabled"] = self.groups_data[idx].get("enabled", True)
             self.groups_data[idx] = plain
             if idx < len(self.list_items):
                 self.list_items[idx].set_data(plain)
@@ -164,132 +175,115 @@ class ImageGroupWidget(QFrame):
         self.index = index
         self.region = None
         self.template_path = None
+        self._enabled = True
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(4, 4, 4, 16)
+        layout.setSpacing(14)
 
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        self.title_edit = QLineEdit(f"检测组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
-        header.addWidget(self.title_edit)
-        header.addStretch()
-        self.toggle = Toggle("启用")
-        header.addWidget(self.toggle)
-        layout.addLayout(header)
+        self.header = GroupEditHeader(f"检测组 {index + 1}")
+        self.header.title_edit.setText(f"检测组 {index + 1}")
+        layout.addWidget(self.header)
 
         # 📍 区域
         region_card = ConfigCard("📍", "区域")
-        region_row = QHBoxLayout()
-        self.region_label = ClickableLabel("未选择")
-        self.region_label.setObjectName("infoText")
-        region_row.addWidget(self.region_label, 1)
+        self.region_chip = ValueChip("未选择")
         region_btn = TextButton("选择区域")
         region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
-        region_row.addWidget(region_btn)
-        region_card.add_widget_row(region_row)
+        region_card.add_action_row("", self.region_chip, region_btn)
         layout.addWidget(region_card)
 
         # 🖼️ 模板
         template_card = ConfigCard("🖼️", "模板")
-        tmpl_row = QHBoxLayout()
-        self.template_label = ClickableLabel("未选择")
-        self.template_label.setObjectName("infoText")
-        tmpl_row.addWidget(self.template_label, 1)
+        self.template_chip = ValueChip("未选择")
         template_btn = TextButton("选择图片")
         template_btn.setObjectName("templateAction")
         template_btn.clicked.connect(self._select_template)
-        tmpl_row.addWidget(template_btn)
         screenshot_btn = TextButton("截图")
         screenshot_btn.setObjectName("templateAction")
         screenshot_btn.clicked.connect(self._capture_template)
-        tmpl_row.addWidget(screenshot_btn)
-        template_card.add_widget_row(tmpl_row)
+        template_card.add_action_row("", self.template_chip, template_btn, screenshot_btn)
         layout.addWidget(template_card)
 
-        # ⚙️ 触发
-        trigger_card = ConfigCard("⚙️", "触发")
+        # 🎯 检测
+        detect_card = ConfigCard("🎯", "检测")
         self.threshold_spin = QSpinBox()
         self.threshold_spin.setRange(50, 100)
         self.threshold_spin.setValue(80)
         self.threshold_spin.setSuffix("%")
-        self.threshold_spin.setFixedWidth(70)
-        trigger_card.add_row("匹配阈值", self.threshold_spin)
+        self.threshold_spin.setFixedWidth(58)
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 99)
         self.interval_spin.setValue(5)
         self.interval_spin.setSuffix(" 秒")
-        self.interval_spin.setFixedWidth(70)
-        trigger_card.add_row("检测间隔", self.interval_spin)
+        self.interval_spin.setFixedWidth(58)
         self.pause_spin = QSpinBox()
         self.pause_spin.setRange(0, 999)
         self.pause_spin.setValue(180)
         self.pause_spin.setSuffix(" 秒")
-        self.pause_spin.setFixedWidth(90)
-        trigger_card.add_row("暂停时长", self.pause_spin)
+        self.pause_spin.setFixedWidth(58)
+        detect_card.add_segments_row(
+            "阈值",
+            ("", self.threshold_spin),
+            ("间隔", self.interval_spin),
+            ("暂停", self.pause_spin),
+        )
+        layout.addWidget(detect_card)
+
+        # ⚙️ 触发
+        trigger_card = ConfigCard("⚙️", "触发")
         self.key_input = KeyCaptureWidget()
-        trigger_card.add_row("按键", self.key_input)
-        delay_row = QHBoxLayout()
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 9999)
         self.delay_min_spin.setValue(300)
         self.delay_min_spin.setSuffix(" ms")
-        self.delay_min_spin.setFixedWidth(80)
-        delay_row.addWidget(self.delay_min_spin)
-        delay_row.addWidget(QLabel("~"))
+        self.delay_min_spin.setFixedWidth(56)
         self.delay_max_spin = QSpinBox()
         self.delay_max_spin.setRange(0, 9999)
         self.delay_max_spin.setValue(500)
         self.delay_max_spin.setSuffix(" ms")
-        self.delay_max_spin.setFixedWidth(80)
-        delay_row.addWidget(self.delay_max_spin)
-        delay_row.addStretch()
-        trigger_card.add_row("按键时长", delay_row)
-        click_row = QHBoxLayout()
-        self.click_toggle = Toggle("点击")
-        click_row.addWidget(self.click_toggle)
-        click_row.addWidget(QLabel("偏移"))
+        self.delay_max_spin.setFixedWidth(56)
+        self.click_toggle = SwitchButton(compact=True)
         self.offset_spin = QSpinBox()
         self.offset_spin.setRange(0, 200)
         self.offset_spin.setValue(0)
-        self.offset_spin.setSuffix("px")
-        self.offset_spin.setFixedWidth(70)
+        self.offset_spin.setSuffix(" px")
+        self.offset_spin.setFixedWidth(58)
         self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
-        click_row.addWidget(self.offset_spin)
-        click_row.addStretch()
-        trigger_card.add_widget_row(click_row)
+        self.alarm_toggle = SwitchButton(compact=True)
+        trigger_card.add_segments_row(
+            "按键",
+            ("", self.key_input),
+            ("时长", spin_range_row(self.delay_min_spin, self.delay_max_spin)),
+        )
+        trigger_card.add_segments_row(
+            "偏移",
+            ("", self.offset_spin),
+            ("是否点击", self.click_toggle),
+            ("是否报警", self.alarm_toggle),
+        )
+        self.click_toggle.stateChanged.connect(self.offset_spin.setEnabled)
+        self.offset_spin.setEnabled(self.click_toggle.isChecked())
         layout.addWidget(trigger_card)
-
-        # 🔔 报警
-        alarm_card = ConfigCard("🔔", "报警")
-        self.alarm_toggle = Toggle("触发时响铃")
-        alarm_card.set_content(self.alarm_toggle)
-        layout.addWidget(alarm_card)
 
         layout.addStretch()
         self._connect_preview()
 
-    def _make_label_blue(self, label):
-        label.setStyleSheet("font-weight: 500;")
-
     def set_config(self, cfg):
-        self.toggle.setChecked(cfg.get("enabled", False))
+        self._enabled = cfg.get("enabled", True)
         name = cfg.get("name", "")
         if name:
-            self.title_edit.setText(name)
+            self.header.title_edit.setText(name)
         region = cfg.get("region")
         if region:
             self.region = tuple(region)
             x1, y1, x2, y2 = self.region
-            self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-            self._make_label_blue(self.region_label)
+            self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
         ref = cfg.get("reference_image", "")
         if ref and os.path.exists(ref):
             self.template_path = ref
-            self.template_label.setText(ref.split("/")[-1].split("\\")[-1])
-            self._make_label_blue(self.template_label)
+            self.template_chip.set_text(ref.split("/")[-1].split("\\")[-1], accent=True)
         try:
             self.threshold_spin.setValue(int(cfg.get("threshold", 80)))
             self.interval_spin.setValue(int(cfg.get("interval", 5)))
@@ -307,12 +301,12 @@ class ImageGroupWidget(QFrame):
 
     def set_title(self, index):
         self.index = index
-        self.title_edit.setText(f"检测组 {index + 1}")
+        self.header.title_edit.setText(f"检测组 {index + 1}")
 
     def collect_config(self):
         return {
-            "name": self.title_edit.text(),
-            "enabled": ConfigVar(self.toggle.isChecked()),
+            "name": self.header.title_edit.text(),
+            "enabled": ConfigVar(self._enabled),
             "region": self.region,
             "reference_image": self.template_path or "",
             "threshold": ConfigVar(str(self.threshold_spin.value())),
@@ -327,22 +321,12 @@ class ImageGroupWidget(QFrame):
         }
 
     def _hide_windows(self):
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            w.hide()
-            from PySide6.QtWidgets import QWidget
-            pw = w.parent()
-            if isinstance(pw, QWidget):
-                pw.hide()
+        from ui.widgets import suspend_group_edit_capture
+        suspend_group_edit_capture(self)
 
     def _show_windows(self):
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            from PySide6.QtWidgets import QWidget
-            pw = w.parent()
-            if isinstance(pw, QWidget):
-                pw.show()
-            w.show()
+        from ui.widgets import resume_group_edit_capture
+        resume_group_edit_capture(self)
 
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
@@ -353,15 +337,13 @@ class ImageGroupWidget(QFrame):
 
     def _on_region_selected(self, x1, y1, x2, y2):
         self.region = (x1, y1, x2, y2)
-        self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-        self._make_label_blue(self.region_label)
+        self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
         self._show_windows()
 
     def _select_template(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择模板图片", "", "Image Files (*.png *.jpg *.bmp)")
         if path:
-            self.template_label.setText(path.split("/")[-1].split("\\")[-1])
-            self._make_label_blue(self.template_label)
+            self.template_chip.set_text(path.split("/")[-1].split("\\")[-1], accent=True)
             ws_path = self._save_template_to_workspace(path)
             self.template_path = ws_path or path
 
@@ -375,8 +357,7 @@ class ImageGroupWidget(QFrame):
     def _on_template_captured(self, pixmap):
         ws_path = self._save_template_to_workspace(pixmap)
         if ws_path:
-            self.template_label.setText(f"截图 ({pixmap.width()}x{pixmap.height()})")
-            self._make_label_blue(self.template_label)
+            self.template_chip.set_text(f"截图 ({pixmap.width()}x{pixmap.height()})", accent=True)
             self.template_path = ws_path
         self._show_windows()
 
@@ -405,5 +386,5 @@ class ImageGroupWidget(QFrame):
             QMessageBox.information(None, "提示", "未设置检测区域")
 
     def _connect_preview(self):
-        self.region_label.clicked.connect(self._preview_region)
-        self.template_label.clicked.connect(self._preview_template)
+        self.region_chip.label.clicked.connect(self._preview_region)
+        self.template_chip.label.clicked.connect(self._preview_template)

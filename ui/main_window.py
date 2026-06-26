@@ -12,7 +12,7 @@ from PySide6.QtGui import QIcon, QFont, QShortcut, QKeySequence
 
 from core.state import AppState
 from ui.theme import ThemeManager
-from ui.components import Toggle
+from ui.components import ThemeSwitcher
 from core.config import ConfigManager, strip_configvar, ConfigVar
 from core.logging import LoggingManager
 from input.keyboard import setup_shortcuts
@@ -180,9 +180,9 @@ class MainWindow(QMainWindow):
 
         h_layout.addSpacing(16)
 
-        self.theme_toggle = Toggle("深色" if ThemeManager.is_dark() else "浅色")
-        self.theme_toggle.stateChanged.connect(self._on_theme_toggled)
-        h_layout.addWidget(self.theme_toggle)
+        self.theme_switcher = ThemeSwitcher()
+        self.theme_switcher.themeChanged.connect(self._on_theme_changed)
+        h_layout.addWidget(self.theme_switcher)
 
         h_layout.addSpacing(8)
 
@@ -272,6 +272,12 @@ class MainWindow(QMainWindow):
         hm = self.panels.get('home')
         if hm:
             hm.config_save_requested.connect(self.save_config)
+        for panel_id in ['ocr', 'timed', 'number', 'image', 'background']:
+            panel = self.panels.get(panel_id)
+            if panel:
+                panel.test_group_requested.connect(
+                    lambda idx, pid=panel_id: self._on_test_group(pid, idx)
+                )
         self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested/record_hotkey_triggered/config_loaded")
 
     def _init_module_bindings(self):
@@ -373,6 +379,80 @@ class MainWindow(QMainWindow):
                 index, on_selected=panel._edit_window._editor._on_pos_selected
             )
 
+    def _format_test_status(self, result):
+        matched = result.get("matched")
+        if matched is None:
+            executed = result.get("executed", False)
+            return "执行完成" if executed else "未配置动作"
+        return "检测通过" if matched else "检测未通过"
+
+    def _on_test_group(self, panel_id, idx):
+        from PySide6.QtWidgets import QMessageBox
+        from PySide6.QtCore import QTimer
+
+        if self._is_running:
+            QMessageBox.warning(self, "测试", "请先停止运行再进行测试")
+            return
+
+        wait_panels = {
+            'timed': ('timed', 'interval', 10, self.timed_module.test_group),
+            'image': ('image', 'interval', 5, self.image_manager.test_group),
+            'ocr': ('ocr', 'interval', 3, self.ocr_module.test_group),
+            'background': ('background', 'interval', 3, self.background_manager.run_once),
+        }
+        if panel_id in wait_panels:
+            pkey, interval_key, default, run_fn = wait_panels[panel_id]
+            panel = self.panels.get(pkey)
+            if not panel or idx >= len(panel.groups_data):
+                QMessageBox.information(self, "测试", "组索引越界")
+                return
+            interval = int(panel.groups_data[idx].get(interval_key, default))
+
+            wait_box = QMessageBox(self)
+            wait_box.setWindowTitle("测试")
+            wait_box.setText(f"等待 {interval} 秒后执行测试动作…")
+            wait_box.setStandardButtons(QMessageBox.NoButton)
+            wait_box.show()
+
+            def _do_wait_test():
+                wait_box.close()
+                wait_box.deleteLater()
+                self._sync_panel_configs()
+                try:
+                    result = run_fn(idx)
+                except Exception as e:
+                    self.logging_manager.error("TEST", f"{pkey} 测试失败: {e}")
+                    QMessageBox.critical(self, "测试失败", str(e))
+                    return
+                status = self._format_test_status(result)
+                QMessageBox.information(
+                    self, f"测试结果 - {pkey}",
+                    f"{status}\n\n{result.get('detail', '')}"
+                )
+
+            QTimer.singleShot(interval * 1000, _do_wait_test)
+            return
+
+        self._sync_panel_configs()
+        test_map = {
+            'number': lambda: self.number_module.test_group(idx),
+        }
+        test_fn = test_map.get(panel_id)
+        if test_fn is None:
+            QMessageBox.information(self, "测试", "该模块暂不支持单次测试")
+            return
+        try:
+            result = test_fn()
+        except Exception as e:
+            self.logging_manager.error("TEST", f"{panel_id} 测试失败: {e}")
+            QMessageBox.critical(self, "测试失败", str(e))
+            return
+        status = self._format_test_status(result)
+        QMessageBox.information(
+            self, f"测试结果 - {panel_id}",
+            f"{status}\n\n{result.get('detail', '')}"
+        )
+
     def _on_settings_config_changed(self, config):
         alarm = config.get("alarm", {})
         if alarm.get("sound_path"):
@@ -473,10 +553,9 @@ class MainWindow(QMainWindow):
         else:
             self.logging_manager.debug("CONFIG", "无保存的配置")
 
-    def _on_theme_toggled(self, checked):
-        mode = "light" if checked else "dark"
+    def _on_theme_changed(self, mode):
         ThemeManager.switch_to(mode)
-        self.theme_toggle._label.setText("浅色" if checked else "深色")
+        self.theme_switcher.set_theme(mode)
         self.app_state.save_index(theme=mode)
 
     def load_saved_config(self, workspace_name=None):
@@ -492,8 +571,7 @@ class MainWindow(QMainWindow):
                 self.logging_manager.debug("CONFIG", f"工作空间已加载: {loaded}")
         if theme and theme != ThemeManager._current:
             ThemeManager.switch_to(theme)
-            self.theme_toggle.setChecked(theme == "light")
-            self.theme_toggle._label.setText("浅色" if theme == "light" else "深色")
+            self.theme_switcher.set_theme(theme)
 
     def _apply_settings(self, settings_cfg):
         general = settings_cfg.get("general", {})

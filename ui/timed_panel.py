@@ -10,14 +10,17 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import Toggle
+from ui.components import SwitchButton
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
+from ui.components import GroupEditHeader, ValueChip
+from ui.components.form_rows import spin_range_row
 from core.config import ConfigVar
 
 
 class TimedPanel(QWidget):
     position_selection_requested = Signal(int)
+    test_group_requested = Signal(int)
 
     def __init__(self, app, parent=None):
         super().__init__(parent)
@@ -94,6 +97,7 @@ class TimedPanel(QWidget):
         item.toggled.connect(self._on_toggle)
         item.double_clicked.connect(self._open_edit)
         item.delete_clicked.connect(self._delete_group)
+        item.test_requested.connect(self._test_group)
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, item)
         self.list_items.append(item)
 
@@ -105,6 +109,9 @@ class TimedPanel(QWidget):
             item.deleteLater()
             self.groups_data.pop(idx)
             self._renumber()
+
+    def _test_group(self, idx):
+        self.test_group_requested.emit(idx)
 
     def _renumber(self):
         for i, item in enumerate(self.list_items):
@@ -123,18 +130,21 @@ class TimedPanel(QWidget):
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
-                self.groups_data[idx], idx, "timed", panel=self
+                self.groups_data[idx], idx, "timed", panel=self,
+                parent=self.window(),
             )
             if hasattr(self._edit_window._editor, 'position_selection_requested'):
                 self._edit_window._editor.position_selection_requested.connect(
                     self.position_selection_requested.emit
                 )
-            self._edit_window.show()
+            self._edit_window.exec()
+            self._edit_window = None
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
             cfg = editor.collect_config()
             plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+            plain["enabled"] = self.groups_data[idx].get("enabled", True)
             self.groups_data[idx] = plain
             if idx < len(self.list_items):
                 self.list_items[idx].set_data(plain)
@@ -167,20 +177,25 @@ class TimedGroupWidget(QFrame):
         self.index = index
         self._pos_x = 0
         self._pos_y = 0
+        self._enabled = True
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(4, 4, 4, 16)
+        layout.setSpacing(14)
 
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        self.title_edit = QLineEdit(f"定时组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
-        header.addWidget(self.title_edit)
-        header.addStretch()
-        self.toggle = Toggle("启用")
-        header.addWidget(self.toggle)
-        layout.addLayout(header)
+        self.header = GroupEditHeader(f"定时组 {index + 1}")
+        self.header.title_edit.setText(f"定时组 {index + 1}")
+        layout.addWidget(self.header)
+
+        # 📍 位置
+        pos_card = ConfigCard("📍", "位置")
+        self.pos_chip = ValueChip("未选择")
+        pos_btn = TextButton("选择位置")
+        pos_btn.setObjectName("regionAction")
+        pos_btn.clicked.connect(self._select_position)
+        pos_card.add_action_row("", self.pos_chip, pos_btn)
+        self.pos_chip.label.clicked.connect(self._preview_position)
+        layout.addWidget(pos_card)
 
         # ⚙️ 触发
         trigger_card = ConfigCard("⚙️", "触发")
@@ -188,69 +203,49 @@ class TimedGroupWidget(QFrame):
         self.interval_spin.setRange(1, 9999)
         self.interval_spin.setValue(10)
         self.interval_spin.setSuffix(" 秒")
-        self.interval_spin.setFixedWidth(120)
-        trigger_card.add_row("执行间隔", self.interval_spin)
+        self.interval_spin.setFixedWidth(58)
         self.key_input = KeyCaptureWidget()
-        trigger_card.add_row("按键", self.key_input)
-        delay_row = QHBoxLayout()
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 9999)
         self.delay_min_spin.setValue(300)
         self.delay_min_spin.setSuffix(" ms")
-        self.delay_min_spin.setFixedWidth(80)
-        delay_row.addWidget(self.delay_min_spin)
-        delay_row.addWidget(QLabel("~"))
+        self.delay_min_spin.setFixedWidth(56)
         self.delay_max_spin = QSpinBox()
         self.delay_max_spin.setRange(0, 9999)
         self.delay_max_spin.setValue(500)
         self.delay_max_spin.setSuffix(" ms")
-        self.delay_max_spin.setFixedWidth(80)
-        delay_row.addWidget(self.delay_max_spin)
-        delay_row.addStretch()
-        trigger_card.add_row("按键时长", delay_row)
-        click_row = QHBoxLayout()
-        self.click_toggle = Toggle("点击触发")
-        click_row.addWidget(self.click_toggle)
-        click_row.addWidget(QLabel("偏移"))
+        self.delay_max_spin.setFixedWidth(56)
+        self.click_toggle = SwitchButton(compact=True)
         self.offset_spin = QSpinBox()
         self.offset_spin.setRange(0, 200)
         self.offset_spin.setValue(0)
-        self.offset_spin.setSuffix("px")
-        self.offset_spin.setFixedWidth(70)
+        self.offset_spin.setSuffix(" px")
+        self.offset_spin.setFixedWidth(58)
         self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
-        click_row.addWidget(self.offset_spin)
-        click_row.addStretch()
-        trigger_card.add_widget_row(click_row)
+        self.alarm_toggle = SwitchButton(compact=True)
+        trigger_card.add_segments_row(
+            "间隔",
+            ("", self.interval_spin),
+            ("时长", spin_range_row(self.delay_min_spin, self.delay_max_spin)),
+        )
+        trigger_card.add_segments_row("按键", ("", self.key_input))
+        trigger_card.add_segments_row(
+            "偏移",
+            ("", self.offset_spin),
+            ("是否点击", self.click_toggle),
+            ("是否报警", self.alarm_toggle),
+        )
+        self.click_toggle.stateChanged.connect(self.offset_spin.setEnabled)
+        self.offset_spin.setEnabled(self.click_toggle.isChecked())
         layout.addWidget(trigger_card)
-
-        # 📍 位置
-        pos_card = ConfigCard("📍", "位置")
-        pos_row = QHBoxLayout()
-        self.pos_label = ClickableLabel("未选择")
-        self.pos_label.setObjectName("infoText")
-        pos_row.addWidget(self.pos_label)
-        pos_btn = TextButton("选择位置")
-        pos_btn.setObjectName("regionAction")
-        pos_btn.clicked.connect(self._select_position)
-        pos_row.addWidget(pos_btn)
-        pos_row.addStretch()
-        pos_card.add_widget_row(pos_row)
-        self.pos_label.clicked.connect(self._preview_position)
-        layout.addWidget(pos_card)
-
-        # 🔔 报警
-        alarm_card = ConfigCard("🔔", "报警")
-        self.alarm_toggle = Toggle("触发时响铃")
-        alarm_card.set_content(self.alarm_toggle)
-        layout.addWidget(alarm_card)
 
         layout.addStretch()
 
     def set_config(self, cfg):
-        self.toggle.setChecked(cfg.get("enabled", False))
+        self._enabled = cfg.get("enabled", True)
         name = cfg.get("name", "")
         if name:
-            self.title_edit.setText(name)
+            self.header.title_edit.setText(name)
         try:
             self.interval_spin.setValue(int(cfg.get("interval", 10)))
             self.delay_min_spin.setValue(int(cfg.get("delay_min", 300)))
@@ -261,8 +256,7 @@ class TimedGroupWidget(QFrame):
         except (ValueError, TypeError):
             pass
         if self._pos_x or self._pos_y:
-            self.pos_label.setText(f"({self._pos_x}, {self._pos_y})")
-            self.pos_label.setStyleSheet("font-weight: 500;")
+            self.pos_chip.set_text(f"({self._pos_x}, {self._pos_y})", accent=True)
         key = cfg.get("key", "")
         if key:
             self.key_input.setKey(key)
@@ -271,12 +265,12 @@ class TimedGroupWidget(QFrame):
 
     def set_title(self, index):
         self.index = index
-        self.title_edit.setText(f"定时组 {index + 1}")
+        self.header.title_edit.setText(f"定时组 {index + 1}")
 
     def collect_config(self):
         return {
-            "name": self.title_edit.text(),
-            "enabled": ConfigVar(self.toggle.isChecked()),
+            "name": self.header.title_edit.text(),
+            "enabled": ConfigVar(self._enabled),
             "interval": ConfigVar(str(self.interval_spin.value())),
             "key": ConfigVar(self.key_input.key()),
             "delay_min": ConfigVar(str(self.delay_min_spin.value())),
@@ -290,25 +284,16 @@ class TimedGroupWidget(QFrame):
         }
 
     def _select_position(self):
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            w.hide()
-            pw = w.parent()
-            if pw:
-                pw.hide()
+        from ui.widgets import suspend_group_edit_capture
+        suspend_group_edit_capture(self)
         self.position_selection_requested.emit(self.index)
 
     def _on_pos_selected(self, x, y):
         self._pos_x = x
         self._pos_y = y
-        self.pos_label.setText(f"({x}, {y})")
-        self.pos_label.setStyleSheet("font-weight: 500;")
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            pw = w.parent()
-            if pw:
-                pw.show()
-            w.show()
+        self.pos_chip.set_text(f"({x}, {y})", accent=True)
+        from ui.widgets import resume_group_edit_capture
+        resume_group_edit_capture(self)
 
     def _preview_position(self):
         if self._pos_x or self._pos_y:

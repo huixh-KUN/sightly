@@ -10,13 +10,17 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import Toggle
+from ui.components import SwitchButton
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
+from ui.components import GroupEditHeader, ValueChip
+from ui.components.form_rows import spin_range_row
 from core.config import ConfigVar
 
 
 class NumberPanel(QWidget):
+    test_group_requested = Signal(int)
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
@@ -89,6 +93,7 @@ class NumberPanel(QWidget):
         item.toggled.connect(self._on_toggle)
         item.double_clicked.connect(self._open_edit)
         item.delete_clicked.connect(self._delete_group)
+        item.test_requested.connect(self._test_group)
         self.scroll_layout.insertWidget(self.scroll_layout.count() - 1, item)
         self.list_items.append(item)
 
@@ -100,6 +105,9 @@ class NumberPanel(QWidget):
             item.deleteLater()
             self.groups_data.pop(idx)
             self._renumber()
+
+    def _test_group(self, idx):
+        self.test_group_requested.emit(idx)
 
     def _renumber(self):
         for i, item in enumerate(self.list_items):
@@ -118,14 +126,17 @@ class NumberPanel(QWidget):
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
-                self.groups_data[idx], idx, "number", panel=self
+                self.groups_data[idx], idx, "number", panel=self,
+                parent=self.window(),
             )
-            self._edit_window.show()
+            self._edit_window.exec()
+            self._edit_window = None
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
             cfg = editor.collect_config()
             plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+            plain["enabled"] = self.groups_data[idx].get("enabled", True)
             self.groups_data[idx] = plain
             if idx < len(self.list_items):
                 self.list_items[idx].set_data(plain)
@@ -156,88 +167,81 @@ class NumberGroupWidget(QFrame):
         super().__init__(parent)
         self.index = index
         self.region = None
+        self._enabled = True
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setContentsMargins(4, 4, 4, 16)
+        layout.setSpacing(14)
 
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        self.title_edit = QLineEdit(f"识别组 {index + 1}")
-        self.title_edit.setStyleSheet("font-size: 16px; font-weight: 600;")
-        header.addWidget(self.title_edit)
-        header.addStretch()
-        self.toggle = Toggle("启用")
-        header.addWidget(self.toggle)
-        layout.addLayout(header)
+        self.header = GroupEditHeader(f"识别组 {index + 1}")
+        self.header.title_edit.setText(f"识别组 {index + 1}")
+        layout.addWidget(self.header)
 
         # 📍 区域
         region_card = ConfigCard("📍", "区域")
-        region_row = QHBoxLayout()
-        self.region_label = ClickableLabel("未选择")
-        self.region_label.setObjectName("infoText")
-        region_row.addWidget(self.region_label, 1)
+        self.region_chip = ValueChip("未选择")
         region_btn = TextButton("选择区域")
         region_btn.setObjectName("regionAction")
         region_btn.clicked.connect(self._select_region)
-        region_row.addWidget(region_btn)
-        region_card.add_widget_row(region_row)
-        self.region_label.clicked.connect(self._preview_region)
+        region_card.add_action_row("", self.region_chip, region_btn)
+        self.region_chip.label.clicked.connect(self._preview_region)
         layout.addWidget(region_card)
 
-        # ⚙️ 触发
-        trigger_card = ConfigCard("⚙️", "触发")
+        # 🎯 检测
+        detect_card = ConfigCard("🎯", "检测")
         self.threshold_spin = QSpinBox()
         self.threshold_spin.setRange(1, 9999)
         self.threshold_spin.setValue(500)
         self.threshold_spin.setSuffix(" 数值")
-        trigger_card.add_row("变化阈值", self.threshold_spin)
+        self.threshold_spin.setFixedWidth(64)
         self.confidence_spin = QDoubleSpinBox()
         self.confidence_spin.setRange(0.0, 1.0)
         self.confidence_spin.setSingleStep(0.05)
         self.confidence_spin.setValue(0.3)
         self.confidence_spin.setDecimals(2)
+        self.confidence_spin.setFixedWidth(58)
         self.confidence_spin.setToolTip("OCR 置信度低于此值的结果被丢弃（0=关闭）")
-        trigger_card.add_row("置信度", self.confidence_spin)
+        detect_card.add_segments_row(
+            "阈值",
+            ("", self.threshold_spin),
+            ("置信度", self.confidence_spin),
+        )
+        layout.addWidget(detect_card)
+
+        # ⚙️ 触发
+        trigger_card = ConfigCard("⚙️", "触发")
         self.key_input = KeyCaptureWidget()
-        trigger_card.add_row("按键", self.key_input)
-        delay_row = QHBoxLayout()
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 9999)
         self.delay_min_spin.setValue(100)
         self.delay_min_spin.setSuffix(" ms")
-        self.delay_min_spin.setFixedWidth(80)
-        delay_row.addWidget(self.delay_min_spin)
-        delay_row.addWidget(QLabel("~"))
+        self.delay_min_spin.setFixedWidth(62)
         self.delay_max_spin = QSpinBox()
         self.delay_max_spin.setRange(0, 9999)
         self.delay_max_spin.setValue(200)
         self.delay_max_spin.setSuffix(" ms")
-        self.delay_max_spin.setFixedWidth(80)
-        delay_row.addWidget(self.delay_max_spin)
-        delay_row.addStretch()
-        trigger_card.add_row("按键时长", delay_row)
+        self.delay_max_spin.setFixedWidth(62)
+        self.alarm_toggle = SwitchButton(compact=True)
+        trigger_card.add_segments_row(
+            "按键",
+            ("", self.key_input),
+            ("时长", spin_range_row(self.delay_min_spin, self.delay_max_spin)),
+        )
+        trigger_card.add_row("是否报警", self.alarm_toggle)
         layout.addWidget(trigger_card)
-
-        # 🔔 报警
-        alarm_card = ConfigCard("🔔", "报警")
-        self.alarm_toggle = Toggle("触发时响铃")
-        alarm_card.set_content(self.alarm_toggle)
-        layout.addWidget(alarm_card)
 
         layout.addStretch()
 
     def set_config(self, cfg):
-        self.toggle.setChecked(cfg.get("enabled", False))
+        self._enabled = cfg.get("enabled", True)
         name = cfg.get("name", "")
         if name:
-            self.title_edit.setText(name)
+            self.header.title_edit.setText(name)
         region = cfg.get("region")
         if region:
             self.region = tuple(region)
             x1, y1, x2, y2 = self.region
-            self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-            self.region_label.setStyleSheet("font-weight: 500;")
+            self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
         try:
             self.threshold_spin.setValue(int(cfg.get("threshold", 500)))
             self.confidence_spin.setValue(float(cfg.get("confidence_threshold", 0.3)))
@@ -252,12 +256,12 @@ class NumberGroupWidget(QFrame):
 
     def set_title(self, index):
         self.index = index
-        self.title_edit.setText(f"识别组 {index + 1}")
+        self.header.title_edit.setText(f"识别组 {index + 1}")
 
     def collect_config(self):
         return {
-            "name": self.title_edit.text(),
-            "enabled": ConfigVar(self.toggle.isChecked()),
+            "name": self.header.title_edit.text(),
+            "enabled": ConfigVar(self._enabled),
             "region": self.region,
             "threshold": ConfigVar(str(self.threshold_spin.value())),
             "confidence_threshold": ConfigVar(str(self.confidence_spin.value())),
@@ -271,24 +275,15 @@ class NumberGroupWidget(QFrame):
         from ui.components.region_overlay import RegionOverlay
         self.overlay = RegionOverlay("number")
         self.overlay.region_selected.connect(self._on_region_selected)
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            w.hide()
-            pw = w.parent()
-            if pw:
-                pw.hide()
+        from ui.widgets import suspend_group_edit_capture, resume_group_edit_capture
+        suspend_group_edit_capture(self)
         self.overlay.show()
 
     def _on_region_selected(self, x1, y1, x2, y2):
         self.region = (x1, y1, x2, y2)
-        self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
-        self.region_label.setStyleSheet("font-weight: 500;")
-        w = self.window()
-        if w and isinstance(w, GroupEditWindow):
-            pw = w.parent()
-            if pw:
-                pw.show()
-            w.show()
+        self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
+        from ui.widgets import resume_group_edit_capture
+        resume_group_edit_capture(self)
 
     def _preview_region(self):
         if self.region:
