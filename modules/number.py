@@ -10,6 +10,7 @@ from utils.recognition import NumberRecognizer
 from utils.image import _preprocess_image
 from core.priority_lock import get_module_priority
 from core.async_utils import run_in_executor
+from utils.memory import MemoryMonitor
 
 
 class _LRUCacheDict(OrderedDict):
@@ -37,6 +38,7 @@ class NumberModule:
     def __init__(self, app):
         self.app = app
         self.screenshot_manager = ScreenshotManager()
+        self.memory_monitor = MemoryMonitor()
         self._last_results = {}
         self._number_cache = _LRUCacheDict(maxsize=200)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -112,6 +114,7 @@ class NumberModule:
         self.app.logging_manager.debug("NUMBER",
             f"数字识别组{g['index']+1} 协程开始: 阈值={g['threshold']}, "
             f"置信度={g['confidence_threshold']}, key={g['key']!r}")
+        frame_count = 0
         try:
             while not (self._loop and self._loop.is_closed()):
                 if not self._check_group_enabled(g["index"]):
@@ -128,6 +131,8 @@ class NumberModule:
                     text = await run_in_executor(
                         self.ocr_number, screenshot, g["confidence_threshold"]
                     )
+                    screenshot.close()
+                    del screenshot
                     number = NumberRecognizer.parse_number(text, self._number_cache)
                     self.app.logging_manager.debug("NUMBER",
                         f"数字识别组{g['index']+1} raw='{text}', parsed={number}")
@@ -157,6 +162,10 @@ class NumberModule:
                                 f"数字识别{g['index']+1}结果: '{text}'"
                             )
                             self._last_results[g["index"]] = text
+                    
+                    frame_count += 1
+                    if self.memory_monitor.gc_if_needed(frame_count):
+                        self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 触发 GC")
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
@@ -216,5 +225,10 @@ class NumberModule:
         processed_image = _preprocess_image(image, group_index=None)
         if processed_image is None:
             processed_image = image.convert('L')
-        return NumberRecognizer.recognize(processed_image,
-                                          confidence_threshold=confidence_threshold)
+        try:
+            return NumberRecognizer.recognize(processed_image,
+                                              confidence_threshold=confidence_threshold)
+        finally:
+            if processed_image is not None:
+                processed_image.close()
+                del processed_image

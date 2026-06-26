@@ -17,11 +17,19 @@ def _preprocess_image(image, group_index=None):
     else:
         gray = img_array
 
+    del img_array
+
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
 
+    del gray
+
     denoised = cv2.bilateralFilter(enhanced, 5, 50, 50)
 
+    del enhanced
+
     rgb = cv2.cvtColor(denoised, cv2.COLOR_GRAY2RGB)
+    del denoised
+
     from PIL import Image
     return Image.fromarray(rgb, mode="RGB")

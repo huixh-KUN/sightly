@@ -17,6 +17,7 @@ from utils.coordinate import RelativeCoordinate, WindowCoordinate
 from utils.recognition import OCRRecognizer, ImageRecognizer, ColorRecognizer
 from utils.image import _preprocess_image
 from core.priority_lock import get_module_priority
+from utils.memory import MemoryMonitor
 from core.click_handler import ClickHandler, execute_combo_key
 from core.config import ConfigVar
 
@@ -109,6 +110,7 @@ class BackgroundMonitor:
         self.click_mode = "physical"  # "physical" | "virtual"
         self.last_trigger_time = 0
         self._last_text = None  # 缓存上次识别文本，用于日志节流
+        self.memory_monitor = MemoryMonitor()
     
     def set_window(self, hwnd: int) -> None:
         """设置目标窗口"""
@@ -206,6 +208,7 @@ class BackgroundMonitor:
         self.app.logging_manager.debug("BG",
             f"组{self.group_index} 协程监控开始: type={self.recognition_type}, "
             f"interval={self.interval}s, pause={self.pause}s")
+        frame_count = 0
         try:
             await asyncio.sleep(self.interval)
 
@@ -236,6 +239,10 @@ class BackgroundMonitor:
                     self.app.logging_manager.debug("BG",
                         f"组{self.group_index} 识别结果: matched={matched}, click={click_position}")
 
+                    if hasattr(image, 'close'):
+                        image.close()
+                    del image
+
                     if matched:
                         if click_position and region:
                             click_position = (
@@ -250,6 +257,10 @@ class BackgroundMonitor:
                         self.app.logging_manager.debug("BG", f"组{self.group_index} 未匹配")
 
                     await asyncio.sleep(self.interval)
+
+                    frame_count += 1
+                    if self.memory_monitor.gc_if_needed(frame_count):
+                        self.app.logging_manager.debug("BG", f"组{self.group_index} 触发 GC")
 
                 except asyncio.CancelledError:
                     raise
@@ -295,39 +306,44 @@ class BackgroundMonitor:
         if not processed:
             return (False, None)
         
-        keyword_list = [keyword.strip().lower() for keyword in keywords.split(",") if keyword.strip()]
-        if not keyword_list:
-            return (False, None)
-        
-        text = OCRRecognizer.get_text(processed, language)
-        
-        if text and text.strip() != self._last_text:
+        try:
+            keyword_list = [keyword.strip().lower() for keyword in keywords.split(",") if keyword.strip()]
+            if not keyword_list:
+                return (False, None)
+            
+            text = OCRRecognizer.get_text(processed, language)
+            
+            if text and text.strip() != self._last_text:
+                self.app.logging_manager.log_message(
+                    f"后台监控组{self.group_index + 1}识别结果: '{text.strip()}'"
+                )
+                self._last_text = text.strip()
+            
+            if not text:
+                return (False, None)
+            
+            lower_text = text.lower()
+            if not any(keyword in lower_text for keyword in keyword_list):
+                return (False, None)
+            
             self.app.logging_manager.log_message(
-                f"后台监控组{self.group_index + 1}识别结果: '{text.strip()}'"
+                f"后台监控组{self.group_index + 1}识别到关键词: {text.strip()}"
             )
-            self._last_text = text.strip()
-        
-        if not text:
-            return (False, None)
-        
-        lower_text = text.lower()
-        if not any(keyword in lower_text for keyword in keyword_list):
-            return (False, None)
-        
-        self.app.logging_manager.log_message(
-            f"后台监控组{self.group_index + 1}识别到关键词: {text.strip()}"
-        )
-        
-        click_pos = OCRRecognizer.find_keyword_position(processed, keyword_list, language)
-        
-        if click_pos is None:
-            region = self._get_current_region()
-            if region:
-                center_x = (region[0] + region[2]) // 2
-                center_y = (region[1] + region[3]) // 2
-                click_pos = (center_x, center_y)
-        
-        return (True, click_pos)
+            
+            click_pos = OCRRecognizer.find_keyword_position(processed, keyword_list, language)
+            
+            if click_pos is None:
+                region = self._get_current_region()
+                if region:
+                    center_x = (region[0] + region[2]) // 2
+                    center_y = (region[1] + region[3]) // 2
+                    click_pos = (center_x, center_y)
+            
+            return (True, click_pos)
+        finally:
+            if processed is not None:
+                processed.close()
+                del processed
     
     def _recognize_image(self, image) -> tuple:
         """图像识别 - 使用公共识别工具类"""

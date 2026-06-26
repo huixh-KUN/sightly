@@ -4,7 +4,6 @@ import time
 from typing import Optional
 
 import numpy as np
-from PIL import Image
 import imagehash
 
 from PySide6.QtWidgets import QMessageBox
@@ -14,6 +13,7 @@ from utils.screenshot import ScreenshotManager
 from utils.recognition import ColorRecognizer
 from core.priority_lock import get_module_priority
 from core.async_utils import run_in_executor
+from utils.memory import MemoryMonitor
 
 
 class ColorRecognition:
@@ -36,6 +36,7 @@ class ColorRecognition:
 
         self.last_image_hash = None
         self.screenshot_manager = ScreenshotManager()
+        self.memory_monitor = MemoryMonitor()
 
     def set_region(self, region):
         self.region = region
@@ -56,6 +57,7 @@ class ColorRecognition:
     async def _recognize_async(self):
         """异步颜色识别循环"""
         self.app.logging_manager.debug("COLOR", f"颜色识别协程开始: 目标={self.target_color}, 容差={self.tolerance}, 间隔={self.interval}s")
+        frame_count = 0
         try:
             while self.is_running:
                 await asyncio.sleep(self.interval)
@@ -67,6 +69,10 @@ class ColorRecognition:
                     await asyncio.sleep(self.interval)
                 else:
                     self.app.logging_manager.debug("COLOR", "颜色未匹配")
+                
+                frame_count += 1
+                if self.memory_monitor.gc_if_needed(frame_count):
+                    self.app.logging_manager.debug("COLOR", "触发 GC")
         except asyncio.CancelledError:
             self.app.logging_manager.debug("COLOR", "颜色识别协程取消")
             self.is_running = False
@@ -75,6 +81,7 @@ class ColorRecognition:
         if not self.region:
             self.app.logging_manager.debug("COLOR", "recognize_color: 未设置识别区域")
             return False
+        screenshot = None
         try:
             screenshot = self.screenshot_manager.get_region_screenshot(
                 self.region, priority=self.PRIORITY)
@@ -101,6 +108,10 @@ class ColorRecognition:
             import traceback
             self.app.logging_manager.error("COLOR", f"错误详情: {traceback.format_exc()}")
             return False
+        finally:
+            if screenshot is not None:
+                screenshot.close()
+                del screenshot
 
     def execute_commands(self):
         if not self.commands:

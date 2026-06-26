@@ -918,10 +918,6 @@ class ConfigManager:
             self.app.logging_manager.error("CONFIG", f"处理配置时发生错误: {str(e)}")
             return False, '1.0.0'
     
-    def _load_click_config(self, config):
-        """加载点击模式和坐标配置（保持兼容性）"""
-        pass
-    
     def _update_config_version(self, config, config_version):
         """
         更新配置文件版本号
@@ -943,69 +939,3 @@ class ConfigManager:
         """更新界面中的Tesseract路径变量"""
         if hasattr(self.app, 'tesseract_path_var'):
             self.app.tesseract_path_var.set(self.app.tesseract_path)
-    
-    def clear_ocr_groups(self):
-        """清空所有OCR组"""
-        for group in self.app.ocr_groups:
-            group['frame'].destroy()
-        self.app.ocr_groups.clear()
-
-    def load_group_config(self, group, group_config):
-        """加载单个OCR组的配置
-        Args:
-            group: OCR组配置字典
-            group_config: 从配置文件读取的组配置
-        """
-        def set_key_value(val):
-            if hasattr(group['key'], 'set'):
-                group['key'].set(val)
-            elif hasattr(group['key'], 'setText'):
-                group['key'].setEnabled(True)
-                group['key'].setText(val)
-                group['key'].setEnabled(False)
-
-        def safe_set_int(var, val, default=0):
-            try:
-                var.set(str(int(val)))
-            except (ValueError, TypeError):
-                var.set(str(default))
-
-        config_mappings = {
-            'enabled': lambda val: self.load_enabled_config(group, val),
-            'region': lambda val: self.load_region_config(group, val),
-            'interval': lambda val: safe_set_int(group['interval'], val, 5),
-            'pause': lambda val: safe_set_int(group['pause'], val, 180),
-            'key': set_key_value,
-            'delay_min': lambda val: safe_set_int(group['delay_min'], val, 300),
-            'delay_max': lambda val: safe_set_int(group['delay_max'], val, 500),
-            'alarm': lambda val: group['alarm'].set(bool(val)),
-            'keywords': lambda val: group['keywords'].set(str(val) if val else ''),
-            'language': lambda val: group['language'].set(str(val) if val else '简体中文'),
-            'click': lambda val: group['click'].set(bool(val))
-        }
-
-        for key, setter in config_mappings.items():
-            if key in group_config:
-                setter(group_config[key])
-
-    def load_enabled_config(self, group, enabled):
-        """加载启用状态配置
-        Args:
-            group: OCR组配置字典
-            enabled: 是否启用
-        """
-        group['enabled'].set(enabled)
-
-    def load_region_config(self, group, region):
-        """加载区域配置
-        Args:
-            group: OCR组配置字典
-            region: 区域坐标
-        """
-        if region is not None:
-            try:
-                region_tuple = tuple(region)
-                group['region'] = region_tuple
-                group['region_var'].set(f"{region_tuple[0]},{region_tuple[1]},{region_tuple[2]},{region_tuple[3]}")
-            except (TypeError, ValueError):
-                self.app.logging_manager.error("CONFIG", f"配置文件中的OCR区域格式错误: {region}")

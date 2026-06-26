@@ -14,6 +14,7 @@ from utils.recognition import OCRRecognizer
 from core.priority_lock import get_module_priority
 from core.click_handler import ClickHandler
 from core.async_utils import run_in_executor
+from utils.memory import MemoryMonitor
 
 
 class OCRModule:
@@ -30,6 +31,7 @@ class OCRModule:
         self.last_trigger_times = {}
         self.click_handler = ClickHandler(app)
         self.screenshot_manager = ScreenshotManager()
+        self.memory_monitor = MemoryMonitor()
         self._last_texts = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
@@ -126,6 +128,10 @@ class OCRModule:
                         self._do_ocr_group, group, group_index, last_hash, frame_count
                     )
                     self.last_recognition_times[group_index] = time.time()
+                    
+                    frame_count += 1
+                    if self.memory_monitor.gc_if_needed(frame_count):
+                        self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 触发 GC")
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
@@ -195,6 +201,8 @@ class OCRModule:
         """
         为单个OCR组执行OCR识别（优化版本，使用增量截图和自适应帧率）
         """
+        screenshot = None
+        processed_image = None
         try:
             if not self.app.is_running:
                 return
@@ -300,6 +308,12 @@ class OCRModule:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未知错误 - {str(e)}")
             import traceback
             self.app.logging_manager.error("OCR", f"错误详情: {traceback.format_exc()}")
+        finally:
+            if processed_image is not None:
+                del processed_image
+            if screenshot is not None:
+                screenshot.close()
+                del screenshot
     
     def _validate_trigger_input(self, group, group_index):
         if not group:

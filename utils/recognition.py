@@ -60,6 +60,7 @@ class OCRRecognizer:
             result, _ = engine(img_array)
             
             if not result:
+                del img_array
                 return None
             
             for item in result:
@@ -71,8 +72,10 @@ class OCRRecognizer:
                     ys = [p[1] for p in box]
                     center_x = int(sum(xs) / len(xs))
                     center_y = int(sum(ys) / len(ys))
+                    del img_array
                     return (center_x, center_y)
             
+            del img_array
             return None
             
         except Exception:
@@ -84,6 +87,8 @@ class OCRRecognizer:
             engine = OCRRecognizer._get_engine()
             img_array = np.array(image.convert('RGB'))
             result, _ = engine(img_array)
+            
+            del img_array
             
             if not result:
                 return None
@@ -136,10 +141,14 @@ class ImageRecognizer:
             screenshot_h, screenshot_w = screenshot_cv.shape[:2]
             
             if template_w > screenshot_w or template_h > screenshot_h:
+                del screenshot_cv
                 return (False, None, 0.0)
             
             result = cv2.matchTemplate(screenshot_cv, template, cv2.TM_CCOEFF_NORMED)
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+            
+            del screenshot_cv
+            del result
             
             if max_val >= threshold:
                 if log_func:
@@ -194,6 +203,8 @@ class ColorRecognizer:
             sample_step = 2
             sampled_array = img_array[::sample_step, ::sample_step]
             
+            del img_array
+            
             is_match = np.all((sampled_array >= lower_bound) & (sampled_array <= upper_bound), axis=2)
             match_pixels = np.sum(is_match)
             
@@ -205,8 +216,10 @@ class ColorRecognizer:
                 match_positions = np.where(is_match)
                 first_match_y = match_positions[0][0] * sample_step
                 first_match_x = match_positions[1][0] * sample_step
+                del sampled_array
                 return (True, (first_match_x, first_match_y), match_pixels)
             
+            del sampled_array
             return (False, None, 0)
             
         except Exception as e:
@@ -263,6 +276,8 @@ class NumberRecognizer:
             engine = OCRRecognizer._get_engine()
             img_array = np.array(image.convert('RGB'))
             result, _ = engine(img_array)
+            
+            del img_array
             
             if not result:
                 return None
