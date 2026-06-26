@@ -163,10 +163,10 @@ class ImageDetection:
                 screenshot.close()
                 del screenshot
 
-    def execute_commands(self, match_result):
+    def execute_commands(self, match_result, *, for_test=False):
         if not match_result:
             return
-        if not self.app.is_running or getattr(self.app, 'system_stopped', False):
+        if not for_test and (not self.app.is_running or getattr(self.app, 'system_stopped', False)):
             return
 
         abs_x, abs_y, match_score = match_result
@@ -185,7 +185,7 @@ class ImageDetection:
             self.click_handler.execute_click(
                 x=abs_x, y=abs_y, priority=self.PRIORITY,
                 module_name="检测组", index=self.group_index,
-                offset_range=offset_range
+                offset_range=offset_range, for_test=for_test
             )
 
         if key:
@@ -359,6 +359,40 @@ class ImageDetectionManager:
                 await asyncio.gather(*tasks, return_exceptions=True)
             except asyncio.CancelledError:
                 pass
+
+    def test_group(self, index) -> dict:
+        groups = getattr(self.app, 'image_groups', [])
+        if index >= len(groups):
+            return {"matched": False, "executed": False, "detail": "组索引越界"}
+        group = groups[index]
+        if not self._safe_get(group, "region"):
+            return {"matched": False, "executed": False, "detail": "未设置检测区域"}
+        template = self._safe_get(group, "template_image")
+        if template is not None:
+            pass
+        else:
+            ref = self._safe_get(group, "reference_image", "")
+            if ref and CV2_AVAILABLE and os.path.exists(ref):
+                template = cv2.imdecode(np.fromfile(ref, dtype=np.uint8), cv2.IMREAD_COLOR)
+                if template is None:
+                    return {"matched": False, "executed": False, "detail": f"无法加载模板图片: {ref}"}
+            else:
+                return {"matched": False, "executed": False, "detail": "未设置模板图片"}
+        threshold = float(self._safe_get(group, "threshold", "80")) / 100.0
+        det = ImageDetection(self.app, index)
+        det.set_region(self._safe_get(group, "region"))
+        det.template_image = template
+        det.threshold = threshold
+        result = det.detect_image()
+        if not result:
+            return {"matched": False, "executed": False, "detail": "未匹配到模板"}
+        abs_x, abs_y, score = result
+        det.execute_commands(result, for_test=True)
+        return {
+            "matched": True,
+            "executed": True,
+            "detail": f"匹配成功，置信度 {score:.1%}；已按配置执行动作",
+        }
 
     def stop_all_detection(self):
         for det in self.image_detections.values():

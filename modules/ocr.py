@@ -197,6 +197,146 @@ class OCRModule:
             self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图异常: {e}")
             return None
     
+    def _recognize_on_processed_image(
+        self, processed_image, group_index, keywords_str, current_lang,
+        click_enabled, left, top, right, bottom, *, log_results=True,
+    ):
+        """在预处理图像上执行 OCR 与关键词匹配，返回识别结果 dict。"""
+        result = {
+            "matched": False,
+            "text": "",
+            "click_pos": None,
+            "click_enabled": click_enabled,
+            "detail": "",
+        }
+        if keywords_str:
+            keywords = [kw.strip().lower() for kw in keywords_str.split(",") if kw.strip()]
+            if log_results:
+                self.app.logging_manager.log_message(
+                    f"识别组{group_index+1}: 开始OCR识别，关键词: {keywords}"
+                )
+                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 开始OCR识别")
+            text = OCRRecognizer.get_text(processed_image, current_lang)
+            result["text"] = text or ""
+            if not text:
+                result["detail"] = "OCR未识别到文字"
+                if log_results:
+                    self.app.logging_manager.log_message(f"识别组{group_index+1}: OCR未识别到文字")
+                return result
+            if log_results:
+                last_text = self._last_texts.get(group_index)
+                if text.strip() != last_text:
+                    self.app.logging_manager.log_message(
+                        f"识别组{group_index+1}识别结果: '{text.strip()[:60]}'"
+                    )
+                    self._last_texts[group_index] = text.strip()
+            lower_text = text.lower()
+            matched_keywords = [kw for kw in keywords if kw in lower_text]
+            if matched_keywords:
+                result["matched"] = True
+                if click_enabled:
+                    rel_pos = OCRRecognizer.find_keyword_position(
+                        processed_image, keywords, current_lang
+                    )
+                    if rel_pos:
+                        click_pos = (left + rel_pos[0], top + rel_pos[1])
+                    else:
+                        click_pos = ((left + right) // 2, (top + bottom) // 2)
+                else:
+                    click_pos = ((left + right) // 2, (top + bottom) // 2)
+                result["click_pos"] = click_pos
+                result["detail"] = (
+                    f"关键词匹配成功: {matched_keywords}；"
+                    f"识别文本: '{text.strip()[:60]}'"
+                )
+                if log_results:
+                    self.app.logging_manager.log_message(
+                        f"识别组{group_index+1}: 关键词匹配成功 - {matched_keywords}"
+                    )
+            else:
+                result["detail"] = f"未匹配到关键词；识别文本: '{text.strip()[:60]}'"
+        else:
+            if log_results:
+                self.app.logging_manager.log_message(f"识别组{group_index+1}: 开始OCR识别（无关键词）")
+            text = OCRRecognizer.get_text(processed_image, current_lang)
+            result["text"] = text or ""
+            if text:
+                if log_results:
+                    last_text = self._last_texts.get(group_index)
+                    if text.strip() != last_text:
+                        self.app.logging_manager.log_message(
+                            f"识别组{group_index+1}识别结果: '{text.strip()[:60]}'"
+                        )
+                        self._last_texts[group_index] = text.strip()
+                result["detail"] = f"识别文本: '{text.strip()[:60]}'（未配置关键词）"
+            else:
+                result["detail"] = "OCR未识别到文字"
+        return result
+
+    def recognize_group_once(self, group, group_index) -> dict:
+        """单次识别（无 imagehash 去重、无 is_running 守卫）。"""
+        screenshot = None
+        processed_image = None
+        try:
+            valid, region, keywords_str, current_lang, click_enabled = (
+                self._validate_ocr_group_input(group, group_index)
+            )
+            if not valid:
+                return {"matched": False, "executed": False, "detail": "组配置无效或未设置识别区域"}
+            valid, left, top, right, bottom = self._validate_region_coordinates(region, group_index)
+            if not valid:
+                return {"matched": False, "executed": False, "detail": "区域坐标无效"}
+            screenshot = self._capture_screen_region(left, top, right, bottom, group_index)
+            if not screenshot:
+                return {"matched": False, "executed": False, "detail": "截图失败"}
+            processed_image = _preprocess_image(screenshot, group_index)
+            if not processed_image:
+                return {"matched": False, "executed": False, "detail": "图像预处理失败"}
+            rec = self._recognize_on_processed_image(
+                processed_image, group_index, keywords_str, current_lang,
+                click_enabled, left, top, right, bottom, log_results=False,
+            )
+            rec["executed"] = False
+            return rec
+        except Exception as e:
+            self.app.logging_manager.error("OCR", f"识别组{group_index+1}测试识别失败: {e}")
+            return {"matched": False, "executed": False, "detail": str(e)}
+        finally:
+            if processed_image is not None:
+                del processed_image
+            if screenshot is not None:
+                screenshot.close()
+                del screenshot
+
+    def execute_group_actions(self, group, group_index, rec_result, *, for_test=False):
+        """执行识别匹配后的动作（点击、按键、报警）。"""
+        if not rec_result.get("matched"):
+            return
+        self.trigger_action_for_group(
+            group, group_index,
+            rec_result.get("click_enabled", False),
+            rec_result.get("click_pos"),
+            for_test=for_test,
+        )
+
+    def test_group(self, index) -> dict:
+        groups = getattr(self.app, 'ocr_groups', [])
+        if index >= len(groups):
+            return {"matched": False, "executed": False, "detail": "组索引越界"}
+        group = groups[index]
+        rec = self.recognize_group_once(group, index)
+        executed = False
+        detail = rec.get("detail", "")
+        if rec.get("matched"):
+            self.execute_group_actions(group, index, rec, for_test=True)
+            executed = True
+            detail = f"{detail}；已按配置执行动作"
+        return {
+            "matched": rec.get("matched", False),
+            "executed": executed,
+            "detail": detail,
+        }
+
     def perform_ocr_for_group_optimized(self, group, group_index, last_hashes, frame_counts):
         """
         为单个OCR组执行OCR识别（优化版本，使用增量截图和自适应帧率）
@@ -247,62 +387,23 @@ class OCRModule:
                 self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 图像预处理失败")
                 return
 
-            if keywords_str:
-                keywords = [keyword.strip().lower() for keyword in keywords_str.split(",") if keyword.strip()]
-                self.app.logging_manager.log_message(f"识别组{group_index+1}: 开始OCR识别，关键词: {keywords}")
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 开始OCR识别")
-                
-                text = OCRRecognizer.get_text(processed_image, current_lang)
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} OCR结果: {repr(text[:100]) if text else 'None'}")
-                if not text:
-                    self.app.logging_manager.log_message(f"识别组{group_index+1}: OCR未识别到文字")
-                    self.app.logging_manager.debug("OCR", f"识别组{group_index+1} OCR未识别到文字")
-                    return
-                
-                lower_text = text.lower()
-                elapsed_time = time.time() - start_time
-                sleep_time = max(0.01, 0.1 - elapsed_time)
-                time.sleep(sleep_time)
+            rec = self._recognize_on_processed_image(
+                processed_image, group_index, keywords_str, current_lang,
+                click_enabled, left, top, right, bottom, log_results=True,
+            )
+            elapsed_time = time.time() - start_time
+            sleep_time = max(0.01, 0.1 - elapsed_time)
+            time.sleep(sleep_time)
 
-                last_text = self._last_texts.get(group_index)
-                if text.strip() != last_text:
-                    self.app.logging_manager.log_message(f"识别组{group_index+1}识别结果: '{text.strip()[:60]}' (耗时: {elapsed_time:.2f}s, 延迟: {sleep_time:.2f}s)")
-                    self._last_texts[group_index] = text.strip()
-
-                matched_keywords = [kw for kw in keywords if kw in lower_text]
-                if matched_keywords:
-                    self.app.logging_manager.log_message(f"识别组{group_index+1}: 关键词匹配成功 - {matched_keywords}")
-                    self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 关键词匹配成功: {matched_keywords}")
-                    if click_enabled:
-                        rel_pos = OCRRecognizer.find_keyword_position(processed_image, keywords, current_lang)
-                        if rel_pos:
-                            click_pos = (left + rel_pos[0], top + rel_pos[1])
-                            self.app.logging_manager.log_message(f"识别组{group_index+1}: 点击位置 ({click_pos[0]}, {click_pos[1]})")
-                        else:
-                            click_pos = ((left + right) // 2, (top + bottom) // 2)
-                            self.app.logging_manager.log_message(f"识别组{group_index+1}: 未找到关键词位置，点击区域中心")
-                    else:
-                        click_pos = ((left + right) // 2, (top + bottom) // 2)
-
-                    self.trigger_action_for_group(group, group_index, click_enabled, click_pos)
-                else:
-                    self.app.logging_manager.log_message(f"识别组{group_index+1}: 未匹配到关键词")
-            else:
-                self.app.logging_manager.log_message(f"识别组{group_index+1}: 开始OCR识别（无关键词）")
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 开始OCR识别（无关键词）")
-                text = OCRRecognizer.get_text(processed_image, current_lang)
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} OCR结果: {repr(text[:100]) if text else 'None'}")
-                if text:
-                    elapsed_time = time.time() - start_time
-                    sleep_time = max(0.01, 0.1 - elapsed_time)
-                    time.sleep(sleep_time)
-                    
-                    last_text = self._last_texts.get(group_index)
-                    if text.strip() != last_text:
-                        self.app.logging_manager.log_message(f"识别组{group_index+1}识别结果: '{text.strip()[:60]}' (耗时: {elapsed_time:.2f}s)")
-                        self._last_texts[group_index] = text.strip()
-                else:
-                    self.app.logging_manager.log_message(f"识别组{group_index+1}: OCR未识别到文字")
+            if rec.get("matched"):
+                if click_enabled and rec.get("click_pos"):
+                    click_pos = rec["click_pos"]
+                    self.app.logging_manager.log_message(
+                        f"识别组{group_index+1}: 点击位置 ({click_pos[0]}, {click_pos[1]})"
+                    )
+                self.execute_group_actions(group, group_index, rec, for_test=False)
+            elif keywords_str:
+                self.app.logging_manager.log_message(f"识别组{group_index+1}: 未匹配到关键词")
 
         except Exception as e:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未知错误 - {str(e)}")
@@ -346,8 +447,8 @@ class OCRModule:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
             return None, None
     
-    def _execute_key_press(self, key, group_index):
-        if not self.app.is_running or getattr(self.app, 'system_stopped', False):
+    def _execute_key_press(self, key, group_index, *, for_test=False):
+        if not for_test and (not self.app.is_running or getattr(self.app, 'system_stopped', False)):
             return
 
         if not key:
@@ -373,9 +474,9 @@ class OCRModule:
         except Exception as e:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 播放报警声音失败 - {str(e)}")
     
-    def trigger_action_for_group(self, group, group_index, click_enabled, click_pos=None):
+    def trigger_action_for_group(self, group, group_index, click_enabled, click_pos=None, *, for_test=False):
         try:
-            if not self.app.is_running or getattr(self.app, 'system_stopped', False):
+            if not for_test and (not self.app.is_running or getattr(self.app, 'system_stopped', False)):
                 return
 
             valid, key, alarm_enabled, region = self._validate_trigger_input(group, group_index)
@@ -393,10 +494,11 @@ class OCRModule:
                     priority=self.PRIORITY,
                     module_name="识别组",
                     index=group_index,
-                    offset_range=offset_range
+                    offset_range=offset_range,
+                    for_test=for_test,
                 )
 
-            self._execute_key_press(key, group_index)
+            self._execute_key_press(key, group_index, for_test=for_test)
         except Exception as e:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 触发动作失败 - {str(e)}")
             import traceback

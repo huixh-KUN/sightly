@@ -210,6 +210,38 @@ class NumberModule:
             f"按住时长范围: {delay_min}-{delay_max} 毫秒"
         )
 
+    def test_group(self, index) -> dict:
+        regions = getattr(self.app, 'number_regions', [])
+        if index >= len(regions):
+            return {"matched": False, "executed": False, "detail": "组索引越界"}
+        rc = regions[index]
+        region = rc.get("region")
+        if not region:
+            return {"matched": False, "executed": False, "detail": "未设置识别区域"}
+        try:
+            confidence = float(rc.get("confidence_threshold", "0.3").get())
+        except Exception:
+            confidence = 0.3
+        screenshot = self.take_screenshot(region)
+        if screenshot is None:
+            return {"matched": False, "executed": False, "detail": "截图失败"}
+        try:
+            text = self.ocr_number(screenshot, confidence)
+            number = NumberRecognizer.parse_number(text, self._number_cache)
+            if number is not None:
+                try:
+                    threshold = int(rc["threshold"].get())
+                except (ValueError, TypeError, KeyError, AttributeError):
+                    threshold = 500
+                will_trigger = number < threshold
+                hint = "运行时将触发" if will_trigger else "运行时不触发"
+                detail = f"当前数值: {number}（{hint}，阈值 {threshold}）"
+                return {"matched": True, "executed": False, "detail": detail}
+            return {"matched": False, "executed": False, "detail": f"识别文本: '{text}'（无法解析为数字）"}
+        finally:
+            screenshot.close()
+            del screenshot
+
     def take_screenshot(self, region):
         try:
             return self.screenshot_manager.get_region_screenshot(

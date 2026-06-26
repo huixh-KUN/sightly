@@ -115,39 +115,7 @@ class TimedModule:
                         return
 
                     self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 触发执行")
-
-                    # 报警
-                    if g["alarm"]:
-                        self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 播放报警")
-                        await run_in_executor(self.app.alarm_module.play_alarm_sound, g["alarm"])
-
-                    # 鼠标点击
-                    if g["click_enabled"] and g["pos_x"] != 0 and g["pos_y"] != 0:
-                        self.app.logging_manager.debug("TIMED",
-                            f"定时组{g['index']+1} 鼠标点击 ({g['pos_x']},{g['pos_y']})")
-                        await run_in_executor(
-                            self.click_handler.execute_click,
-                            x=g["pos_x"], y=g["pos_y"], priority=self.PRIORITY,
-                            module_name="定时任务", index=g["index"], delay=0.5,
-                            offset_range=g["click_offset"]
-                        )
-
-                    # 按键
-                    if g["key"]:
-                        import platform
-                        plat = platform.system()
-                        self.app.logging_manager.log_message(
-                            f"[{plat}] 定时任务{g['index']+1}触发按键: {g['key']}"
-                        )
-                        await run_in_executor(
-                            self._execute_keypress, g["key"], g["index"],
-                            g["delay_min"], g["delay_max"]
-                        )
-                    else:
-                        import platform
-                        plat = platform.system()
-                        self.app.logging_manager.debug("TIMED",
-                            f"定时组{g['index']+1} 按键配置为空")
+                    await run_in_executor(self._execute_group_actions, g["index"])
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
@@ -180,6 +148,56 @@ class TimedModule:
         self.app.logging_manager.log_message(
             f"定时任务{group_index+1}按下了 {key} 键"
         )
+
+    def _execute_group_actions(self, index, *, for_test=False) -> list:
+        groups = getattr(self.app, 'timed_groups', [])
+        if index >= len(groups):
+            return []
+        g = groups[index]
+        key = _get_val(g.get("key", ""))
+        click_enabled = _get_val(g.get("click_enabled", False))
+        alarm = _get_val(g.get("alarm", False))
+        pos_x = int(_get_val(g.get("position_x", 0)))
+        pos_y = int(_get_val(g.get("position_y", 0)))
+        delay_min = int(_get_val(g.get("delay_min", 100)))
+        delay_max = int(_get_val(g.get("delay_max", 200)))
+        click_offset = int(_get_val(g.get("click_offset"), 0))
+
+        result_parts = []
+        if alarm:
+            try:
+                self.app.alarm_module.play_alarm_sound(ConfigVar(True))
+                result_parts.append("报警")
+            except Exception as e:
+                self.app.logging_manager.error("TIMED", f"测试报警失败: {e}")
+        if click_enabled and pos_x != 0 and pos_y != 0:
+            try:
+                self.click_handler.execute_click(
+                    x=pos_x, y=pos_y, priority=self.PRIORITY,
+                    module_name="定时任务", index=index, delay=0.5,
+                    offset_range=click_offset, for_test=for_test,
+                )
+                result_parts.append(f"点击 ({pos_x},{pos_y})")
+            except Exception as e:
+                self.app.logging_manager.error("TIMED", f"测试点击失败: {e}")
+        if key:
+            try:
+                self._execute_keypress(key, index, delay_min, delay_max)
+                result_parts.append(f"按键 {key}")
+            except Exception as e:
+                self.app.logging_manager.error("TIMED", f"测试按键失败: {e}")
+        return result_parts
+
+    def test_group(self, index) -> dict:
+        actions = self._execute_group_actions(index, for_test=True)
+        return {
+            "matched": None,
+            "executed": bool(actions),
+            "detail": "；".join(actions) if actions else "未配置按键、点击或报警",
+        }
+
+    def execute_once(self, index) -> dict:
+        return self.test_group(index)
 
     def start_timed_position_selection(self, group_index, on_selected=None):
         self.app.logging_manager.log_message(

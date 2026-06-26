@@ -61,7 +61,7 @@ class ClickHandler:
             return x, y
         return x + random.randint(-offset_range, offset_range), y + random.randint(-offset_range, offset_range)
 
-    def execute_click(self, x, y, priority=0, module_name="", index=0, delay=None, offset_range=0):
+    def execute_click(self, x, y, priority=0, module_name="", index=0, delay=None, offset_range=0, *, for_test=False):
         """
         执行鼠标点击
         
@@ -79,7 +79,7 @@ class ClickHandler:
         """
         self.app.logging_manager.debug("INPUT",
             f"execute_click: ({x},{y}), module={module_name}{index+1}, offset={offset_range}")
-        if not self._validate_running_state():
+        if not for_test and not self._validate_running_state():
             self.app.logging_manager.debug("INPUT", "execute_click: 运行状态无效，跳过")
             return False
         

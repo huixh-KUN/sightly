@@ -201,6 +201,21 @@ class ColorRecognitionManager:
             except asyncio.CancelledError:
                 pass
 
+    def test_once(self) -> dict:
+        if not self.color_recognition:
+            self.color_recognition = ColorRecognition(self.app)
+        cr = self.color_recognition
+        if not cr.region:
+            return {"matched": False, "detail": "未设置识别区域"}
+        if not cr.target_color:
+            return {"matched": False, "detail": "未设置目标颜色"}
+        matched = cr.recognize_color()
+        r, g, b = cr.target_color
+        hex_color = f"#{r:02x}{g:02x}{b:02x}"
+        if matched:
+            return {"matched": True, "detail": f"检测到目标颜色 {hex_color}"}
+        return {"matched": False, "detail": f"未检测到目标颜色 {hex_color}（容差 {cr.tolerance}）"}
+
     def stop_color_recognition(self):
         if self.color_recognition:
             self.color_recognition.stop_recognition()

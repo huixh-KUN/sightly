@@ -226,32 +226,15 @@ class BackgroundMonitor:
                         continue
 
                     self.app.logging_manager.debug("BG",
-                        f"组{self.group_index} 截图: region={region}, type={self.recognition_type}")
-                    image = await run_in_executor(self._capture_region, region)
-                    if image is None:
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 截图失败")
-                        await asyncio.sleep(self.interval)
-                        continue
-
-                    self.app.logging_manager.debug("BG",
-                        f"组{self.group_index} 开始识别: type={self.recognition_type}, image={image.size if hasattr(image,'size') else '?'}")
-                    matched, click_position = await run_in_executor(self._recognize, image)
+                        f"组{self.group_index} 开始识别: region={region}, type={self.recognition_type}")
+                    matched, click_position, _ = await run_in_executor(self.recognize_once)
                     self.app.logging_manager.debug("BG",
                         f"组{self.group_index} 识别结果: matched={matched}, click={click_position}")
 
-                    if hasattr(image, 'close'):
-                        image.close()
-                    del image
-
                     if matched:
-                        if click_position and region:
-                            click_position = (
-                                click_position[0] + region[0],
-                                click_position[1] + region[1]
-                            )
                         self.app.logging_manager.log_message(
                             f"后台监控组{self.group_index+1} 匹配成功: pos={click_position}")
-                        await run_in_executor(self._trigger_action, click_position)
+                        await run_in_executor(self.trigger_actions, click_position)
                         self.last_trigger_time = current_time
                     else:
                         self.app.logging_manager.debug("BG", f"组{self.group_index} 未匹配")
@@ -377,10 +360,45 @@ class BackgroundMonitor:
         
         return (matched, click_pos)
     
-    def _trigger_action(self, click_position=None) -> None:
+    def recognize_once(self) -> tuple:
+        """单次识别：截图 + 匹配，返回 (matched, click_pos, detail)。"""
+        region = self._get_current_region()
+        if not region:
+            return False, None, "未设置监控区域"
+        if not self.hwnd:
+            return False, None, "未绑定目标窗口，无法截图"
+        image = self._capture_region(region)
+        if image is None:
+            return False, None, "截图失败"
+        try:
+            matched, click_position = self._recognize(image)
+            if matched and click_position:
+                click_position = (
+                    click_position[0] + region[0],
+                    click_position[1] + region[1],
+                )
+            detail = self._build_recognize_detail(matched, click_position)
+            return matched, click_position, detail
+        finally:
+            if image is not None and hasattr(image, 'close'):
+                image.close()
+
+    def _build_recognize_detail(self, matched, click_position) -> str:
+        type_labels = {"ocr": "文字", "image": "图像", "color": "颜色"}
+        label = type_labels.get(self.recognition_type, self.recognition_type)
+        if not matched:
+            return f"{label}识别：未匹配"
+        pos_hint = f"，点击位置 ({click_position[0]}, {click_position[1]})" if click_position else ""
+        return f"{label}识别：匹配成功{pos_hint}"
+
+    def trigger_actions(self, click_position=None, *, for_test=False) -> None:
+        """触发动作（报警、点击、按键）。"""
+        self._trigger_action(click_position, for_test=for_test)
+
+    def _trigger_action(self, click_position=None, *, for_test=False) -> None:
         """触发动作"""
         self.app.logging_manager.debug("BG", f"组{self.group_index} 触发动作: click_position={click_position}, trigger_click={self.trigger_click}, trigger_key={self.trigger_key}")
-        if not self.app.is_running:
+        if not for_test and not self.app.is_running:
             self.app.logging_manager.debug("BG", f"组{self.group_index} app未运行")
             return
         
@@ -578,6 +596,78 @@ class BackgroundManager:
             "window_title": self.target_title,
         }
     
+    def _apply_group_config(self, monitor: BackgroundMonitor, group: dict) -> None:
+        """从 app 配置同步到 monitor 实例。"""
+        region = group.get("region")
+        region_ratio = group.get("region_ratio")
+        if region:
+            monitor.region = region
+        if region_ratio:
+            monitor.region_ratio = region_ratio
+
+        try:
+            monitor.interval = float(_safe_get(group, "interval", "5"))
+            monitor.pause = int(_safe_get(group, "pause", "180"))
+        except (ValueError, TypeError):
+            monitor.interval = 5.0
+            monitor.pause = 180
+
+        monitor_type = _safe_get(group, "type", "ocr")
+        monitor.recognition_type = monitor_type
+
+        if monitor_type == "ocr":
+            keywords = _safe_get(group, "keywords", "")
+            language = _safe_get(group, "language", "简体中文")
+            monitor.configure_ocr(keywords, language)
+        elif monitor_type == "image":
+            template = group.get("template_image")
+            try:
+                threshold = float(_safe_get(group, "threshold", "80")) / 100.0
+            except (ValueError, TypeError):
+                threshold = 0.8
+            monitor.configure_image(template, threshold)
+        elif monitor_type == "color":
+            target_color = group.get("target_color")
+            try:
+                tolerance = int(_safe_get(group, "tolerance", "10"))
+            except (ValueError, TypeError):
+                tolerance = 10
+            monitor.configure_color(target_color, tolerance)
+
+        monitor.trigger_key = _safe_get(group, "key", "")
+        try:
+            monitor.delay_min = int(_safe_get(group, "delay_min", "100"))
+            monitor.delay_max = int(_safe_get(group, "delay_max", "200"))
+        except (ValueError, TypeError):
+            monitor.delay_min = 100
+            monitor.delay_max = 200
+
+        monitor.trigger_click = _safe_get(group, "click_enabled", False)
+        monitor.click_offset = int(_safe_get(group, "click_offset", "0"))
+        monitor.click_mode = _safe_get(group, "click_mode", "physical")
+        monitor.alarm_enabled = _safe_get(group, "alarm", False)
+
+    def run_once(self, index: int) -> dict:
+        """单次测试：识别 + 执行动作。"""
+        groups = getattr(self.app, 'background_groups', [])
+        if index >= len(groups):
+            return {"matched": False, "executed": False, "detail": "组索引越界"}
+        if not self.target_hwnd:
+            return {"matched": False, "executed": False, "detail": "未绑定目标窗口，无法截图"}
+        group = groups[index]
+        monitor = BackgroundMonitor(self.app, index)
+        monitor.set_window(self.target_hwnd)
+        self._apply_group_config(monitor, group)
+        if not monitor.region and not monitor.region_ratio:
+            return {"matched": False, "executed": False, "detail": "未设置监控区域"}
+        matched, click_pos, detail = monitor.recognize_once()
+        executed = False
+        if matched:
+            monitor.trigger_actions(click_pos, for_test=True)
+            executed = True
+            detail = f"{detail}；已按配置执行动作"
+        return {"matched": matched, "executed": executed, "detail": detail}
+
     def create_group(self, index: int, monitor_type: str = "ocr") -> BackgroundMonitor:
         """创建监控组"""
         monitor = BackgroundMonitor(self.app, index)
@@ -637,60 +727,10 @@ class BackgroundManager:
 
             monitor = self.monitors[group_index]
             monitor.set_window(self.target_hwnd)
-
-            region = group.get("region")
-            region_ratio = group.get("region_ratio")
-            if region:
-                monitor.region = region
-            if region_ratio:
-                monitor.region_ratio = region_ratio
+            self._apply_group_config(monitor, group)
 
             if not monitor.region and not monitor.region_ratio:
                 continue
-
-            try:
-                monitor.interval = float(_safe_get(group, "interval", "5"))
-                monitor.pause = int(_safe_get(group, "pause", "180"))
-            except (ValueError, TypeError):
-                monitor.interval = 5.0
-                monitor.pause = 180
-
-            monitor_type = _safe_get(group, "type", "ocr")
-            monitor.recognition_type = monitor_type
-
-            if monitor_type == "ocr":
-                keywords = _safe_get(group, "keywords", "")
-                language = _safe_get(group, "language", "简体中文")
-                monitor.configure_ocr(keywords, language)
-
-            elif monitor_type == "image":
-                template = group.get("template_image")
-                try:
-                    threshold = float(_safe_get(group, "threshold", "80")) / 100.0
-                except (ValueError, TypeError):
-                    threshold = 0.8
-                monitor.configure_image(template, threshold)
-
-            elif monitor_type == "color":
-                target_color = group.get("target_color")
-                try:
-                    tolerance = int(_safe_get(group, "tolerance", "10"))
-                except (ValueError, TypeError):
-                    tolerance = 10
-                monitor.configure_color(target_color, tolerance)
-
-            monitor.trigger_key = _safe_get(group, "key", "")
-            try:
-                monitor.delay_min = int(_safe_get(group, "delay_min", "100"))
-                monitor.delay_max = int(_safe_get(group, "delay_max", "200"))
-            except (ValueError, TypeError):
-                monitor.delay_min = 100
-                monitor.delay_max = 200
-
-            monitor.trigger_click = _safe_get(group, "click_enabled", False)
-            monitor.click_offset = int(_safe_get(group, "click_offset", "0"))
-            monitor.click_mode = _safe_get(group, "click_mode", "physical")
-            monitor.alarm_enabled = _safe_get(group, "alarm", False)
 
             self.app.logging_manager.debug("BG",
                 f"组{group_index}: region={monitor.region}, click={monitor.trigger_click}, key={monitor.trigger_key}")
