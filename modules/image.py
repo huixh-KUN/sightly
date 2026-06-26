@@ -4,7 +4,6 @@ import time
 import os
 from typing import Optional
 
-from PIL import Image
 import numpy as np
 
 from PySide6.QtWidgets import QMessageBox, QFileDialog
@@ -23,6 +22,7 @@ from utils.screenshot import ScreenshotManager
 from utils.recognition import ImageRecognizer
 from core.click_handler import ClickHandler
 from core.priority_lock import get_module_priority
+from utils.memory import MemoryMonitor
 
 
 class ImageDetection:
@@ -49,6 +49,7 @@ class ImageDetection:
         self.last_trigger_time = 0
         self.last_match_pos = None
         self.screenshot_manager = ScreenshotManager()
+        self.memory_monitor = MemoryMonitor()
 
     def set_region(self, region):
         self.region = region
@@ -85,6 +86,7 @@ class ImageDetection:
         """异步检测循环"""
         self.app.logging_manager.debug("IMAGE",
             f"检测组{self.group_index+1} 协程开始: 间隔={self.interval}s, 暂停={self.pause}s")
+        frame_count = 0
         try:
             while self.is_running:
                 await asyncio.sleep(self.interval)
@@ -106,6 +108,10 @@ class ImageDetection:
                 else:
                     self.app.logging_manager.debug("IMAGE",
                         f"检测组{self.group_index+1} 未匹配")
+                
+                frame_count += 1
+                if self.memory_monitor.gc_if_needed(frame_count):
+                    self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 触发 GC")
         except asyncio.CancelledError:
             self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 协程取消")
             self.is_running = False
@@ -120,6 +126,7 @@ class ImageDetection:
         if not CV2_AVAILABLE:
             self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} detect_image: OpenCV 不可用")
             return None
+        screenshot = None
         try:
             screenshot = self.screenshot_manager.get_region_screenshot(
                 self.region, priority=self.PRIORITY)
@@ -151,6 +158,10 @@ class ImageDetection:
             import traceback
             self.app.logging_manager.error("IMAGE", f"错误详情: {traceback.format_exc()}")
             return None
+        finally:
+            if screenshot is not None:
+                screenshot.close()
+                del screenshot
 
     def execute_commands(self, match_result):
         if not match_result:
@@ -242,7 +253,6 @@ class ImageDetectionManager:
     def _update_image_preview(self, group, image_path):
         try:
             if "image_preview" in group and group["image_preview"]:
-                image = Image.open(image_path)
                 from PySide6.QtGui import QPixmap
                 from PySide6.QtWidgets import QLabel
                 pixmap = QPixmap(image_path)

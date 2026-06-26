@@ -68,7 +68,7 @@ class ScreenshotManager:
             priority: 优先级，数值越大优先级越高
         
         Returns:
-            PIL.Image: 截图副本，失败返回 None
+            PIL.Image: 截图副本（调用方使用完毕后应调用 .close()），失败返回 None
         """
         with self.screenshot_lock.acquire(priority):
             current_time = time.time()
@@ -78,9 +78,12 @@ class ScreenshotManager:
                 return self.last_full_screenshot.copy()
             
             try:
+                old = self.last_full_screenshot
                 self.last_full_screenshot = ImageGrab.grab(all_screens=True)
+                if old is not None:
+                    old.close()
                 self.last_time = current_time
-                return self.last_full_screenshot
+                return self.last_full_screenshot.copy()
             except Exception:
                 return None
     
@@ -93,7 +96,7 @@ class ScreenshotManager:
             priority: 优先级
         
         Returns:
-            PIL.Image: 区域截图，失败返回 None
+            PIL.Image: 区域截图（调用方使用完毕后应调用 .close()），失败返回 None
         """
         if not region:
             return None
@@ -115,10 +118,14 @@ class ScreenshotManager:
             return full_screenshot.crop((left, top, right, bottom))
         except Exception:
             return None
+        finally:
+            full_screenshot.close()
     
     def clear_cache(self):
-        """清除缓存"""
+        """清除缓存（释放 PIL 资源）"""
         with self.screenshot_lock.acquire(10):
+            if self.last_full_screenshot is not None:
+                self.last_full_screenshot.close()
             self.last_full_screenshot = None
             self.last_time = 0
     

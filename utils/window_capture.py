@@ -264,6 +264,8 @@ def capture_window_region(hwnd: int, region: tuple) -> Optional[Image.Image]:
         
     except Exception:
         return None
+    finally:
+        full_image.close()
 
 
 def get_window_size(hwnd: int) -> Optional[Tuple[int, int]]:
