@@ -23,7 +23,6 @@ from ui.timed_panel import TimedPanel
 from ui.number_panel import NumberPanel
 from ui.image_panel import ImagePanel
 from ui.background_panel import BackgroundPanel
-from ui.script_panel import ScriptPanel
 from ui.settings_panel import SettingsPanel
 
 from input.controller import InputController
@@ -106,7 +105,6 @@ class MainWindow(QMainWindow):
         from modules.timed import TimedModule as _Timed
         from modules.number import NumberModule as _Number
         from modules.alarm import AlarmModule as _Alarm
-        from modules.script import ScriptModule as _Script
         from modules.color import ColorRecognitionManager as _Color
         from modules.image import ImageDetectionManager as _Image
         from modules.background import BackgroundManager as _BG
@@ -119,8 +117,6 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("INIT", "NumberModule 初始化完成")
         self.alarm_module = _Alarm(self)
         self.logging_manager.debug("INIT", "AlarmModule 初始化完成")
-        self.script_module = _Script(self)
-        self.logging_manager.debug("INIT", "ScriptModule 初始化完成")
         self.color_manager = _Color(self)
         self.logging_manager.debug("INIT", "ColorRecognitionManager 初始化完成")
         self.image_manager = _Image(self)
@@ -133,7 +129,6 @@ class MainWindow(QMainWindow):
             'timed': self.timed_module,
             'number': self.number_module,
             'alarm': self.alarm_module,
-            'script': self.script_module,
             'color': self.color_manager,
             'image': self.image_manager,
             'background': self.background_manager,
@@ -144,7 +139,6 @@ class MainWindow(QMainWindow):
         self.app_state.register_module("number", "数字识别", "识别屏幕数字变化触发动作", "🔢")
         self.app_state.register_module("image", "图像检测", "检测屏幕图像匹配模板触发", "🖼️")
         self.app_state.register_module("background", "后台监控", "监控指定窗口的内容变化", "🖥️")
-        self.app_state.register_module("script", "脚本运行", "录制和执行按键脚本", "📜")
         self.logging_manager.debug("INIT", "所有模块注册完成")
 
     def _init_ui(self):
@@ -212,7 +206,6 @@ class MainWindow(QMainWindow):
             ("number", "🔢", "数字识别"),
             ("image", "🖼️", "图像检测"),
             ("background", "🖥️", "后台监控"),
-            ("script", "📜", "脚本运行"),
             ("settings", "⚙️", "设置"),
         ]
 
@@ -243,7 +236,6 @@ class MainWindow(QMainWindow):
             ('number', NumberPanel),
             ('image', ImagePanel),
             ('background', BackgroundPanel),
-            ('script', ScriptPanel),
             ('settings', SettingsPanel),
         ]
         for panel_id, PanelClass in panel_order:
@@ -257,7 +249,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(idx)
         for btn in self.nav_buttons:
             btn.setChecked(False)
-        nav_keys = ['home', 'ocr', 'timed', 'number', 'image', 'background', 'script', 'settings']
+        nav_keys = ['home', 'ocr', 'timed', 'number', 'image', 'background', 'settings']
         if page_id in nav_keys:
             self.nav_buttons[nav_keys.index(page_id)].setChecked(True)
 
@@ -266,6 +258,20 @@ class MainWindow(QMainWindow):
         self.app_state.all_stop_requested.connect(self._on_stop_all)
         self.app_state.record_hotkey_triggered.connect(self._on_record_hotkey)
         self.app_state.config_loaded.connect(self._on_config_loaded)
+        bg = self.panels.get('background')
+        if bg:
+            bg.window_selected.connect(self._on_bg_window_selected)
+            bg.auto_reconnect_requested.connect(self._on_bg_auto_reconnect)
+        tm = self.panels.get('timed')
+        if tm:
+            tm.position_selection_requested.connect(self._on_timed_position_selection)
+        st = self.panels.get('settings')
+        if st:
+            st.config_changed.connect(self._on_settings_config_changed)
+            st.shortcuts_changed.connect(self._on_settings_shortcuts_changed)
+        hm = self.panels.get('home')
+        if hm:
+            hm.config_save_requested.connect(self.save_config)
         self.logging_manager.debug("INIT", "信号连接完成: all_start_requested/all_stop_requested/record_hotkey_triggered/config_loaded")
 
     def _init_module_bindings(self):
@@ -314,8 +320,6 @@ class MainWindow(QMainWindow):
                         self.background_groups = config.get("groups", [])
                     else:
                         self.background_groups = config
-                elif panel_id == 'script':
-                    self.script_config = config
                 elif panel_id == 'settings':
                     self.settings_config = config
         self.logging_manager.debug("CONFIG", "面板配置同步完成")
@@ -326,7 +330,7 @@ class MainWindow(QMainWindow):
             return
         self._is_running = False
         self.logging_manager.debug("STOP", "_on_stop_all 开始")
-        for module_id in ['ocr', 'timed', 'number', 'image', 'background', 'script']:
+        for module_id in ['ocr', 'timed', 'number', 'image', 'background']:
             self._stop_module(module_id)
         self.alarm_module.play_stop_sound()
         self._lock_panels(False)
@@ -349,12 +353,41 @@ class MainWindow(QMainWindow):
             return True
         return super().eventFilter(obj, event)
 
-    def _on_record_hotkey(self):
-        is_recording = getattr(getattr(self, 'script_executor', None), 'is_recording', False)
-        if is_recording:
-            self.script_module.stop_recording()
+    def _on_record_hotkey(self): pass
+
+    def _on_bg_window_selected(self, hwnd, title):
+        self.background_manager.set_target_window(hwnd)
+
+    def _on_bg_auto_reconnect(self, wc, wp, wt):
+        ok = self.background_manager.auto_reconnect(wc, wp, wt)
+        bg = self.panels.get('background')
+        if ok:
+            bg.on_auto_reconnect_result(True, self.background_manager.target_hwnd, self.background_manager.target_title or "")
         else:
-            self.script_module.start_recording()
+            bg.on_auto_reconnect_result(False, 0, "")
+
+    def _on_timed_position_selection(self, index):
+        panel = self.panels.get('timed')
+        if panel and panel._edit_window and hasattr(panel._edit_window._editor, '_on_pos_selected'):
+            self.timed_module.start_timed_position_selection(
+                index, on_selected=panel._edit_window._editor._on_pos_selected
+            )
+
+    def _on_settings_config_changed(self, config):
+        alarm = config.get("alarm", {})
+        if alarm.get("sound_path"):
+            self.alarm_sound_path.set(alarm["sound_path"])
+        if "volume" in alarm:
+            self.alarm_volume.set(alarm["volume"])
+            self.alarm_volume_str.set(str(alarm["volume"]))
+        self.save_config()
+
+    def _on_settings_shortcuts_changed(self, start_key, stop_key):
+        if start_key:
+            self.app_state.start_shortcut = start_key
+        if stop_key:
+            self.app_state.stop_shortcut = stop_key
+        self._register_shortcuts()
 
     def _start_module(self, module_id):
         try:
@@ -369,8 +402,6 @@ class MainWindow(QMainWindow):
                 self.image_manager.start_all_detection()
             elif module_id == 'background':
                 self.background_manager.start_all_groups()
-            elif module_id == 'script':
-                self.script_module.start()
             self.logging_manager.debug("MODULE", f"模块 {module_id} 启动成功")
             self.logging_manager.log_message(f"  ✓ {module_id} 已启动")
         except Exception as e:
@@ -390,8 +421,6 @@ class MainWindow(QMainWindow):
                 self.image_manager.stop_all_detection()
             elif module_id == 'background':
                 self.background_manager.stop_all_groups()
-            elif module_id == 'script':
-                self.script_module.stop()
             self.logging_manager.debug("MODULE", f"模块 {module_id} 停止成功")
         except Exception as e:
             self.logging_manager.error("MODULE", f"模块 {module_id} 停止失败: {e}")
@@ -434,9 +463,7 @@ class MainWindow(QMainWindow):
                 if panel_id == 'settings':
                     self._apply_settings(panel_cfg)
             else:
-                if panel_id == 'script':
-                    panel.set_config({"script_content": "", "color_commands": ""})
-                elif panel_id == 'settings':
+                if panel_id == 'settings':
                     panel.set_config({})
                 else:
                     panel.set_config([])
@@ -539,11 +566,6 @@ class MainWindow(QMainWindow):
 
     def _shutdown_all_modules(self):
         self.logging_manager.debug("CLOSE", "停止所有模块...")
-        if hasattr(self, 'script_module'):
-            try:
-                self.script_module.stop(stop_color_recognition=False)
-            except Exception as e:
-                self.logging_manager.error("CLOSE", f"停止 script_module 失败: {e}")
         if hasattr(self, 'number_module'):
             try:
                 self.number_module.stop_number_recognition()
@@ -581,12 +603,7 @@ class MainWindow(QMainWindow):
                     self.global_listener.join(timeout=2)
             except Exception as e:
                 self.logging_manager.error("CLOSE", f"停止 global_listener 失败: {e}")
-        script_exec = getattr(self, 'script_executor', None) or getattr(self, 'script_module', None)
-        if hasattr(script_exec, 'is_running') and script_exec.is_running:
-            try:
-                script_exec.stop_script()
-            except Exception as e:
-                self.logging_manager.error("CLOSE", f"停止 script_executor 失败: {e}")
+
         self.logging_manager.debug("CLOSE", "所有模块已停止")
 
     def run(self):

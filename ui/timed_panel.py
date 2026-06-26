@@ -17,6 +17,8 @@ from core.config import ConfigVar
 
 
 class TimedPanel(QWidget):
+    position_selection_requested = Signal(int)
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
@@ -121,8 +123,12 @@ class TimedPanel(QWidget):
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
-                self.app, self.groups_data[idx], idx, "timed", panel=self
+                self.groups_data[idx], idx, "timed", panel=self
             )
+            if hasattr(self._edit_window._editor, 'position_selection_requested'):
+                self._edit_window._editor.position_selection_requested.connect(
+                    self.position_selection_requested.emit
+                )
             self._edit_window.show()
 
     def _on_edit_window_closed(self, idx, editor):
@@ -154,10 +160,10 @@ class TimedPanel(QWidget):
 
 
 class TimedGroupWidget(QFrame):
+    position_selection_requested = Signal(int)
 
-    def __init__(self, app, index, parent=None):
+    def __init__(self, index, parent=None):
         super().__init__(parent)
-        self.app = app
         self.index = index
         self._pos_x = 0
         self._pos_y = 0
@@ -290,10 +296,7 @@ class TimedGroupWidget(QFrame):
             pw = w.parent()
             if pw:
                 pw.hide()
-        self.app.timed_module.start_timed_position_selection(
-            self.index,
-            on_selected=lambda x, y: self._on_pos_selected(x, y)
-        )
+        self.position_selection_requested.emit(self.index)
 
     def _on_pos_selected(self, x, y):
         self._pos_x = x

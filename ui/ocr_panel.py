@@ -123,7 +123,7 @@ class OCRPanel(QWidget):
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
-                self.app, self.groups_data[idx], idx, "ocr", panel=self
+                self.groups_data[idx], idx, "ocr", panel=self
             )
             self._edit_window.show()
 
@@ -157,9 +157,8 @@ class OCRPanel(QWidget):
 
 class OCRGroupWidget(QFrame):
 
-    def __init__(self, app, index, parent=None):
+    def __init__(self, index, parent=None):
         super().__init__(parent)
-        self.app = app
         self.index = index
         self.region = None
 

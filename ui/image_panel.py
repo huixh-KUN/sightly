@@ -123,7 +123,8 @@ class ImagePanel(QWidget):
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
-                self.app, self.groups_data[idx], idx, "image", panel=self
+                self.groups_data[idx], idx, "image", panel=self,
+                app_state=self.app.app_state,
             )
             self._edit_window.show()
 
@@ -157,9 +158,9 @@ class ImagePanel(QWidget):
 
 class ImageGroupWidget(QFrame):
 
-    def __init__(self, app, index, parent=None):
+    def __init__(self, index, parent=None, app_state=None):
         super().__init__(parent)
-        self.app = app
+        self._app_state = app_state
         self.index = index
         self.region = None
         self.template_path = None
@@ -380,9 +381,8 @@ class ImageGroupWidget(QFrame):
         self._show_windows()
 
     def _save_template_to_workspace(self, pixmap_or_path):
-        app_state = getattr(self.app, 'app_state', None)
-        if app_state and app_state.current is not None:
-            return app_state.save_template("image", self.index, pixmap_or_path)
+        if self._app_state and self._app_state.current is not None:
+            return self._app_state.save_template("image", self.index, pixmap_or_path)
         return None
 
     def _preview_template(self):

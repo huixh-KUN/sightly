@@ -2,13 +2,16 @@ import os
 import winsound
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 from ui.widgets import SectionTitle
 from ui.components import GeneralSettingsCard, AlarmSettingsCard, AboutCard
 
 
 class SettingsPanel(QWidget):
+    config_changed = Signal(dict)
+    shortcuts_changed = Signal(str, str)
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
@@ -31,22 +34,9 @@ class SettingsPanel(QWidget):
 
     def _on_config_changed(self):
         general = self._general.get_config()
-        if "start_key" in general:
-            self.app.app_state.start_shortcut = general["start_key"] or ""
-        if "stop_key" in general:
-            self.app.app_state.stop_shortcut = general["stop_key"] or ""
         alarm_cfg = self._alarm.get_config()
-        if alarm_cfg.get("sound_path"):
-            self.app.alarm_sound_path.set(alarm_cfg["sound_path"])
-        if "volume" in alarm_cfg:
-            self.app.alarm_volume.set(alarm_cfg["volume"])
-            self.app.alarm_volume_str.set(str(alarm_cfg["volume"]))
-        self.app._register_shortcuts()
-        if hasattr(self.app, 'save_config') and callable(self.app.save_config):
-            try:
-                self.app.save_config()
-            except Exception as e:
-                self.app.logging_manager.error("SETTINGS", f"保存配置失败: {e}")
+        self.shortcuts_changed.emit(general.get("start_key", ""), general.get("stop_key", ""))
+        self.config_changed.emit({"general": general, "alarm": alarm_cfg})
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)

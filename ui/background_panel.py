@@ -21,6 +21,9 @@ from core.config import ConfigVar
 
 
 class BackgroundPanel(QWidget):
+    window_selected = Signal(int, str)
+    auto_reconnect_requested = Signal(str, str, str)
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
@@ -28,6 +31,10 @@ class BackgroundPanel(QWidget):
         self.list_items = []
         self._view_only = False
         self._edit_window = None
+        self._target_hwnd = 0
+        self._window_class = ""
+        self._window_process = ""
+        self._window_title = ""
         self._setup_ui()
 
     def _setup_ui(self):
@@ -167,7 +174,9 @@ class BackgroundPanel(QWidget):
             mt = data.get("type", "ocr")
             bg_type = f"{mt}_bg"
             self._edit_window = GroupEditWindow(
-                self.app, data, idx, bg_type, panel=self
+                data, idx, bg_type, panel=self,
+                logging_manager=self.app.logging_manager,
+                target_hwnd=self._target_hwnd,
             )
             self._edit_window.show()
 
@@ -184,12 +193,10 @@ class BackgroundPanel(QWidget):
         self._view_only = not enabled
 
     def collect_config(self):
-        bg_manager = getattr(self.app, 'background_manager', None)
-        window_info = bg_manager.window_info() if bg_manager else {}
         return {
-            "window_class": window_info.get("window_class"),
-            "window_process": window_info.get("window_process"),
-            "window_title": window_info.get("window_title"),
+            "window_class": self._window_class,
+            "window_process": self._window_process,
+            "window_title": self._window_title,
             "groups": [{k: ConfigVar(v) for k, v in g.items()} for g in self.groups_data],
         }
 
@@ -215,21 +222,8 @@ class BackgroundPanel(QWidget):
         self.list_items.clear()
         self.groups_data.clear()
 
-        if (wc or wt) and hasattr(self.app, 'background_manager'):
-            self.app.logging_manager.log_message(
-                f"尝试自动重连窗口: class={wc}, process={wp}, title={wt}"
-            )
-            ok = self.app.background_manager.auto_reconnect(wc, wp, wt)
-            if ok:
-                title = self.app.background_manager.target_title or ""
-                self.app.logging_manager.log_message(f"自动重连成功: {title}")
-                self._window_selector.set_window_by_hwnd(
-                    self.app.background_manager.target_hwnd
-                )
-            else:
-                self.app.logging_manager.log_message(
-                    "自动重连失败：未找到匹配的窗口，请重新选择"
-                )
+        if (wc or wt):
+            self.auto_reconnect_requested.emit(wc, wp, wt)
 
         for cfg in groups:
             mon_type = cfg.get("type", "ocr")
@@ -237,14 +231,43 @@ class BackgroundPanel(QWidget):
             self._add_list_item(len(self.list_items), cfg, mon_type)
 
     def _on_window_selected(self, hwnd, title):
-        self.app.background_manager.set_target_window(hwnd)
+        self._target_hwnd = hwnd
+        self._window_title = title
+        try:
+            import win32gui
+            self._window_class = win32gui.GetClassName(hwnd)
+            import win32process
+            _, pid = win32process.GetWindowThreadProcessId(hwnd)
+            import psutil
+            self._window_process = psutil.Process(pid).name()
+        except Exception:
+            pass
+        self.window_selected.emit(hwnd, title)
+        if self._edit_window and hasattr(self._edit_window._editor, 'set_target_hwnd'):
+            self._edit_window._editor.set_target_hwnd(hwnd)
+
+    def on_auto_reconnect_result(self, ok, hwnd, title):
+        if ok:
+            self._target_hwnd = hwnd
+            self._window_title = title
+            try:
+                import win32gui
+                self._window_class = win32gui.GetClassName(hwnd)
+                import win32process
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                import psutil
+                self._window_process = psutil.Process(pid).name()
+            except Exception:
+                pass
+            self._window_selector.set_window_by_hwnd(hwnd)
 
 
 class BackgroundGroupWidget(QFrame):
 
-    def __init__(self, app, index, monitor_type="ocr", parent=None):
+    def __init__(self, logging_manager, target_hwnd, index, monitor_type="ocr", parent=None):
         super().__init__(parent)
-        self.app = app
+        self._logging_manager = logging_manager
+        self._target_hwnd = target_hwnd
         self.index = index
         self.monitor_type = monitor_type
         self.region = None
@@ -425,6 +448,9 @@ class BackgroundGroupWidget(QFrame):
             except (ValueError, TypeError):
                 pass
 
+    def set_target_hwnd(self, hwnd):
+        self._target_hwnd = hwnd
+
     def set_title(self, index):
         self.index = index
         type_names = {"ocr": "OCR", "image": "图像", "color": "颜色"}
@@ -434,17 +460,15 @@ class BackgroundGroupWidget(QFrame):
 
     def collect_config(self):
         region_ratio = None
-        if self.region and hasattr(self.app, 'background_manager'):
-            hwnd = self.app.background_manager.target_hwnd
-            if hwnd:
-                try:
-                    from utils.window_capture import get_window_size
-                    from utils.coordinate import RelativeCoordinate
-                    window_size = get_window_size(hwnd)
-                    if window_size:
-                        region_ratio = RelativeCoordinate.pixel_to_ratio(self.region, window_size)
-                except Exception as e:
-                    self.app.logging_manager.error("BG", f"获取窗口大小失败: {e}")
+        if self.region and self._target_hwnd:
+            try:
+                from utils.window_capture import get_window_size
+                from utils.coordinate import RelativeCoordinate
+                window_size = get_window_size(self._target_hwnd)
+                if window_size:
+                    region_ratio = RelativeCoordinate.pixel_to_ratio(self.region, window_size)
+            except Exception as e:
+                self._logging_manager.error("BG", f"获取窗口大小失败: {e}")
 
         cfg = {
             "name": self.title_edit.text(),
@@ -510,18 +534,17 @@ class BackgroundGroupWidget(QFrame):
         self.overlay.show()
 
     def _on_region_selected(self, x1, y1, x2, y2):
-        hwnd = self.app.background_manager.target_hwnd if hasattr(self.app, 'background_manager') else None
-        if hwnd:
+        if self._target_hwnd:
             try:
                 import win32gui
-                win_rect = win32gui.GetWindowRect(hwnd)
+                win_rect = win32gui.GetWindowRect(self._target_hwnd)
                 win_left, win_top = win_rect[0], win_rect[1]
                 x1 -= win_left
                 y1 -= win_top
                 x2 -= win_left
                 y2 -= win_top
             except Exception as e:
-                self.app.logging_manager.error("BG", f"坐标转换失败: {e}")
+                self._logging_manager.error("BG", f"坐标转换失败: {e}")
         self.region = (x1, y1, x2, y2)
         self.region_label.setText(f"({x1}, {y1}) → ({x2}, {y2})")
         self.region_label.setStyleSheet("font-weight: 500;")

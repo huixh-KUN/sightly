@@ -3,13 +3,15 @@ from PySide6.QtWidgets import (
     QFrame, QGridLayout, QScrollArea,
     QInputDialog, QMessageBox
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 from ui.widgets import SectionTitle, PrimaryButton, InfoLabel, TextButton
 from ui.components import LogViewer, ModuleCard, ComboBox
 
 
 class HomePanel(QWidget):
+    config_save_requested = Signal()
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
         self.app = app
@@ -123,7 +125,6 @@ class HomePanel(QWidget):
             ("number", "🔢", "数字识别", "识别屏幕数字变化触发动作"),
             ("image", "🖼️", "图像检测", "检测屏幕图像匹配模板触发"),
             ("background", "🖥️", "后台监控", "监控指定窗口的内容变化"),
-            ("script", "📜", "脚本运行", "录制和执行按键脚本"),
         ]
 
         grid = QGridLayout()
@@ -206,7 +207,7 @@ class HomePanel(QWidget):
         if self.app_state.current == name:
             return
         self.app.logging_manager.debug("HOME", f"_on_ws_selected: {self.app_state.current!r} -> {name!r}")
-        self.app.save_config()
+        self.config_save_requested.emit()
         self.app_state.switch_workspace(name)
         self.app.logging_manager.log_message(f"已切换到工作空间: {name}")
 

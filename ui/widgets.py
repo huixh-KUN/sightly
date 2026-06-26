@@ -300,13 +300,13 @@ class GroupListItem(QFrame):
 class GroupEditWindow(QWidget):
     config_changed = Signal(int, dict)
 
-    def __init__(self, app, group_data: dict, group_index: int, group_type: str, panel=None, parent=None):
+    def __init__(self, group_data: dict, group_index: int, group_type: str, panel=None, parent=None,
+                 logging_manager=None, target_hwnd=0, app_state=None):
         super().__init__(parent)
         self.setWindowTitle(f"编辑 - {group_data.get('name', f'组 {group_index+1}')}")
         self.setMinimumSize(640, 500)
         self.resize(680, 600)
         self.setAttribute(Qt.WA_DeleteOnClose)
-        self._app = app
         self._group_index = group_index
         self._panel = panel
 
@@ -315,20 +315,20 @@ class GroupEditWindow(QWidget):
 
         if group_type == "image":
             from ui.image_panel import ImageGroupWidget
-            self._editor = ImageGroupWidget(app, group_index, parent=self)
+            self._editor = ImageGroupWidget(group_index, parent=self, app_state=app_state)
         elif group_type == "ocr":
             from ui.ocr_panel import OCRGroupWidget
-            self._editor = OCRGroupWidget(app, group_index, parent=self)
+            self._editor = OCRGroupWidget(group_index, parent=self)
         elif group_type == "timed":
             from ui.timed_panel import TimedGroupWidget
-            self._editor = TimedGroupWidget(app, group_index, parent=self)
+            self._editor = TimedGroupWidget(group_index, parent=self)
         elif group_type == "number":
             from ui.number_panel import NumberGroupWidget
-            self._editor = NumberGroupWidget(app, group_index, parent=self)
+            self._editor = NumberGroupWidget(group_index, parent=self)
         elif group_type in ("background", "ocr_bg", "image_bg", "color_bg"):
             from ui.background_panel import BackgroundGroupWidget
             mt = group_type.replace("_bg", "")
-            self._editor = BackgroundGroupWidget(app, group_index, mt, parent=self)
+            self._editor = BackgroundGroupWidget(logging_manager, target_hwnd, group_index, mt, parent=self)
         else:
             raise ValueError(f"Unknown group type: {group_type}")
 
