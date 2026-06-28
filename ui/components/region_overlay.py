@@ -11,6 +11,7 @@ class RegionOverlay(QWidget):
     """
 
     region_selected = Signal(int, int, int, int)
+    closed = Signal()
 
     def __init__(self, selection_type="normal", parent=None):
         super().__init__(parent)
@@ -55,6 +56,10 @@ class RegionOverlay(QWidget):
         if x2 - x1 > 10 and y2 - y1 > 10:
             self.region_selected.emit(x1, y1, x2, y2)
         self.close()
+
+    def closeEvent(self, event):
+        self.closed.emit()
+        super().closeEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:

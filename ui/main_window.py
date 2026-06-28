@@ -602,6 +602,8 @@ class MainWindow(QMainWindow):
         self.logging_manager.debug("CONFIG", "配置保存完成")
 
     def _save_template_images(self, config):
+        def _unwrap(v):
+            return v.get() if hasattr(v, 'get') else v
         try:
             if not self.app_state.current:
                 return
@@ -609,9 +611,9 @@ class MainWindow(QMainWindow):
             bg_raw = config.get("background", [])
             bg_list = bg_raw.get("groups", bg_raw) if isinstance(bg_raw, dict) else bg_raw
             for i, g in enumerate(bg_list):
-                if not isinstance(g, dict) or g.get("type") != "image":
+                if not isinstance(g, dict) or _unwrap(g.get("type")) != "image":
                     continue
-                pixmap = g.get("reference_image")
+                pixmap = _unwrap(g.get("reference_image"))
                 if pixmap and hasattr(pixmap, "save") and not pixmap.isNull():
                     path = self.app_state.save_template("background", i, pixmap)
                     g["reference_image"] = path
@@ -622,7 +624,7 @@ class MainWindow(QMainWindow):
             for i, g in enumerate(img_list):
                 if not isinstance(g, dict):
                     continue
-                path = g.get("reference_image", "")
+                path = _unwrap(g.get("reference_image", ""))
                 if path and not os.path.exists(path):
                     g.pop("reference_image", None)
         except Exception as e:

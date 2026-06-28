@@ -276,7 +276,7 @@ class ImageDetectionManager:
             self.app.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未启用")
             return
         if group.get("template_image") is None:
-            ref_path = group.get("reference_image", "")
+            ref_path = self._safe_get(group, "reference_image", "")
             if ref_path and CV2_AVAILABLE and os.path.exists(ref_path):
                 template = cv2.imdecode(np.fromfile(ref_path, dtype=np.uint8), cv2.IMREAD_COLOR)
                 if template is not None:
@@ -290,15 +290,16 @@ class ImageDetectionManager:
             else:
                 self.app.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未设置参考图像")
                 return
-        if not group.get("region"):
+        region = self._safe_get(group, "region")
+        if not region:
             self.app.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未设置检测区域")
             return
         if group_index not in self.image_detections:
             self.image_detections[group_index] = ImageDetection(self.app, group_index)
         detection = self.image_detections[group_index]
-        detection.set_region(group["region"])
+        detection.set_region(region)
         detection.template_image = group["template_image"]
-        detection.template_path = group.get("reference_image", "")
+        detection.template_path = self._safe_get(group, "reference_image", "")
         threshold = self._safe_get(group, "threshold", "80")
         interval = self._safe_get(group, "interval", "5")
         pause = self._safe_get(group, "pause", "180")
@@ -325,7 +326,7 @@ class ImageDetectionManager:
         started = 0
         for i, group in enumerate(getattr(self.app, 'image_groups', [])):
             if self._safe_get(group, "enabled", False):
-                if not group.get("region"):
+                if not self._safe_get(group, "region"):
                     self.app.logging_manager.debug("IMAGE", f"检测组{i+1} 跳过: 无区域")
                     continue
                 self.start_detection(i)

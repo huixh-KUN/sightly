@@ -51,6 +51,7 @@ class NumberModule:
             if not rc["enabled"].get():
                 continue
             region = rc["region"]
+            region = region.get() if hasattr(region, 'get') else region
             if not region:
                 continue
             try:

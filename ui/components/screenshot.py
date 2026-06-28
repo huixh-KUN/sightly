@@ -11,6 +11,7 @@ class ScreenCaptureOverlay(QWidget):
     """
 
     region_captured = Signal(object)
+    closed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -53,6 +54,10 @@ class ScreenCaptureOverlay(QWidget):
             pixmap = screen.grabWindow(0, rect.x(), rect.y(), rect.width(), rect.height())
             self.region_captured.emit(pixmap)
         self.close()
+
+    def closeEvent(self, event):
+        self.closed.emit()
+        super().closeEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:

@@ -34,8 +34,10 @@ def strip_configvar(obj):
     elif isinstance(obj, list):
         return [strip_configvar(v) for v in obj]
     elif isinstance(obj, ConfigVar):
-        return obj.get()
-    # 清除不可 JSON 序列化的对象（如 QPixmap）
+        v = obj.get()
+        return list(v) if isinstance(v, tuple) else v
+    if isinstance(obj, tuple):
+        return list(obj)
     if isinstance(obj, (str, int, float, bool)) or obj is None:
         return obj
     try:

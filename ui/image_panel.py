@@ -127,16 +127,17 @@ class ImagePanel(QWidget):
         if self._view_only:
             return
         if self._edit_window:
-            self._edit_window.close()
+            try:
+                self._edit_window.close()
+            except RuntimeError:
+                self.app.logging_manager.error("UI", "编辑窗口已被销毁")
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
                 self.groups_data[idx], idx, "image", panel=self,
                 app_state=self.app.app_state,
-                parent=self.window(),
             )
-            self._edit_window.exec()
-            self._edit_window = None
+            self._edit_window.show()
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
@@ -321,17 +322,18 @@ class ImageGroupWidget(QFrame):
         }
 
     def _hide_windows(self):
-        from ui.widgets import suspend_group_edit_capture
-        suspend_group_edit_capture(self)
+        from ui.widgets import hide_for_capture
+        hide_for_capture(self)
 
     def _show_windows(self):
-        from ui.widgets import resume_group_edit_capture
-        resume_group_edit_capture(self)
+        from ui.widgets import show_after_capture
+        show_after_capture(self)
 
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
         self.overlay = RegionOverlay("image")
         self.overlay.region_selected.connect(self._on_region_selected)
+        self.overlay.closed.connect(self._show_windows)
         self._hide_windows()
         self.overlay.show()
 
@@ -351,6 +353,7 @@ class ImageGroupWidget(QFrame):
         from ui.components.screenshot import ScreenCaptureOverlay
         self._capture_overlay = ScreenCaptureOverlay()
         self._capture_overlay.region_captured.connect(self._on_template_captured)
+        self._capture_overlay.closed.connect(self._show_windows)
         self._hide_windows()
         self._capture_overlay.show()
 

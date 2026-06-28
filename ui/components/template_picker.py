@@ -83,7 +83,21 @@ class TemplatePicker(QFrame):
     def _on_capture(self):
         self._overlay = ScreenCaptureOverlay()
         self._overlay.region_captured.connect(self._on_captured)
+        self._overlay.closed.connect(self._show_after_capture)
+        self._hide_for_capture()
         self._overlay.show()
+
+    def _hide_for_capture(self):
+        w = self.window()
+        if w and isinstance(w, QWidget):
+            w.hide()
+
+    def _show_after_capture(self):
+        w = self.window()
+        if w and isinstance(w, QWidget):
+            w.show()
+            w.raise_()
+            w.activateWindow()
 
     def _on_captured(self, pixmap):
         if self._manager.load_from_pixmap(pixmap):

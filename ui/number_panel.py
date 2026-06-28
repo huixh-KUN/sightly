@@ -122,15 +122,16 @@ class NumberPanel(QWidget):
         if self._view_only:
             return
         if self._edit_window:
-            self._edit_window.close()
+            try:
+                self._edit_window.close()
+            except RuntimeError:
+                self.app.logging_manager.error("UI", "编辑窗口已被销毁")
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
                 self.groups_data[idx], idx, "number", panel=self,
-                parent=self.window(),
             )
-            self._edit_window.exec()
-            self._edit_window = None
+            self._edit_window.show()
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
@@ -273,17 +274,17 @@ class NumberGroupWidget(QFrame):
 
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
+        from ui.widgets import hide_for_capture, show_after_capture
         self.overlay = RegionOverlay("number")
         self.overlay.region_selected.connect(self._on_region_selected)
-        from ui.widgets import suspend_group_edit_capture, resume_group_edit_capture
-        suspend_group_edit_capture(self)
+        self.overlay.closed.connect(lambda: show_after_capture(self))
+        hide_for_capture(self)
         self.overlay.show()
 
     def _on_region_selected(self, x1, y1, x2, y2):
         self.region = (x1, y1, x2, y2)
         self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
-        from ui.widgets import resume_group_edit_capture
-        resume_group_edit_capture(self)
+        show_after_capture(self)
 
     def _preview_region(self):
         if self.region:

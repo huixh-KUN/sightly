@@ -482,6 +482,25 @@ def resume_group_edit_capture(host_widget):
         w.resume_after_capture()
 
 
+def hide_for_capture(host_widget):
+    """隐藏 GroupEditWindow 供全屏选区使用，不改 modality（避免 Windows 句柄重建）。"""
+    w = host_widget.window()
+    if isinstance(w, GroupEditWindow):
+        if w.isVisible():
+            w.hide()
+            return True
+    return False
+
+
+def show_after_capture(host_widget):
+    """恢复被 hide_for_capture 隐藏的 GroupEditWindow。"""
+    w = host_widget.window()
+    if isinstance(w, GroupEditWindow):
+        w.show()
+        w.raise_()
+        w.activateWindow()
+
+
 def set_panel_view_only(panel, view_only):
     """将面板设为只读（保留滚动查看，禁用编辑控件）"""
     from ui.components.combo_box import ComboBox

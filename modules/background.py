@@ -598,8 +598,8 @@ class BackgroundManager:
     
     def _apply_group_config(self, monitor: BackgroundMonitor, group: dict) -> None:
         """从 app 配置同步到 monitor 实例。"""
-        region = group.get("region")
-        region_ratio = group.get("region_ratio")
+        region = _safe_get(group, "region", None)
+        region_ratio = _safe_get(group, "region_ratio", None)
         if region:
             monitor.region = region
         if region_ratio:
@@ -620,14 +620,14 @@ class BackgroundManager:
             language = _safe_get(group, "language", "简体中文")
             monitor.configure_ocr(keywords, language)
         elif monitor_type == "image":
-            template = group.get("template_image")
+            template = _safe_get(group, "template_image", None)
             try:
                 threshold = float(_safe_get(group, "threshold", "80")) / 100.0
             except (ValueError, TypeError):
                 threshold = 0.8
             monitor.configure_image(template, threshold)
         elif monitor_type == "color":
-            target_color = group.get("target_color")
+            target_color = _safe_get(group, "target_color", None)
             try:
                 tolerance = int(_safe_get(group, "tolerance", "10"))
             except (ValueError, TypeError):

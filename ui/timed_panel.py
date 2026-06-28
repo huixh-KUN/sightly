@@ -126,19 +126,20 @@ class TimedPanel(QWidget):
         if self._view_only:
             return
         if self._edit_window:
-            self._edit_window.close()
+            try:
+                self._edit_window.close()
+            except RuntimeError:
+                self.app.logging_manager.error("UI", "编辑窗口已被销毁")
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             self._edit_window = GroupEditWindow(
                 self.groups_data[idx], idx, "timed", panel=self,
-                parent=self.window(),
             )
             if hasattr(self._edit_window._editor, 'position_selection_requested'):
                 self._edit_window._editor.position_selection_requested.connect(
                     self.position_selection_requested.emit
                 )
-            self._edit_window.exec()
-            self._edit_window = None
+            self._edit_window.show()
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
@@ -284,16 +285,16 @@ class TimedGroupWidget(QFrame):
         }
 
     def _select_position(self):
-        from ui.widgets import suspend_group_edit_capture
-        suspend_group_edit_capture(self)
+        from ui.widgets import hide_for_capture
+        hide_for_capture(self)
         self.position_selection_requested.emit(self.index)
 
     def _on_pos_selected(self, x, y):
         self._pos_x = x
         self._pos_y = y
         self.pos_chip.set_text(f"({x}, {y})", accent=True)
-        from ui.widgets import resume_group_edit_capture
-        resume_group_edit_capture(self)
+        from ui.widgets import show_after_capture
+        show_after_capture(self)
 
     def _preview_position(self):
         if self._pos_x or self._pos_y:

@@ -47,7 +47,7 @@ class OCRModule:
 
         has_enabled_group = False
         for group in self.app.ocr_groups:
-            if group["enabled"].get() and group["region"]:
+            if group["enabled"].get() and safe_group_get(group, "region", None):
                 has_enabled_group = True
                 break
 
@@ -82,7 +82,7 @@ class OCRModule:
     async def _async_main(self):
         tasks = []
         for i, group in enumerate(self.app.ocr_groups):
-            if group["enabled"].get() and group["region"]:
+            if group["enabled"].get() and safe_group_get(group, "region", None):
                 t = asyncio.create_task(self._ocr_group_loop(i, group))
                 tasks.append(t)
         if tasks:
@@ -102,7 +102,7 @@ class OCRModule:
         try:
             while not (self._loop and self._loop.is_closed()):
                 try:
-                    if not _get(group.get("enabled"), False) or not group.get("region"):
+                    if not _get(group.get("enabled"), False) or not _get(group.get("region")):
                         await asyncio.sleep(1)
                         continue
                     try:
@@ -153,7 +153,7 @@ class OCRModule:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")
             return False, None, None, None, None
 
-        region = group.get("region")
+        region = safe_group_get(group, "region", None)
         if not region:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未设置识别区域")
             return False, None, None, None, None
@@ -423,7 +423,7 @@ class OCRModule:
 
         key = safe_group_get(group, "key", "")
         alarm_enabled = safe_group_get(group, "alarm", False)
-        region = group.get("region")
+        region = safe_group_get(group, "region", None)
 
         if not key:
             self.app.logging_manager.log_message(f"识别组{group_index+1}警告: 未设置触发按键")

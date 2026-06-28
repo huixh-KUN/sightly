@@ -173,7 +173,10 @@ class BackgroundPanel(QWidget):
         if self._view_only:
             return
         if self._edit_window:
-            self._edit_window.close()
+            try:
+                self._edit_window.close()
+            except RuntimeError:
+                self.app.logging_manager.error("UI", "编辑窗口已被销毁")
             self._edit_window = None
         if 0 <= idx < len(self.groups_data):
             data = self.groups_data[idx]
@@ -183,10 +186,8 @@ class BackgroundPanel(QWidget):
                 data, idx, bg_type, panel=self,
                 logging_manager=self.app.logging_manager,
                 target_hwnd=self._target_hwnd,
-                parent=self.window(),
             )
-            self._edit_window.exec()
-            self._edit_window = None
+            self._edit_window.show()
 
     def _on_edit_window_closed(self, idx, editor):
         if 0 <= idx < len(self.groups_data):
@@ -321,7 +322,7 @@ class BackgroundGroupWidget(QFrame):
         detect_card = ConfigCard("🎯", "检测")
         if monitor_type == "ocr":
             self.keywords_input = QLineEdit()
-            self.keywords_input.setPlaceholderText("多个关键词用 | 分隔")
+            self.keywords_input.setPlaceholderText("多个关键词用 , 分隔")
             detect_card.add_row("关键词", self.keywords_input, stretch=1)
             self.lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"], width=100)
             detect_card.add_segments_row(
@@ -440,11 +441,14 @@ class BackgroundGroupWidget(QFrame):
             except (ValueError, TypeError):
                 pass
             ref = cfg.get("reference_image", "")
-            if ref and os.path.exists(ref):
+            if isinstance(ref, str) and ref and os.path.exists(ref):
                 pixmap = QPixmap(ref)
                 if not pixmap.isNull():
                     self.template_pixmap = pixmap
                     self.template_picker.set_pixmap(pixmap)
+            elif hasattr(ref, 'isNull') and ref and not ref.isNull():
+                self.template_pixmap = ref
+                self.template_picker.set_pixmap(ref)
         elif self.monitor_type == "color":
             tc = cfg.get("target_color")
             if tc and len(tc) == 3:
@@ -499,8 +503,11 @@ class BackgroundGroupWidget(QFrame):
             cfg["language"] = ConfigVar(self.lang_combo.currentText())
         elif self.monitor_type == "image":
             cfg["threshold"] = ConfigVar(str(self.threshold_spin.value()))
-            cfg["reference_image"] = getattr(self, 'template_pixmap', None)
-            cfg["template_image"] = getattr(self, 'template_pixmap', None)
+            tm = getattr(self, 'template_pixmap', None)
+            picker = getattr(self, 'template_picker', None)
+            source = picker._manager.source_path() if picker and picker._manager.has_template() else ""
+            cfg["reference_image"] = ConfigVar(source)
+            cfg["template_image"] = tm
         elif self.monitor_type == "color":
             hex_text = self.color_hex.text().strip()
             if hex_text.startswith("#") and len(hex_text) == 7:
@@ -517,18 +524,19 @@ class BackgroundGroupWidget(QFrame):
         return cfg
 
     def _hide_windows(self):
-        from ui.widgets import suspend_group_edit_capture
-        suspend_group_edit_capture(self)
+        from ui.widgets import hide_for_capture
+        hide_for_capture(self)
 
     def _show_windows(self):
-        from ui.widgets import resume_group_edit_capture
-        resume_group_edit_capture(self)
+        from ui.widgets import show_after_capture
+        show_after_capture(self)
 
     def _select_region(self):
         from ui.components.region_overlay import RegionOverlay
-        self._hide_windows()
         self.overlay = RegionOverlay("bg")
         self.overlay.region_selected.connect(self._on_region_selected)
+        self.overlay.closed.connect(self._show_windows)
+        self._hide_windows()
         self.overlay.show()
 
     def _on_region_selected(self, x1, y1, x2, y2):
