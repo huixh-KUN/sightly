@@ -247,8 +247,6 @@ class ImageDetectionManager:
                 return
             group["template_image"] = template
             group["reference_image"] = file_path
-            if "image_path_var" in group:
-                group["image_path_var"].set(os.path.basename(file_path))
             if "image_preview" in group and group["image_preview"]:
                 self._update_image_preview(group, file_path)
         except Exception as e:

@@ -146,8 +146,6 @@ class ColorRecognitionManager:
         def on_color_selected(color):
             r, g, b = color
             self.app.target_color = color
-            if hasattr(self.app, 'color_var'):
-                self.app.color_var.set(f"RGB({r}, {g}, {b})")
             if hasattr(self.app, 'color_display'):
                 try:
                     color_hex = f"#{r:02x}{g:02x}{b:02x}"

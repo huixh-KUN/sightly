@@ -67,8 +67,6 @@ def _on_region_complete(app, selection_type, region_index, x1, y1, x2, y2):
             groups = getattr(app, 'ocr_groups', [])
             if 0 <= idx < len(groups):
                 groups[idx]['region'] = region
-                if 'region_var' in groups[idx]:
-                    groups[idx]['region_var'].set(f"{region[0]},{region[1]},{region[2]},{region[3]}")
                 app.logging_manager.log_message(f"已为识别组{idx+1}选择区域: {region}")
 
     elif selection_type == 'image':
@@ -77,10 +75,6 @@ def _on_region_complete(app, selection_type, region_index, x1, y1, x2, y2):
             groups = getattr(app, 'image_groups', [])
             if 0 <= idx < len(groups):
                 groups[idx]['region'] = region
-                if 'region_var' in groups[idx]:
-                    groups[idx]['region_var'].set(
-                        f"{region[0]},{region[1]} - {region[2]},{region[3]}"
-                    )
                 app.logging_manager.log_message(f"已为检测组{idx+1}选择区域: {region}")
 
     elif selection_type == 'crop':
@@ -112,8 +106,6 @@ def _on_region_complete(app, selection_type, region_index, x1, y1, x2, y2):
         app.logging_manager.log_message(f"已选择颜色识别区域: {region}")
 
     else:
-        if hasattr(app, 'region_var'):
-            app.region_var.set(f"{region[0]},{region[1]},{region[2]},{region[3]}")
         app.logging_manager.log_message(f"已选择区域: {region}")
 
     app.is_selecting = False

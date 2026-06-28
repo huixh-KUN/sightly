@@ -24,7 +24,6 @@ pynput_to_pyautogui_map = {
     'win_r': 'winright',
 }
 
-_SKIP_TOGGLE = object()
 
 def _set_status_text(app, text):
     if hasattr(app, 'status_label') and app.status_label:
@@ -357,20 +356,9 @@ class ScriptExecutor:
                 self.generate_recorded_script()
                 return
 
-            _record_hotkey = _SKIP_TOGGLE
+            _record_hotkey = "f6"
 
             def _get_record_hotkey():
-                nonlocal _record_hotkey
-                if _record_hotkey is _SKIP_TOGGLE:
-                    val = None
-                    if hasattr(self.app, 'record_hotkey_var'):
-                        try:
-                            val = self.app.record_hotkey_var.get()
-                        except Exception:
-                            pass
-                    if not val:
-                        val = "f6"
-                    _record_hotkey = val.lower()
                 return _record_hotkey
 
             def on_key_press(key):
@@ -555,11 +543,4 @@ class ScriptExecutor:
             pass
 
 
-def _get_record_hotkey(app):
-    val = None
-    if hasattr(app, 'record_hotkey_var'):
-        try:
-            val = app.record_hotkey_var.get()
-        except Exception:
-            pass
-    return (val or "f6").lower()
+
