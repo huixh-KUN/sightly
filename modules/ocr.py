@@ -47,7 +47,7 @@ class OCRModule:
 
         has_enabled_group = False
         for group in self.app.ocr_groups:
-            if group["enabled"].get() and safe_group_get(group, "region", None):
+            if group["enabled"] and safe_group_get(group, "region", None):
                 has_enabled_group = True
                 break
 
@@ -60,7 +60,6 @@ class OCRModule:
         self._thread.start()
 
     def stop_monitoring(self):
-        """停止监控"""
         if self._loop and self._loop.is_running():
             for task in asyncio.all_tasks(loop=self._loop):
                 if not task.done():
@@ -82,7 +81,7 @@ class OCRModule:
     async def _async_main(self):
         tasks = []
         for i, group in enumerate(self.app.ocr_groups):
-            if group["enabled"].get() and safe_group_get(group, "region", None):
+            if group["enabled"] and safe_group_get(group, "region", None):
                 t = asyncio.create_task(self._ocr_group_loop(i, group))
                 tasks.append(t)
         if tasks:
@@ -95,24 +94,22 @@ class OCRModule:
         """单个OCR组的异步识别循环"""
         last_hash = None
         frame_count = 0
-        def _get(v, default=None):
-            return v.get() if hasattr(v, 'get') else (v if v is not None else default)
-        cycle = _get(group.get("cycle_enabled"), True)
+        cycle = group.get("cycle_enabled", True)
         if isinstance(cycle, str):
             cycle = cycle.lower() in ("true", "1")
         self.app.logging_manager.debug("OCR",
-            f"识别组{group_index+1} 协程开始: keywords={_get(group.get('keywords',''))}, "
+            f"识别组{group_index+1} 协程开始: keywords={group.get('keywords', '')}, "
             f"循环={'开' if cycle else '关'}")
         try:
             while not (self._loop and self._loop.is_closed()):
                 try:
-                    if not _get(group.get("enabled"), False) or not _get(group.get("region")):
+                    if not group.get("enabled", False) or not group.get("region"):
                         await asyncio.sleep(1)
                         continue
                     try:
-                        group_interval = float(_get(group.get("interval"), 5))
+                        group_interval = float(group.get("interval", 5))
                     except (ValueError, TypeError):
-                        group_interval = 5
+                        group_interval = 5.0
                     if group_interval <= 0:
                         import random
                         group_interval = random.uniform(0.25, 0.3)
@@ -471,9 +468,7 @@ class OCRModule:
     def _play_alarm_if_enabled(self, alarm_enabled, group_index):
         try:
             if alarm_enabled:
-                from core.config import ConfigVar
-                temp_alarm_var = ConfigVar(True)
-                self.app.alarm_module.play_alarm_sound(temp_alarm_var)
+                self.app.alarm_module.play_alarm_sound(True)
         except Exception as e:
             self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 播放报警声音失败 - {str(e)}")
     

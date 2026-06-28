@@ -13,17 +13,8 @@ def select_alarm_sound(app):
         None, "选择全局报警声音", "", filetypes
     )
     if filename:
-        if hasattr(app, 'alarm_sound_path'):
-            try:
-                app.alarm_sound_path.set(filename)
-            except Exception:
-                app.alarm_sound_path = filename
+        app.alarm_sound_path = filename
         app.logging_manager.log_message(f"已选择全局报警声音: {os.path.basename(filename)}")
-        if hasattr(app, 'save_config') and callable(app.save_config):
-            try:
-                app.save_config()
-            except Exception as e:
-                app.logging_manager.error("ALARM", f"保存报警配置失败: {e}")
 
 
 class AlarmModule(QObject):
@@ -80,11 +71,11 @@ class AlarmModule(QObject):
                 return
         elif not alarm_var:
             return
-        sound_file = self.app.alarm_sound_path.get()
+        sound_file = self.app.alarm_sound_path
         if not sound_file or not os.path.exists(sound_file):
             self.app.logging_manager.error("ALARM", "未设置有效的全局报警声音文件")
             return
-        volume = max(0.0, min(1.0, self.app.alarm_volume.get() / 100))
+        volume = max(0.0, min(1.0, self.app.alarm_volume / 100))
         self._play_file(sound_file, volume)
         self.app.logging_manager.log_message("报警声音已播放")
 

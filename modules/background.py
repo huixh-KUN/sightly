@@ -19,7 +19,7 @@ from utils.image import _preprocess_image
 from core.priority_lock import get_module_priority
 from utils.memory import MemoryMonitor
 from core.click_handler import ClickHandler, execute_combo_key
-from core.config import ConfigVar
+
 
 # 虚拟点击 WM_ 消息常量
 WM_MOUSEMOVE = 0x0200
@@ -408,8 +408,7 @@ class BackgroundMonitor:
         # 播放报警声音
         if self.alarm_enabled:
             try:
-                temp_alarm_var = ConfigVar(True)
-                self.app.alarm_module.play_alarm_sound(temp_alarm_var)
+                self.app.alarm_module.play_alarm_sound(True)
             except Exception as e:
                 self.app.logging_manager.error("BG", f"播放报警声音失败: {e}")
         

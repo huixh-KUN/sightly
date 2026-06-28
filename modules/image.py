@@ -9,7 +9,7 @@ import numpy as np
 from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtCore import Qt, QTimer
 
-from core.config import safe_group_get, ConfigVar
+from core.config import safe_group_get
 from core.async_utils import run_in_executor
 
 try:
@@ -204,8 +204,7 @@ class ImageDetection:
 
         if alarm_enabled:
             try:
-                temp_alarm_var = ConfigVar(True)
-                self.app.alarm_module.play_alarm_sound(temp_alarm_var)
+                self.app.alarm_module.play_alarm_sound(True)
             except Exception as e:
                 self.app.logging_manager.error("IMAGE", f"播放报警声音失败: {e}")
 

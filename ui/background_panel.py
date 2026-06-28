@@ -18,7 +18,7 @@ from ui.components import ComboBox
 from ui.components import SwitchButton, CycleControlWidget
 from ui.components import TemplatePicker, KeyCaptureWidget, WindowSelector, ConfigCard
 from ui.components import GroupEditHeader, ValueChip
-from core.config import ConfigVar
+
 
 
 class BackgroundPanel(QWidget):
@@ -207,7 +207,7 @@ class BackgroundPanel(QWidget):
             "window_class": self._window_class,
             "window_process": self._window_process,
             "window_title": self._window_title,
-            "groups": [{k: ConfigVar(v) for k, v in g.items()} for g in self.groups_data],
+            "groups": list(self.groups_data),
         }
 
     def set_config(self, config):
@@ -405,8 +405,7 @@ class BackgroundGroupWidget(QFrame):
         except (ValueError, TypeError):
             pass
         key = cfg.get("key", "")
-        if key:
-            self.key_input.setKey(key)
+        self.key_input.setKey(key)
         self.click_toggle.setChecked(cfg.get("click_enabled", False))
         mode = cfg.get("click_mode", "physical")
         self.click_mode_combo.setCurrentIndex(0 if mode == "physical" else 1)
@@ -470,30 +469,30 @@ class BackgroundGroupWidget(QFrame):
 
         cfg = {
             "name": self.header.title_edit.text(),
-            "enabled": ConfigVar(self._enabled),
+            "enabled": self._enabled,
             "type": self.monitor_type,
             "region": self.region,
             "region_ratio": region_ratio,
-            "key": ConfigVar(self.key_input.key()),
-            "alarm": ConfigVar(self.alarm_toggle.isChecked()),
-            "click_enabled": ConfigVar(self.click_toggle.isChecked()),
-            "click_mode": ConfigVar("physical" if self.click_mode_combo.currentIndex() == 0 else "virtual"),
-            "click_offset": ConfigVar(str(self.offset_spin.value())),
-            "delay_min": ConfigVar("100"),
-            "delay_max": ConfigVar("200"),
-            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
-            "pause": ConfigVar("0"),
-            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
+            "key": self.key_input.key(),
+            "alarm": self.alarm_toggle.isChecked(),
+            "click_enabled": self.click_toggle.isChecked(),
+            "click_mode": "physical" if self.click_mode_combo.currentIndex() == 0 else "virtual",
+            "click_offset": str(self.offset_spin.value()),
+            "delay_min": "100",
+            "delay_max": "200",
+            "interval": str(self.cycle_widget.interval_value()),
+            "pause": "0",
+            "cycle_enabled": self.cycle_widget.is_cycle_enabled(),
         }
         if self.monitor_type == "ocr":
-            cfg["keywords"] = ConfigVar(self.keywords_input.text())
-            cfg["language"] = ConfigVar(self.lang_combo.currentText())
+            cfg["keywords"] = self.keywords_input.text()
+            cfg["language"] = self.lang_combo.currentText()
         elif self.monitor_type == "image":
-            cfg["threshold"] = ConfigVar(str(self.threshold_spin.value()))
+            cfg["threshold"] = str(self.threshold_spin.value())
             tm = getattr(self, 'template_pixmap', None)
             picker = getattr(self, 'template_picker', None)
             source = picker._manager.source_path() if picker and picker._manager.has_template() else ""
-            cfg["reference_image"] = ConfigVar(source)
+            cfg["reference_image"] = source
             cfg["template_image"] = tm
         elif self.monitor_type == "color":
             hex_text = self.color_hex.text().strip()
@@ -507,7 +506,7 @@ class BackgroundGroupWidget(QFrame):
                     cfg["target_color"] = None
             else:
                 cfg["target_color"] = None
-            cfg["tolerance"] = ConfigVar(str(self.tolerance_spin.value()))
+            cfg["tolerance"] = str(self.tolerance_spin.value())
         return cfg
 
     def _hide_windows(self):

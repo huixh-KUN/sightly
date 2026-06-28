@@ -3,62 +3,8 @@ import os
 import datetime
 
 
-
-class ConfigVar:
-    """Mimics tkinter Variable .get()/.set() interface for PySide6 migration.
-    
-    Modules expect self.app.ocr_groups[i]["enabled"].get() — this class
-    provides the same .get()/.set() contract without tkinter dependency.
-    trace_add / trace_remove are no-ops for PySide6 compatibility.
-    """
-    def __init__(self, value=None):
-        self._value = value
-
-    def get(self):
-        return self._value
-
-    def set(self, value):
-        self._value = value
-
-    def trace_add(self, *args, **kwargs):
-        pass
-
-    def trace_remove(self, *args, **kwargs):
-        pass
-
-
-def strip_configvar(obj):
-    """递归去除嵌套 dict/list 中的 ConfigVar 包装，返回纯 JSON 可序列化对象"""
-    if isinstance(obj, dict):
-        return {k: strip_configvar(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [strip_configvar(v) for v in obj]
-    elif isinstance(obj, ConfigVar):
-        v = obj.get()
-        return list(v) if isinstance(v, tuple) else v
-    if isinstance(obj, tuple):
-        return list(obj)
-    if isinstance(obj, (str, int, float, bool)) or obj is None:
-        return obj
-    try:
-        json.dumps(obj)
-        return obj
-    except (TypeError, ValueError):
-        return None
-
-
 def safe_group_get(group, key, default):
-    """Like dict.get(key, default) but avoids evaluating tkinter var constructors.
-    
-    Modules access group config via patterns like:
-        group.get("key", tk.StringVar(value="")).get()
-    This crashes when no tkinter root exists (PySide6 mode).
-    safe_group_get returns the value directly.
-    """
-    if key in group:
-        val = group[key]
-        return val.get() if hasattr(val, 'get') else val
-    return default
+    return group.get(key, default)
 
 class ConfigManager:
     """统一配置管理器类"""
@@ -213,9 +159,7 @@ class ConfigManager:
                     if i < len(self.app.ocr_groups):
                         for key, value in group_config.items():
                             if key in self.app.ocr_groups[i]:
-                                if key == 'enabled':
-                                    self.app.ocr_groups[i][key].set(value)
-                                elif key == 'region' and value is not None:
+                                if key == 'region' and value is not None:
                                     try:
                                         region = tuple(value)
                                         self.app.ocr_groups[i][key] = region
@@ -224,8 +168,7 @@ class ConfigManager:
                                         if hasattr(self.app, 'logging_manager'):
                                             self.app.logging_manager.error("CONFIG", f"配置文件中的OCR区域格式错误: {value}")
                                 else:
-                                    if hasattr(self.app.ocr_groups[i][key], 'set'):
-                                        self.app.ocr_groups[i][key].set(value)
+                                    self.app.ocr_groups[i][key] = value
 
             if len(self.app.ocr_groups) == 0:
                 self.app.ocr.create_group(0)
@@ -246,10 +189,7 @@ class ConfigManager:
                     if i < len(self.app.timed_groups):
                         for key, value in group_config.items():
                             if key in self.app.timed_groups[i]:
-                                if key == 'enabled':
-                                    self.app.timed_groups[i][key].set(value)
-                                elif hasattr(self.app.timed_groups[i][key], 'set'):
-                                    self.app.timed_groups[i][key].set(value)
+                                self.app.timed_groups[i][key] = value
                         
                         pos_x = group_config.get('position_x', 0)
                         pos_y = group_config.get('position_y', 0)
@@ -275,9 +215,7 @@ class ConfigManager:
                     if i < len(self.app.number_regions):
                         for key, value in region_config.items():
                             if key in self.app.number_regions[i]:
-                                if key == 'enabled':
-                                    self.app.number_regions[i][key].set(value)
-                                elif key == 'region' and value is not None:
+                                if key == 'region' and value is not None:
                                     try:
                                         region = tuple(value)
                                         self.app.number_regions[i][key] = region
@@ -285,8 +223,8 @@ class ConfigManager:
                                     except (TypeError, ValueError):
                                         if hasattr(self.app, 'logging_manager'):
                                             self.app.logging_manager.error("CONFIG", f"配置文件中的数字识别区域格式错误: {value}")
-                                elif hasattr(self.app.number_regions[i][key], 'set'):
-                                    self.app.number_regions[i][key].set(value)
+                                else:
+                                    self.app.number_regions[i][key] = value
 
             if len(self.app.number_regions) == 0:
                 self.app.number.create_region(0)
@@ -307,9 +245,7 @@ class ConfigManager:
                     if i < len(self.app.image_groups):
                         for key, value in group_config.items():
                             if key in self.app.image_groups[i]:
-                                if key == 'enabled':
-                                    self.app.image_groups[i][key].set(value)
-                                elif key == 'region' and value is not None:
+                                if key == 'region' and value is not None:
                                     try:
                                         region = tuple(value)
                                         self.app.image_groups[i][key] = region
@@ -320,8 +256,7 @@ class ConfigManager:
                                 elif key == 'reference_image' and value is not None:
                                     self._load_reference_image(i, value)
                                 else:
-                                    if hasattr(self.app.image_groups[i][key], 'set'):
-                                        self.app.image_groups[i][key].set(value)
+                                    self.app.image_groups[i][key] = value
             
             if len(self.app.image_groups) == 0:
                 self.app.image.create_group(0)
@@ -366,9 +301,7 @@ class ConfigManager:
             
             for key, value in group_config.items():
                 if key in group:
-                    if key == 'enabled':
-                        group[key].set(value)
-                    elif key == 'region' and value is not None:
+                    if key == 'region' and value is not None:
                         group['region'] = tuple(value)
                         group['region_var'].set(f"({value[0]}, {value[1]}) - ({value[2]}, {value[3]})")
                     elif key == 'region_ratio' and value is not None:
@@ -382,8 +315,8 @@ class ConfigManager:
                             r, g, b = tuple(value)
                             color_hex = f"#{r:02x}{g:02x}{b:02x}"
                             group['color_display'].setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
-                    elif hasattr(group[key], 'set'):
-                        group[key].set(value)
+                    else:
+                        group[key] = value
             
             if group_type == 'image' and group_config.get('reference_image'):
                 self._load_bg_template_image(group_index, group_config['reference_image'])
@@ -472,18 +405,18 @@ class ConfigManager:
 
         # 加载全局报警声音
         if 'sound' in alarm_config:
-            self.app.alarm_sound_path.set(alarm_config['sound'])
+            self.app.alarm_sound_path = alarm_config['sound']
 
         # 加载报警音量
         if 'volume' in alarm_config:
-            self.app.alarm_volume.set(alarm_config['volume'])
-            self.app.alarm_volume_str.set(str(alarm_config['volume']))
+            self.app.alarm_volume = alarm_config['volume']
+            self.app.alarm_volume_str = str(alarm_config['volume'])
 
         # 加载各模块报警开关状态
         for module in ["ocr", "timed", "number", "image"]:
             module_config = alarm_config.get(module, {})
             if 'enabled' in module_config:
-                self.app.alarm_enabled[module].set(module_config['enabled'])
+                self.app.alarm_enabled[module] = module_config['enabled']
     
     def load_shortcuts_config(self, config):
         """加载快捷键配置"""
@@ -610,16 +543,16 @@ class ConfigManager:
         timed_groups_config = []
         for group in self.app.timed_groups:
             timed_groups_config.append({
-                'enabled': group['enabled'].get(),
-                'interval': group['interval'].get(),
-                'key': group['key'].get(),
-                'delay_min': group['delay_min'].get(),
-                'delay_max': group['delay_max'].get(),
-                'alarm': group['alarm'].get(),
-                'click_enabled': group['click_enabled'].get(),
+                'enabled': group['enabled'],
+                'interval': group['interval'],
+                'key': group['key'],
+                'delay_min': group['delay_min'],
+                'delay_max': group['delay_max'],
+                'alarm': group['alarm'],
+                'click_enabled': group['click_enabled'],
                 'click_offset': safe_group_get(group, 'click_offset', '0'),
-                'position_x': group['position_x'].get(),
-                'position_y': group['position_y'].get(),
+                'position_x': group['position_x'],
+                'position_y': group['position_y'],
                 'position': group['position_var'].get()
             })
         return timed_groups_config
@@ -629,14 +562,14 @@ class ConfigManager:
         number_regions_config = []
         for region_config in self.app.number_regions:
             number_regions_config.append({
-                'enabled': region_config['enabled'].get(),
+                'enabled': region_config['enabled'],
                 'region': list(region_config['region']) if region_config['region'] else None,
-                'threshold': region_config['threshold'].get(),
-                'confidence_threshold': region_config.get('confidence_threshold', ConfigVar('0.3')).get(),
-                'key': region_config['key'].get(),
-                'delay_min': region_config['delay_min'].get(),
-                'delay_max': region_config['delay_max'].get(),
-                'alarm': region_config['alarm'].get()
+                'threshold': region_config['threshold'],
+                'confidence_threshold': region_config.get('confidence_threshold', '0.3'),
+                'key': region_config['key'],
+                'delay_min': region_config['delay_min'],
+                'delay_max': region_config['delay_max'],
+                'alarm': region_config['alarm']
             })
         return number_regions_config
     
@@ -645,17 +578,17 @@ class ConfigManager:
         ocr_groups_config = []
         for group in self.app.ocr_groups:
             ocr_groups_config.append({
-                'enabled': group['enabled'].get(),
+                'enabled': group['enabled'],
                 'region': list(group['region']) if group['region'] else None,
-                'interval': group['interval'].get(),
-                'pause': group['pause'].get(),
-                'key': group['key'].get(),
-                'delay_min': group['delay_min'].get(),
-                'delay_max': group['delay_max'].get(),
-                'alarm': group['alarm'].get(),
-                'keywords': group['keywords'].get(),
-                'language': group['language'].get(),
-                'click': group['click'].get(),
+                'interval': group['interval'],
+                'pause': group['pause'],
+                'key': group['key'],
+                'delay_min': group['delay_min'],
+                'delay_max': group['delay_max'],
+                'alarm': group['alarm'],
+                'keywords': group['keywords'],
+                'language': group['language'],
+                'click': group['click'],
                 'click_offset': safe_group_get(group, 'click_offset', '0')
             })
         return {
@@ -667,17 +600,17 @@ class ConfigManager:
         image_groups_config = []
         for group in self.app.image_groups:
             image_groups_config.append({
-                'enabled': group['enabled'].get(),
+                'enabled': group['enabled'],
                 'region': list(group['region']) if group['region'] else None,
                 'reference_image': group.get('reference_image'),
-                'threshold': group['threshold'].get(),
-                'interval': group['interval'].get(),
-                'pause': group['pause'].get(),
-                'key': group['key'].get(),
-                'delay_min': group['delay_min'].get(),
-                'delay_max': group['delay_max'].get(),
-                'alarm': group['alarm'].get(),
-                'click': group['click'].get(),
+                'threshold': group['threshold'],
+                'interval': group['interval'],
+                'pause': group['pause'],
+                'key': group['key'],
+                'delay_min': group['delay_min'],
+                'delay_max': group['delay_max'],
+                'alarm': group['alarm'],
+                'click': group['click'],
                 'click_offset': safe_group_get(group, 'click_offset', '0')
             })
         return {
@@ -756,19 +689,19 @@ class ConfigManager:
             dict: 报警功能配置字典
         """
         return {
-            'sound': self.app.alarm_sound_path.get(),
-            'volume': self.app.alarm_volume.get(),
+            'sound': self.app.alarm_sound_path,
+            'volume': self.app.alarm_volume,
             'ocr': {
-                'enabled': self.app.alarm_enabled['ocr'].get()
+                'enabled': self.app.alarm_enabled['ocr']
             },
             'timed': {
-                'enabled': self.app.alarm_enabled['timed'].get()
+                'enabled': self.app.alarm_enabled['timed']
             },
             'number': {
-                'enabled': self.app.alarm_enabled['number'].get()
+                'enabled': self.app.alarm_enabled['number']
             },
             'image': {
-                'enabled': self.app.alarm_enabled['image'].get()
+                'enabled': self.app.alarm_enabled['image']
             }
         }
     

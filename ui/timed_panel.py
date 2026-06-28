@@ -15,7 +15,7 @@ from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
 from ui.components import GroupEditHeader, ValueChip
 from ui.components.form_rows import spin_range_row
-from core.config import ConfigVar
+
 
 
 class TimedPanel(QWidget):
@@ -155,7 +155,7 @@ class TimedPanel(QWidget):
         self._view_only = not enabled
 
     def collect_config(self):
-        return [{k: ConfigVar(v) for k, v in g.items()} for g in self.groups_data]
+        return list(self.groups_data)
 
     def set_config(self, config_list):
         for item in self.list_items:
@@ -259,8 +259,7 @@ class TimedGroupWidget(QFrame):
         if self._pos_x or self._pos_y:
             self.pos_chip.set_text(f"({self._pos_x}, {self._pos_y})", accent=True)
         key = cfg.get("key", "")
-        if key:
-            self.key_input.setKey(key)
+        self.key_input.setKey(key)
         self.click_toggle.setChecked(cfg.get("click_enabled", False))
         self.alarm_toggle.setChecked(cfg.get("alarm", False))
 
@@ -271,18 +270,18 @@ class TimedGroupWidget(QFrame):
     def collect_config(self):
         return {
             "name": self.header.title_edit.text(),
-            "enabled": ConfigVar(self._enabled),
-            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
-            "pause": ConfigVar("0"),
-            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
-            "key": ConfigVar(self.key_input.key()),
-            "delay_min": ConfigVar(str(self.delay_min_spin.value())),
-            "delay_max": ConfigVar(str(self.delay_max_spin.value())),
-            "alarm": ConfigVar(self.alarm_toggle.isChecked()),
-            "click_enabled": ConfigVar(self.click_toggle.isChecked()),
-            "click_offset": ConfigVar(str(self.offset_spin.value())),
-            "position_x": ConfigVar(str(self._pos_x)),
-            "position_y": ConfigVar(str(self._pos_y)),
+            "enabled": self._enabled,
+            "interval": str(self.cycle_widget.interval_value()),
+            "pause": "0",
+            "cycle_enabled": self.cycle_widget.is_cycle_enabled(),
+            "key": self.key_input.key(),
+            "delay_min": str(self.delay_min_spin.value()),
+            "delay_max": str(self.delay_max_spin.value()),
+            "alarm": self.alarm_toggle.isChecked(),
+            "click_enabled": self.click_toggle.isChecked(),
+            "click_offset": str(self.offset_spin.value()),
+            "position_x": str(self._pos_x),
+            "position_y": str(self._pos_y),
             "position": f"{self._pos_x},{self._pos_y}",
         }
 

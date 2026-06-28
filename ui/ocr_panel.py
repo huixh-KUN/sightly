@@ -16,7 +16,7 @@ from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
 from ui.components import GroupEditHeader, ValueChip
 from ui.components.form_rows import spin_range_row
-from core.config import ConfigVar
+
 
 
 class OCRPanel(QWidget):
@@ -152,7 +152,7 @@ class OCRPanel(QWidget):
         self._view_only = not enabled
 
     def collect_config(self):
-        return [{k: ConfigVar(v) for k, v in g.items()} for g in self.groups_data]
+        return list(self.groups_data)
 
     def set_config(self, config_list):
         for item in self.list_items:
@@ -245,19 +245,19 @@ class OCRGroupWidget(QFrame):
     def collect_config(self):
         return {
             "name": self.header.title_edit.text(),
-            "enabled": ConfigVar(self._enabled),
+            "enabled": self._enabled,
             "region": self.region,
-            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
-            "pause": ConfigVar("0"),
-            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
-            "key": ConfigVar(self.key_input.key()),
-            "delay_min": ConfigVar(str(self.delay_min_spin.value())),
-            "delay_max": ConfigVar(str(self.delay_max_spin.value())),
-            "alarm": ConfigVar(self.alarm_toggle.isChecked()),
-            "click": ConfigVar(self.click_toggle.isChecked()),
-            "click_offset": ConfigVar(str(self.offset_spin.value())),
-            "keywords": ConfigVar(self.keywords_input.text()),
-            "language": ConfigVar(self.lang_combo.currentText()),
+            "interval": str(self.cycle_widget.interval_value()),
+            "pause": "0",
+            "cycle_enabled": self.cycle_widget.is_cycle_enabled(),
+            "key": self.key_input.key(),
+            "delay_min": str(self.delay_min_spin.value()),
+            "delay_max": str(self.delay_max_spin.value()),
+            "alarm": self.alarm_toggle.isChecked(),
+            "click": self.click_toggle.isChecked(),
+            "click_offset": str(self.offset_spin.value()),
+            "keywords": self.keywords_input.text(),
+            "language": self.lang_combo.currentText(),
         }
 
     def set_config(self, cfg):
@@ -282,8 +282,7 @@ class OCRGroupWidget(QFrame):
         except (ValueError, TypeError):
             pass
         key = cfg.get("key", "")
-        if key:
-            self.key_input.setKey(key)
+        self.key_input.setKey(key)
         self.keywords_input.setText(cfg.get("keywords", ""))
         lang = cfg.get("language", "简体中文")
         idx = self.lang_combo.findText(lang)

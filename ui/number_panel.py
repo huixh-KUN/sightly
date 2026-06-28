@@ -15,7 +15,7 @@ from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
 from ui.components import GroupEditHeader, ValueChip
 from ui.components.form_rows import spin_range_row
-from core.config import ConfigVar
+
 
 
 class NumberPanel(QWidget):
@@ -147,7 +147,7 @@ class NumberPanel(QWidget):
         self._view_only = not enabled
 
     def collect_config(self):
-        return [{k: ConfigVar(v) for k, v in g.items()} for g in self.groups_data]
+        return list(self.groups_data)
 
     def set_config(self, config_list):
         for item in self.list_items:
@@ -255,8 +255,7 @@ class NumberGroupWidget(QFrame):
         except (ValueError, TypeError):
             pass
         key = cfg.get("key", "")
-        if key:
-            self.key_input.setKey(key)
+        self.key_input.setKey(key)
         self.alarm_toggle.setChecked(cfg.get("alarm", False))
 
     def set_title(self, index):
@@ -266,17 +265,17 @@ class NumberGroupWidget(QFrame):
     def collect_config(self):
         return {
             "name": self.header.title_edit.text(),
-            "enabled": ConfigVar(self._enabled),
+            "enabled": self._enabled,
             "region": self.region,
-            "threshold": ConfigVar(str(self.threshold_spin.value())),
-            "confidence_threshold": ConfigVar(str(self.confidence_spin.value())),
-            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
-            "pause": ConfigVar("0"),
-            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
-            "key": ConfigVar(self.key_input.key()),
-            "delay_min": ConfigVar(str(self.delay_min_spin.value())),
-            "delay_max": ConfigVar(str(self.delay_max_spin.value())),
-            "alarm": ConfigVar(self.alarm_toggle.isChecked()),
+            "threshold": str(self.threshold_spin.value()),
+            "confidence_threshold": str(self.confidence_spin.value()),
+            "interval": str(self.cycle_widget.interval_value()),
+            "pause": "0",
+            "cycle_enabled": self.cycle_widget.is_cycle_enabled(),
+            "key": self.key_input.key(),
+            "delay_min": str(self.delay_min_spin.value()),
+            "delay_max": str(self.delay_max_spin.value()),
+            "alarm": self.alarm_toggle.isChecked(),
         }
 
     def _select_region(self):

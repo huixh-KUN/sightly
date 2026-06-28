@@ -48,27 +48,25 @@ class NumberModule:
         groups = []
         regions = getattr(self.app, 'number_regions', [])
         for i, rc in enumerate(regions):
-            if not rc["enabled"].get():
+            if not rc["enabled"]:
                 continue
             region = rc["region"]
-            region = region.get() if hasattr(region, 'get') else region
             if not region:
                 continue
             try:
-                threshold = int(rc["threshold"].get())
+                threshold = int(rc["threshold"])
             except (ValueError, TypeError):
                 threshold = 500
             try:
-                conf = rc.get("confidence_threshold")
-                confidence_threshold = float(conf.get())
-            except (ValueError, TypeError, KeyError, AttributeError):
+                confidence_threshold = float(rc.get("confidence_threshold", "0.3"))
+            except (ValueError, TypeError):
                 confidence_threshold = 0.3
             try:
-                interval = float(rc["interval"].get())
+                interval = float(rc["interval"])
             except (ValueError, TypeError):
                 interval = 0
             try:
-                cycle = rc["cycle_enabled"].get()
+                cycle = rc["cycle_enabled"]
                 if isinstance(cycle, str):
                     cycle = cycle.lower() in ("true", "1")
             except (KeyError, AttributeError):
@@ -80,10 +78,10 @@ class NumberModule:
                 "confidence_threshold": confidence_threshold,
                 "interval": interval,
                 "cycle_enabled": bool(cycle),
-                "key": rc["key"].get(),
-                "alarm": rc["alarm"].get(),
-                "delay_min": rc["delay_min"].get(),
-                "delay_max": rc["delay_max"].get(),
+                "key": rc["key"],
+                "alarm": rc["alarm"],
+                "delay_min": rc["delay_min"],
+                "delay_max": rc["delay_max"],
             })
         if not groups:
             return
@@ -202,7 +200,7 @@ class NumberModule:
         if index >= len(regions):
             return False
         try:
-            return bool(regions[index]["enabled"].get())
+            return bool(regions[index]["enabled"])
         except Exception:
             return False
 
@@ -210,7 +208,7 @@ class NumberModule:
         regions = getattr(self.app, 'number_regions', [])
         if index < len(regions):
             try:
-                return regions[index]["alarm"].get()
+                return regions[index]["alarm"]
             except Exception:
                 pass
         return False
@@ -240,7 +238,7 @@ class NumberModule:
         if not region:
             return {"matched": False, "executed": False, "detail": "未设置识别区域"}
         try:
-            confidence = float(rc.get("confidence_threshold", "0.3").get())
+            confidence = float(rc.get("confidence_threshold", "0.3"))
         except Exception:
             confidence = 0.3
         screenshot = self.take_screenshot(region)
@@ -251,7 +249,7 @@ class NumberModule:
             number = NumberRecognizer.parse_number(text, self._number_cache)
             if number is not None:
                 try:
-                    threshold = int(rc["threshold"].get())
+                    threshold = int(rc["threshold"])
                 except (ValueError, TypeError, KeyError, AttributeError):
                     threshold = 500
                 will_trigger = number < threshold

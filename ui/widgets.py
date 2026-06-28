@@ -429,7 +429,22 @@ class GroupEditWindow(QDialog):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         scroll.setFrameShape(QFrame.NoFrame)
         scroll.setWidget(self._editor)
-        layout.addWidget(scroll)
+        layout.addWidget(scroll, 1)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        btn_row.addStretch()
+
+        self._save_btn = QPushButton("保存")
+        self._save_btn.setObjectName("primary")
+        self._save_btn.clicked.connect(self._on_save)
+        btn_row.addWidget(self._save_btn)
+
+        cancel_btn = QPushButton("取消")
+        cancel_btn.clicked.connect(self.close)
+        btn_row.addWidget(cancel_btn)
+
+        layout.addLayout(btn_row)
 
         self._is_running = False
 
@@ -464,9 +479,23 @@ class GroupEditWindow(QDialog):
         self.raise_()
         self.activateWindow()
 
+    def _on_save(self):
+        cfg = self._editor.collect_config()
+        if self._panel:
+            if 0 <= self._group_index < len(self._panel.groups_data):
+                plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+                plain["enabled"] = self._panel.groups_data[self._group_index].get("enabled", True)
+                self._panel.groups_data[self._group_index] = plain
+                if self._group_index < len(self._panel.list_items):
+                    self._panel.list_items[self._group_index].set_data(plain)
+            self._panel._edit_window = None
+            if hasattr(self._panel, 'app') and hasattr(self._panel.app, 'save_config'):
+                self._panel.app.save_config()
+        self.close()
+
     def closeEvent(self, event):
-        if self._panel and hasattr(self._panel, '_on_edit_window_closed'):
-            self._panel._on_edit_window_closed(self._group_index, self._editor)
+        if self._panel:
+            self._panel._edit_window = None
         super().closeEvent(event)
 
 

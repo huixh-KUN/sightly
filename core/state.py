@@ -6,6 +6,16 @@ from PySide6.QtCore import QObject, Signal
 from core.workspace import WorkspaceManager
 
 
+def _tuples_to_lists(obj):
+    if isinstance(obj, dict):
+        return {k: _tuples_to_lists(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_tuples_to_lists(v) for v in obj]
+    elif isinstance(obj, tuple):
+        return list(obj)
+    return obj
+
+
 class AppState(QObject):
     """集中应用状态管理器。
 
@@ -233,8 +243,8 @@ class AppState(QObject):
         config["module_enabled"] = self.collect_module_enabled_config()
         if extra_config:
             config.update(extra_config)
-        from core.config import strip_configvar
-        config = strip_configvar(config)
+        # 转换 tuple 为 list（JSON 序列化需要）
+        config = _tuples_to_lists(config)
         self._log("STATE", f"写入配置: {json.dumps(config, ensure_ascii=False)[:200]}")
         return self._wm.save(self._current, config)
 

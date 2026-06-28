@@ -121,6 +121,3 @@ def _on_region_complete(app, selection_type, region_index, x1, y1, x2, y2):
         app.logging_manager.log_message(f"已选择区域: {region}")
 
     app.is_selecting = False
-
-    if hasattr(app, 'config_manager') and app.config_manager:
-        app.config_manager.defer_save_config()

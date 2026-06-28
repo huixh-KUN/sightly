@@ -6,15 +6,11 @@ from typing import Optional
 
 from core.priority_lock import get_module_priority
 from core.click_handler import ClickHandler
-from core.config import ConfigVar
+
 from core.async_utils import run_in_executor
 
 
-def _get_val(v, default=None):
-    """兼容 ConfigVar 和纯类型，安全取值"""
-    if hasattr(v, 'get'):
-        return v.get()
-    return v if v is not None else default
+
 
 
 class TimedModule:
@@ -36,16 +32,16 @@ class TimedModule:
         app_groups = getattr(self.app, 'timed_groups', [])
         self.app.logging_manager.debug("TIMED", f"开始定时任务: 共 {len(app_groups)} 组")
         for i, g in enumerate(app_groups):
-            enabled = _get_val(g["enabled"])
+            enabled = g["enabled"]
             self.app.logging_manager.debug("TIMED", f"  组{i+1}: enabled={enabled}")
             if not enabled:
                 continue
             try:
-                interval = int(_get_val(g["interval"]))
+                interval = int(g["interval"])
             except (ValueError, TypeError):
                 interval = 10
             try:
-                cycle = _get_val(g.get("cycle_enabled", "true"))
+                cycle = g.get("cycle_enabled", "true")
                 if isinstance(cycle, str):
                     cycle = cycle.lower() in ("true", "1")
             except (ValueError, TypeError):
@@ -54,14 +50,14 @@ class TimedModule:
                 "index": i,
                 "interval": interval,
                 "cycle_enabled": bool(cycle),
-                "key": _get_val(g["key"]),
-                "alarm": _get_val(g["alarm"]),
-                "click_enabled": _get_val(g["click_enabled"]),
-                "pos_x": int(_get_val(g["position_x"], 0)),
-                "pos_y": int(_get_val(g["position_y"], 0)),
-                "click_offset": int(_get_val(g.get("click_offset"), 0)),
-                "delay_min": int(_get_val(g["delay_min"], 100)),
-                "delay_max": int(_get_val(g["delay_max"], 200)),
+                "key": g["key"],
+                "alarm": g["alarm"],
+                "click_enabled": g["click_enabled"],
+                "pos_x": int(g.get("position_x", 0)),
+                "pos_y": int(g.get("position_y", 0)),
+                "click_offset": int(g.get("click_offset", 0)),
+                "delay_min": int(g.get("delay_min", 100)),
+                "delay_max": int(g.get("delay_max", 200)),
             }
             self.app.logging_manager.debug("TIMED",
                 f"  组{i+1} 已启用: interval={interval}s, key={gd['key']!r}, "
@@ -145,7 +141,7 @@ class TimedModule:
         if index >= len(groups):
             return False
         try:
-            return bool(groups[index]["enabled"].get())
+            return bool(groups[index]["enabled"])
         except Exception:
             return False
 
@@ -178,7 +174,7 @@ class TimedModule:
         result_parts = []
         if alarm:
             try:
-                self.app.alarm_module.play_alarm_sound(ConfigVar(True))
+                self.app.alarm_module.play_alarm_sound(True)
                 result_parts.append("报警")
             except Exception as e:
                 self.app.logging_manager.error("TIMED", f"测试报警失败: {e}")
@@ -284,11 +280,6 @@ class TimedModule:
             group["position_y"].set(pos_y)
             if "position_var" in group:
                 group["position_var"].set(f"{pos_x},{pos_y}")
-            if hasattr(self.app, 'save_config') and callable(self.app.save_config):
-                try:
-                    self.app.save_config()
-                except Exception as e:
-                    self.app.logging_manager.error("TIMED", f"保存定时配置失败: {e}")
         if hasattr(self, '_pos_callback') and self._pos_callback:
             try:
                 self._pos_callback(pos_x, pos_y)

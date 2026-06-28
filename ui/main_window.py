@@ -13,7 +13,7 @@ from PySide6.QtGui import QIcon, QFont, QShortcut, QKeySequence
 from core.state import AppState
 from ui.theme import ThemeManager
 from ui.components import ThemeSwitcher
-from core.config import ConfigManager, strip_configvar, ConfigVar
+from core.config import ConfigManager
 from core.logging import LoggingManager
 from input.keyboard import setup_shortcuts
 from ui.widgets import StatusIndicator, NavButton, Divider
@@ -56,14 +56,14 @@ class MainWindow(QMainWindow):
 
         self.app_state = AppState(self)
 
-        self.alarm_sound_path = ConfigVar("")
-        self.alarm_volume = ConfigVar(70)
-        self.alarm_volume_str = ConfigVar("70")
+        self.alarm_sound_path = ""
+        self.alarm_volume = 70
+        self.alarm_volume_str = "70"
         self.alarm_enabled = {
-            "ocr": ConfigVar(False),
-            "timed": ConfigVar(False),
-            "number": ConfigVar(False),
-            "image": ConfigVar(False),
+            "ocr": False,
+            "timed": False,
+            "number": False,
+            "image": False,
         }
 
         self._init_backend()
@@ -456,11 +456,10 @@ class MainWindow(QMainWindow):
     def _on_settings_config_changed(self, config):
         alarm = config.get("alarm", {})
         if alarm.get("sound_path"):
-            self.alarm_sound_path.set(alarm["sound_path"])
+            self.alarm_sound_path = alarm["sound_path"]
         if "volume" in alarm:
-            self.alarm_volume.set(alarm["volume"])
-            self.alarm_volume_str.set(str(alarm["volume"]))
-        self.save_config()
+            self.alarm_volume = alarm["volume"]
+            self.alarm_volume_str = str(alarm["volume"])
 
     def _on_settings_shortcuts_changed(self, start_key, stop_key):
         if start_key:
@@ -582,9 +581,9 @@ class MainWindow(QMainWindow):
         self._register_shortcuts()
         alarm = settings_cfg.get("alarm", {})
         if alarm.get("sound_path"):
-            self.alarm_sound_path.set(alarm["sound_path"])
+            self.alarm_sound_path = alarm["sound_path"]
         if "volume" in alarm:
-            self.alarm_volume.set(alarm["volume"])
+            self.alarm_volume = alarm["volume"]
             self.alarm_volume_str.set(str(alarm["volume"]))
         self.logging_manager.debug("CONFIG", "设置已应用")
 
@@ -596,7 +595,6 @@ class MainWindow(QMainWindow):
                 extra_config[panel_id] = panel.collect_config()
                 self.logging_manager.debug("CONFIG", f"  面板 {panel_id}: {len(extra_config[panel_id])} 项")
         self._save_template_images(extra_config)
-        extra_config = strip_configvar(extra_config)
         self.app_state.save_current(extra_config)
         self.logging_manager.debug("CONFIG", f"模块启用状态: {self.app_state._module_states}")
         self.logging_manager.debug("CONFIG", "配置保存完成")
