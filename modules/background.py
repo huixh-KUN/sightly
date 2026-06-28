@@ -772,6 +772,7 @@ class BackgroundManager:
 
         if self._async_thread and self._async_thread.is_alive():
             self._async_thread.join(timeout=3)
+        self.monitors.clear()
 
     def get_window_info(self) -> Optional[Dict[str, Any]]:
         """获取目标窗口信息"""

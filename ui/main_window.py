@@ -258,6 +258,7 @@ class MainWindow(QMainWindow):
         self.app_state.all_stop_requested.connect(self._on_stop_all)
         self.app_state.record_hotkey_triggered.connect(self._on_record_hotkey)
         self.app_state.config_loaded.connect(self._on_config_loaded)
+        self.app_state.workspace_changed.connect(self._on_workspace_changed)
         bg = self.panels.get('background')
         if bg:
             bg.window_selected.connect(self._on_bg_window_selected)
@@ -551,6 +552,13 @@ class MainWindow(QMainWindow):
             self.logging_manager.log_message("配置已加载")
         else:
             self.logging_manager.debug("CONFIG", "无保存的配置")
+        self._sync_panel_configs()
+
+    def _on_workspace_changed(self, name):
+        self.logging_manager.debug("STATE", f"工作空间切换到: {name!r}")
+        if self._is_running:
+            self.logging_manager.log_message("切换工作空间，自动停止所有模块")
+            self._on_stop_all()
 
     def _on_theme_changed(self, mode):
         ThemeManager.switch_to(mode)
