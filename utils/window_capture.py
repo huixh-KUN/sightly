@@ -361,20 +361,24 @@ def find_window_by_class_and_process(class_name: str, process_name: str) -> Opti
     candidates = []
 
     def enum_callback(hwnd, _):
-        if not win32gui.IsWindowVisible(hwnd):
-            return True
+        result = True
+        try:
+            if not win32gui.IsWindowVisible(hwnd):
+                return True
 
-        cls = win32gui.GetClassName(hwnd)
-        if cls and cls.lower() == class_name.lower():
-            if process_name:
-                proc = get_window_process_name(hwnd)
-                if proc and proc.lower() == process_name.lower():
+            cls = win32gui.GetClassName(hwnd)
+            if cls and cls.lower() == class_name.lower():
+                if process_name:
+                    proc = get_window_process_name(hwnd)
+                    if proc and proc.lower() == process_name.lower():
+                        candidates.append(hwnd)
+                        result = False
+                else:
                     candidates.append(hwnd)
-                    return False  # 找到即停
-            else:
-                candidates.append(hwnd)
-                return False
-        return True
+                    result = False
+        finally:
+            ctypes.windll.kernel32.SetLastError(0)
+        return result
 
     try:
         win32gui.EnumWindows(enum_callback, None)
