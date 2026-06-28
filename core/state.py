@@ -55,8 +55,6 @@ class AppState(QObject):
     def _log(self, tag, message):
         if self._logger:
             self._logger.debug(tag, message)
-        else:
-            print(f"[{tag}] {message}")
 
     # ========== 工作空间 ==========
 

@@ -28,8 +28,6 @@ class KeyCaptureWidget(QWidget):
     def _debug(self, msg):
         if self._log:
             self._log.debug("KEYCAPTURE", msg)
-        else:
-            print(f"[KEYCAPTURE] {msg}")
 
     def _setup_ui(self):
         self.setObjectName("keyCaptureRoot")

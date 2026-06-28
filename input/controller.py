@@ -131,11 +131,8 @@ class InputController:
     
     def _log(self, message: str):
         """日志输出"""
-        if self.app:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(message)
-            else:
-                print(message)
+        if self.app and hasattr(self.app, 'logging_manager'):
+            self.app.logging_manager.log_message(message)
     
     @staticmethod
     def handle_permission_errors(func):

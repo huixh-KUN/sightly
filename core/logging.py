@@ -34,7 +34,7 @@ class LoggingManager:
                 with open(self._debug_log_path, 'a', encoding='utf-8') as f:
                     f.write(debug_entry)
         except Exception as exc:
-            print(f"[LOGGING] 写入调试日志失败: {exc}")
+            pass
 
     def error(self, tag, message):
         """记录错误日志（写入 error 日志文件 + 主日志文件 + GUI 红色显示）"""
@@ -45,12 +45,12 @@ class LoggingManager:
                 with open(self._error_log_path, 'a', encoding='utf-8') as f:
                     f.write(entry)
         except Exception as exc:
-            print(f"[LOGGING] 写入错误日志失败: {exc}")
+            pass
         try:
             with open(self.app.log_file_path, 'a', encoding='utf-8') as f:
                 f.write(entry)
         except Exception as exc:
-            print(f"[LOGGING] 写入主日志失败: {exc}")
+            pass
         if self.error_callback:
             QTimer.singleShot(0, lambda: self.error_callback(entry.rstrip('\n')))
 
@@ -67,7 +67,7 @@ class LoggingManager:
             with open(self.app.log_file_path, 'a', encoding='utf-8') as f:
                 f.write(log_entry)
         except Exception as e:
-            print(f"写入日志文件失败: {str(e)}")
+            pass
 
         with self._update_lock:
             self._log_buffer.append(log_entry)

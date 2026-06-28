@@ -161,6 +161,7 @@ def capture_window(hwnd: int) -> Optional[Image.Image]:
     mfcDC = None
     saveDC = None
     saveBitMap = None
+    old_bitmap = None
     
     try:
         rect = win32gui.GetWindowRect(hwnd)
@@ -185,7 +186,7 @@ def capture_window(hwnd: int) -> Optional[Image.Image]:
         
         saveBitMap = win32ui.CreateBitmap()
         saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
-        saveDC.SelectObject(saveBitMap)
+        old_bitmap = saveDC.SelectObject(saveBitMap)
         
         result = ctypes.windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 2)
         if not result:
@@ -206,29 +207,36 @@ def capture_window(hwnd: int) -> Optional[Image.Image]:
         return None
     
     finally:
+        # 先恢复原对象，保证 DeleteObject 成功
+        if saveDC and old_bitmap:
+            try:
+                saveDC.SelectObject(old_bitmap)
+            except Exception:
+                pass
+        
         try:
             if saveBitMap:
                 win32gui.DeleteObject(saveBitMap.GetHandle())
-        except Exception as e:
-            logging.getLogger(__name__).error(f"释放位图资源失败: {e}")
+        except Exception:
+            pass
         
         try:
             if saveDC:
                 saveDC.DeleteDC()
-        except Exception as e:
-            logging.getLogger(__name__).error(f"释放设备上下文失败: {e}")
+        except Exception:
+            pass
         
         try:
             if mfcDC:
                 mfcDC.DeleteDC()
-        except Exception as e:
-            logging.getLogger(__name__).error(f"释放MFC设备上下文失败: {e}")
+        except Exception:
+            pass
         
         try:
             if hwndDC:
                 win32gui.ReleaseDC(hwnd, hwndDC)
-        except Exception as e:
-            logging.getLogger(__name__).error(f"释放窗口设备上下文失败: {e}")
+        except Exception:
+            pass
 
 
 def capture_window_region(hwnd: int, region: tuple) -> Optional[Image.Image]:

@@ -38,11 +38,8 @@ class PyAutoGUIInput(BaseInputController):
     
     def _log(self, message: str):
         """日志输出"""
-        if self.app:
-            if hasattr(self.app, 'logging_manager'):
-                self.app.logging_manager.log_message(message)
-            else:
-                print(message)
+        if self.app and hasattr(self.app, 'logging_manager'):
+            self.app.logging_manager.log_message(message)
     
     def key_down(self, key: str, priority: int = 0) -> bool:
         try:
