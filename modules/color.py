@@ -12,7 +12,7 @@ from PySide6.QtCore import QTimer
 from utils.screenshot import ScreenshotManager
 from utils.recognition import ColorRecognizer
 from core.priority_lock import get_module_priority
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 from utils.memory import MemoryMonitor
 
 
@@ -178,19 +178,8 @@ class ColorRecognitionManager:
         self.color_recognition.start_recognition(target_color, tolerance, interval, commands)
 
         if self.color_recognition.is_running:
-            self._thread = threading.Thread(target=self._run_async, daemon=True)
-            self._thread.start()
+            self._thread, self._loop = create_async_thread(self._async_main)
             _set_status_text(self.app, "颜色识别中...")
-
-    def _run_async(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
 
     async def _async_main(self):
         if self.color_recognition and self.color_recognition.is_running:

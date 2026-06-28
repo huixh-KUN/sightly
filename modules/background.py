@@ -1,10 +1,9 @@
 import asyncio
 import ctypes
-import threading
 import time
 from typing import Optional, Dict, Any
 
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 
 from utils.window_capture import (
     capture_window_region, find_window_by_title,
@@ -744,20 +743,8 @@ class BackgroundManager:
             return 0
 
         # 异步运行阶段（每个模块一个线程 + 事件循环）
-        self._async_thread = threading.Thread(target=self._run_async, daemon=True)
-        self._async_thread.start()
+        self._async_thread, self._loop = create_async_thread(self._async_main)
         return start_count
-
-    def _run_async(self):
-        """后台线程：创建事件循环并运行所有监控组协程"""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
 
     async def _async_main(self):
         """创建所有已启用监控组的协程任务"""

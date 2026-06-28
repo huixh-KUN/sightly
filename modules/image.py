@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtCore import Qt, QTimer
 
 from core.config import safe_group_get
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 
 try:
     import cv2
@@ -341,18 +341,7 @@ class ImageDetectionManager:
         self.app.logging_manager.debug("IMAGE", f"start_all_detection: 启动了 {started} 组")
 
         if self.image_detections:
-            self._thread = threading.Thread(target=self._run_async, daemon=True)
-            self._thread.start()
-
-    def _run_async(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
+            self._thread, self._loop = create_async_thread(self._async_main)
 
     async def _async_main(self):
         tasks = []
