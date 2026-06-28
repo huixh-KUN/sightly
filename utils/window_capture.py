@@ -348,7 +348,8 @@ def get_window_process_name(hwnd: int) -> Optional[str]:
             try:
                 exe_name = ctypes.create_unicode_buffer(260)
                 size = wintypes.DWORD(260)
-                if ctypes.windll.kernel32.GetModuleBaseNameW(handle, None, exe_name, size):
+                psapi = ctypes.windll.psapi
+                if psapi.GetModuleBaseNameW(handle, None, exe_name, size):
                     return exe_name.value
             finally:
                 ctypes.windll.kernel32.CloseHandle(handle)
