@@ -131,27 +131,11 @@ class ColorRecognitionManager:
         self._thread: Optional[threading.Thread] = None
         self.screenshot_manager = ScreenshotManager()
 
-    def select_color_region(self):
-        self.app.logging_manager.log_message("开始选择颜色识别区域...")
-        from utils.region import _start_selection
-        _start_selection(self.app, "color", 0)
-
     def set_region(self, region):
         if not self.color_recognition:
             self.color_recognition = ColorRecognition(self.app)
         self.color_recognition.set_region(region)
         self.app.color_recognition_region = region
-
-    def select_color(self):
-        def on_color_selected(color):
-            r, g, b = color
-            self.app.target_color = color
-            if hasattr(self.app, 'color_display'):
-                try:
-                    color_hex = f"#{r:02x}{g:02x}{b:02x}"
-                    self.app.color_display.setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
-                except Exception as e:
-                    self.app.logging_manager.error("COLOR", f"更新颜色显示失败: {e}")
 
     def start_color_recognition(self):
         if not self.color_recognition:

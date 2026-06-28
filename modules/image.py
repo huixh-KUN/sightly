@@ -223,10 +223,6 @@ class ImageDetectionManager:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
 
-    def select_region(self, group_index):
-        from utils.region import _start_selection
-        _start_selection(self.app, "image", group_index)
-
     def select_reference_image(self, group_index):
         file_path, _ = QFileDialog.getOpenFileName(
             None, "选择参考图像（模板）",
