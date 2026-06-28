@@ -406,7 +406,7 @@ class MainWindow(QMainWindow):
             if not panel or idx >= len(panel.groups_data):
                 QMessageBox.information(self, "测试", "组索引越界")
                 return
-            interval = int(panel.groups_data[idx].get(interval_key, default))
+            interval = float(panel.groups_data[idx].get(interval_key, default))
 
             wait_box = QMessageBox(self)
             wait_box.setWindowTitle("测试")

@@ -10,7 +10,7 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import SwitchButton
+from ui.components import SwitchButton, CycleControlWidget
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
 from ui.components import GroupEditHeader, ValueChip
@@ -200,11 +200,8 @@ class TimedGroupWidget(QFrame):
 
         # ⚙️ 触发
         trigger_card = ConfigCard("⚙️", "触发")
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(1, 9999)
-        self.interval_spin.setValue(10)
-        self.interval_spin.setSuffix(" 秒")
-        self.interval_spin.setFixedWidth(58)
+        self.cycle_widget = CycleControlWidget()
+        trigger_card.add_row("", self.cycle_widget, stretch=1)
         self.key_input = KeyCaptureWidget()
         self.delay_min_spin = QSpinBox()
         self.delay_min_spin.setRange(0, 9999)
@@ -225,9 +222,8 @@ class TimedGroupWidget(QFrame):
         self.offset_spin.setToolTip("点击位置随机偏移范围（像素），0=关闭")
         self.alarm_toggle = SwitchButton(compact=True)
         trigger_card.add_segments_row(
-            "间隔",
-            ("", self.interval_spin),
-            ("时长", spin_range_row(self.delay_min_spin, self.delay_max_spin)),
+            "时长",
+            ("", spin_range_row(self.delay_min_spin, self.delay_max_spin)),
         )
         trigger_card.add_segments_row("按键", ("", self.key_input))
         trigger_card.add_segments_row(
@@ -248,7 +244,11 @@ class TimedGroupWidget(QFrame):
         if name:
             self.header.title_edit.setText(name)
         try:
-            self.interval_spin.setValue(int(cfg.get("interval", 10)))
+            self.cycle_widget.set_interval_value(float(cfg.get("interval", 10)))
+            cycle = cfg.get("cycle_enabled", True)
+            if isinstance(cycle, str):
+                cycle = cycle.lower() in ("true", "1")
+            self.cycle_widget.set_cycle_enabled(bool(cycle))
             self.delay_min_spin.setValue(int(cfg.get("delay_min", 300)))
             self.delay_max_spin.setValue(int(cfg.get("delay_max", 500)))
             self.offset_spin.setValue(int(cfg.get("click_offset", 0)))
@@ -272,7 +272,9 @@ class TimedGroupWidget(QFrame):
         return {
             "name": self.header.title_edit.text(),
             "enabled": ConfigVar(self._enabled),
-            "interval": ConfigVar(str(self.interval_spin.value())),
+            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
+            "pause": ConfigVar("0"),
+            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
             "key": ConfigVar(self.key_input.key()),
             "delay_min": ConfigVar(str(self.delay_min_spin.value())),
             "delay_max": ConfigVar(str(self.delay_max_spin.value())),

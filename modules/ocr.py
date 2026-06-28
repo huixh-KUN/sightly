@@ -97,8 +97,12 @@ class OCRModule:
         frame_count = 0
         def _get(v, default=None):
             return v.get() if hasattr(v, 'get') else (v if v is not None else default)
+        cycle = _get(group.get("cycle_enabled"), True)
+        if isinstance(cycle, str):
+            cycle = cycle.lower() in ("true", "1")
         self.app.logging_manager.debug("OCR",
-            f"识别组{group_index+1} 协程开始: keywords={_get(group.get('keywords',''))}")
+            f"识别组{group_index+1} 协程开始: keywords={_get(group.get('keywords',''))}, "
+            f"循环={'开' if cycle else '关'}")
         try:
             while not (self._loop and self._loop.is_closed()):
                 try:
@@ -106,29 +110,28 @@ class OCRModule:
                         await asyncio.sleep(1)
                         continue
                     try:
-                        pause_duration = int(_get(group.get("pause"), 180))
-                    except (ValueError, TypeError):
-                        pause_duration = 180
-                    try:
-                        group_interval = int(_get(group.get("interval"), 5))
+                        group_interval = float(_get(group.get("interval"), 5))
                     except (ValueError, TypeError):
                         group_interval = 5
+                    if group_interval <= 0:
+                        import random
+                        group_interval = random.uniform(0.25, 0.3)
 
                     now = time.time()
-                    if now - self.last_trigger_times.get(group_index, 0) < pause_duration:
-                        await asyncio.sleep(1)
-                        continue
                     if now - self.last_recognition_times.get(group_index, 0) < group_interval:
                         await asyncio.sleep(1)
                         continue
 
                     self.app.logging_manager.debug("OCR",
-                        f"识别组{group_index+1} 开始识别: pause={pause_duration}, interval={group_interval}")
+                        f"识别组{group_index+1} 开始识别: interval={group_interval}")
                     last_hash, frame_count = await run_in_executor(
                         self._do_ocr_group, group, group_index, last_hash, frame_count
                     )
                     self.last_recognition_times[group_index] = time.time()
-                    
+
+                    if not cycle:
+                        self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 单次执行完成，退出")
+                        break
                     frame_count += 1
                     if self.memory_monitor.gc_if_needed(frame_count):
                         self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 触发 GC")

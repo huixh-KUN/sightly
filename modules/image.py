@@ -44,6 +44,7 @@ class ImageDetection:
         self.threshold = 0.8
         self.interval = 5.0
         self.pause = 180
+        self.cycle_enabled = True
         self.commands = ""
         self.click_handler = ClickHandler(app)
         self.last_trigger_time = 0
@@ -54,10 +55,11 @@ class ImageDetection:
     def set_region(self, region):
         self.region = region
 
-    def start_detection(self, threshold, interval, pause, commands):
+    def start_detection(self, threshold, interval, pause, commands, cycle_enabled=True):
         self.threshold = float(threshold) / 100.0
         self.interval = float(interval)
         self.pause = int(pause)
+        self.cycle_enabled = cycle_enabled
         self.commands = commands
         self.last_trigger_time = 0
 
@@ -85,16 +87,16 @@ class ImageDetection:
     async def _detect_async(self):
         """异步检测循环"""
         self.app.logging_manager.debug("IMAGE",
-            f"检测组{self.group_index+1} 协程开始: 间隔={self.interval}s, 暂停={self.pause}s")
+            f"检测组{self.group_index+1} 协程开始: 间隔={self.interval}s, "
+            f"循环={'开' if self.cycle_enabled else '关'}")
         frame_count = 0
         try:
             while self.is_running:
-                await asyncio.sleep(self.interval)
-                now = time.time()
-                if now - self.last_trigger_time < self.pause:
-                    self.app.logging_manager.debug("IMAGE",
-                        f"检测组{self.group_index+1} 暂停中, 剩余={self.pause - (now - self.last_trigger_time):.0f}s")
-                    continue
+                interval = self.interval
+                if interval <= 0:
+                    import random
+                    interval = random.uniform(0.25, 0.3)
+                await asyncio.sleep(interval)
                 self.app.logging_manager.debug("IMAGE",
                     f"检测组{self.group_index+1} 开始检测循环")
                 match_result = await run_in_executor(self.detect_image)
@@ -103,12 +105,15 @@ class ImageDetection:
                     self.app.logging_manager.log_message(
                         f"检测组{self.group_index+1} 匹配成功: 位置=({abs_x},{abs_y}), 得分={score:.3f}")
                     await run_in_executor(self.execute_commands, match_result)
-                    self.last_trigger_time = now
+                    self.last_trigger_time = time.time()
                     await asyncio.sleep(5)
                 else:
                     self.app.logging_manager.debug("IMAGE",
                         f"检测组{self.group_index+1} 未匹配")
-                
+
+                if not self.cycle_enabled:
+                    self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 单次执行完成，退出")
+                    break
                 frame_count += 1
                 if self.memory_monitor.gc_if_needed(frame_count):
                     self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 触发 GC")
@@ -304,7 +309,10 @@ class ImageDetectionManager:
         interval = self._safe_get(group, "interval", "5")
         pause = self._safe_get(group, "pause", "180")
         commands = group.get("commands", "")
-        detection.start_detection(threshold, interval, pause, commands)
+        cycle = self._safe_get(group, "cycle_enabled", True)
+        if isinstance(cycle, str):
+            cycle = cycle.lower() in ("true", "1")
+        detection.start_detection(threshold, interval, pause, commands, cycle_enabled=bool(cycle))
         _set_status_text(self.app, f"图像检测组{group_index + 1}运行中...")
 
     def stop_detection(self, group_index):

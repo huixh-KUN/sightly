@@ -63,11 +63,23 @@ class NumberModule:
                 confidence_threshold = float(conf.get())
             except (ValueError, TypeError, KeyError, AttributeError):
                 confidence_threshold = 0.3
+            try:
+                interval = float(rc["interval"].get())
+            except (ValueError, TypeError):
+                interval = 0
+            try:
+                cycle = rc["cycle_enabled"].get()
+                if isinstance(cycle, str):
+                    cycle = cycle.lower() in ("true", "1")
+            except (KeyError, AttributeError):
+                cycle = True
             groups.append({
                 "index": i,
                 "region": region,
                 "threshold": threshold,
                 "confidence_threshold": confidence_threshold,
+                "interval": interval,
+                "cycle_enabled": bool(cycle),
                 "key": rc["key"].get(),
                 "alarm": rc["alarm"].get(),
                 "delay_min": rc["delay_min"].get(),
@@ -114,7 +126,8 @@ class NumberModule:
     async def _number_group_loop(self, g):
         self.app.logging_manager.debug("NUMBER",
             f"数字识别组{g['index']+1} 协程开始: 阈值={g['threshold']}, "
-            f"置信度={g['confidence_threshold']}, key={g['key']!r}")
+            f"置信度={g['confidence_threshold']}, 循环={'开' if g['cycle_enabled'] else '关'}, "
+            f"间隔={g['interval']}s")
         frame_count = 0
         try:
             while not (self._loop and self._loop.is_closed()):
@@ -122,7 +135,11 @@ class NumberModule:
                     self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 已禁用，退出")
                     break
                 try:
-                    await asyncio.sleep(1)
+                    interval = g["interval"]
+                    if interval <= 0:
+                        import random
+                        interval = random.uniform(0.25, 0.3)
+                    await asyncio.sleep(interval)
                     self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 截图")
                     screenshot = await run_in_executor(self.take_screenshot, g["region"])
                     if screenshot is None:
@@ -164,6 +181,9 @@ class NumberModule:
                             )
                             self._last_results[g["index"]] = text
                     
+                    if not g["cycle_enabled"]:
+                        self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 单次执行完成，退出")
+                        break
                     frame_count += 1
                     if self.memory_monitor.gc_if_needed(frame_count):
                         self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 触发 GC")

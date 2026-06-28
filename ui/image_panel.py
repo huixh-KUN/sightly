@@ -10,7 +10,7 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import SwitchButton
+from ui.components import SwitchButton, CycleControlWidget
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
 from ui.components import GroupEditHeader, ValueChip
@@ -214,22 +214,9 @@ class ImageGroupWidget(QFrame):
         self.threshold_spin.setValue(80)
         self.threshold_spin.setSuffix("%")
         self.threshold_spin.setFixedWidth(58)
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(1, 99)
-        self.interval_spin.setValue(5)
-        self.interval_spin.setSuffix(" 秒")
-        self.interval_spin.setFixedWidth(58)
-        self.pause_spin = QSpinBox()
-        self.pause_spin.setRange(0, 999)
-        self.pause_spin.setValue(180)
-        self.pause_spin.setSuffix(" 秒")
-        self.pause_spin.setFixedWidth(58)
-        detect_card.add_segments_row(
-            "阈值",
-            ("", self.threshold_spin),
-            ("间隔", self.interval_spin),
-            ("暂停", self.pause_spin),
-        )
+        detect_card.add_row("阈值", self.threshold_spin)
+        self.cycle_widget = CycleControlWidget()
+        detect_card.add_row("", self.cycle_widget, stretch=1)
         layout.addWidget(detect_card)
 
         # ⚙️ 触发
@@ -287,8 +274,11 @@ class ImageGroupWidget(QFrame):
             self.template_chip.set_text(ref.split("/")[-1].split("\\")[-1], accent=True)
         try:
             self.threshold_spin.setValue(int(cfg.get("threshold", 80)))
-            self.interval_spin.setValue(int(cfg.get("interval", 5)))
-            self.pause_spin.setValue(int(cfg.get("pause", 180)))
+            self.cycle_widget.set_interval_value(float(cfg.get("interval", 3)))
+            cycle = cfg.get("cycle_enabled", True)
+            if isinstance(cycle, str):
+                cycle = cycle.lower() in ("true", "1")
+            self.cycle_widget.set_cycle_enabled(bool(cycle))
             self.delay_min_spin.setValue(int(cfg.get("delay_min", 300)))
             self.delay_max_spin.setValue(int(cfg.get("delay_max", 500)))
             self.offset_spin.setValue(int(cfg.get("click_offset", 0)))
@@ -311,8 +301,9 @@ class ImageGroupWidget(QFrame):
             "region": self.region,
             "reference_image": self.template_path or "",
             "threshold": ConfigVar(str(self.threshold_spin.value())),
-            "interval": ConfigVar(str(self.interval_spin.value())),
-            "pause": ConfigVar(str(self.pause_spin.value())),
+            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
+            "pause": ConfigVar("0"),
+            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
             "key": ConfigVar(self.key_input.key()),
             "delay_min": ConfigVar(str(self.delay_min_spin.value())),
             "delay_max": ConfigVar(str(self.delay_max_spin.value())),

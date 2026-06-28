@@ -10,7 +10,7 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import SwitchButton
+from ui.components import SwitchButton, CycleControlWidget
 from ui.components import ComboBox
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
@@ -193,29 +193,16 @@ class OCRGroupWidget(QFrame):
         self.region_chip.label.clicked.connect(self._preview_region)
         layout.addWidget(region_card)
 
-        # 🎯 匹配
-        match_card = ConfigCard("🎯", "匹配")
+        # 🎯 检测
+        detect_card = ConfigCard("🎯", "检测")
         self.keywords_input = QLineEdit()
         self.keywords_input.setPlaceholderText("多个关键词用 , 分隔")
-        match_card.add_row("关键词", self.keywords_input, stretch=1)
+        detect_card.add_row("关键词", self.keywords_input, stretch=1)
         self.lang_combo = ComboBox(items=["简体中文", "繁体中文", "英文"], width=100)
-        self.interval_spin = QSpinBox()
-        self.interval_spin.setRange(1, 999)
-        self.interval_spin.setValue(3)
-        self.interval_spin.setSuffix(" 秒")
-        self.interval_spin.setFixedWidth(58)
-        self.pause_spin = QSpinBox()
-        self.pause_spin.setRange(0, 999)
-        self.pause_spin.setValue(3)
-        self.pause_spin.setSuffix(" 秒")
-        self.pause_spin.setFixedWidth(58)
-        match_card.add_segments_row(
-            "语言",
-            ("", self.lang_combo),
-            ("间隔", self.interval_spin),
-            ("暂停", self.pause_spin),
-        )
-        layout.addWidget(match_card)
+        detect_card.add_row("语言", self.lang_combo)
+        self.cycle_widget = CycleControlWidget()
+        detect_card.add_row("", self.cycle_widget, stretch=1)
+        layout.addWidget(detect_card)
 
         # ⚙️ 触发
         trigger_card = ConfigCard("⚙️", "触发")
@@ -260,8 +247,9 @@ class OCRGroupWidget(QFrame):
             "name": self.header.title_edit.text(),
             "enabled": ConfigVar(self._enabled),
             "region": self.region,
-            "interval": ConfigVar(str(self.interval_spin.value())),
-            "pause": ConfigVar(str(self.pause_spin.value())),
+            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
+            "pause": ConfigVar("0"),
+            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
             "key": ConfigVar(self.key_input.key()),
             "delay_min": ConfigVar(str(self.delay_min_spin.value())),
             "delay_max": ConfigVar(str(self.delay_max_spin.value())),
@@ -283,8 +271,11 @@ class OCRGroupWidget(QFrame):
             x1, y1, x2, y2 = self.region
             self.region_chip.set_text(f"({x1}, {y1}) → ({x2}, {y2})", accent=True)
         try:
-            self.interval_spin.setValue(int(cfg.get("interval", 3)))
-            self.pause_spin.setValue(int(cfg.get("pause", 3)))
+            self.cycle_widget.set_interval_value(float(cfg.get("interval", 0)))
+            cycle = cfg.get("cycle_enabled", True)
+            if isinstance(cycle, str):
+                cycle = cycle.lower() in ("true", "1")
+            self.cycle_widget.set_cycle_enabled(bool(cycle))
             self.delay_min_spin.setValue(int(cfg.get("delay_min", 1)))
             self.delay_max_spin.setValue(int(cfg.get("delay_max", 3)))
             self.offset_spin.setValue(int(cfg.get("click_offset", 0)))

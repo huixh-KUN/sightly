@@ -10,7 +10,7 @@ from ui.widgets import (
     TextButton, ClickableLabel,
     GroupListItem, GroupEditWindow,
 )
-from ui.components import SwitchButton
+from ui.components import SwitchButton, CycleControlWidget
 from ui.components import KeyCaptureWidget
 from ui.components import ConfigCard
 from ui.components import GroupEditHeader, ValueChip
@@ -202,11 +202,10 @@ class NumberGroupWidget(QFrame):
         self.confidence_spin.setDecimals(2)
         self.confidence_spin.setFixedWidth(58)
         self.confidence_spin.setToolTip("OCR 置信度低于此值的结果被丢弃（0=关闭）")
-        detect_card.add_segments_row(
-            "阈值",
-            ("", self.threshold_spin),
-            ("置信度", self.confidence_spin),
-        )
+        detect_card.add_row("阈值", self.threshold_spin)
+        detect_card.add_row("置信度", self.confidence_spin)
+        self.cycle_widget = CycleControlWidget()
+        detect_card.add_row("", self.cycle_widget, stretch=1)
         layout.addWidget(detect_card)
 
         # ⚙️ 触发
@@ -246,6 +245,11 @@ class NumberGroupWidget(QFrame):
         try:
             self.threshold_spin.setValue(int(cfg.get("threshold", 500)))
             self.confidence_spin.setValue(float(cfg.get("confidence_threshold", 0.3)))
+            self.cycle_widget.set_interval_value(float(cfg.get("interval", 0)))
+            cycle = cfg.get("cycle_enabled", True)
+            if isinstance(cycle, str):
+                cycle = cycle.lower() in ("true", "1")
+            self.cycle_widget.set_cycle_enabled(bool(cycle))
             self.delay_min_spin.setValue(int(cfg.get("delay_min", 100)))
             self.delay_max_spin.setValue(int(cfg.get("delay_max", 200)))
         except (ValueError, TypeError):
@@ -266,6 +270,9 @@ class NumberGroupWidget(QFrame):
             "region": self.region,
             "threshold": ConfigVar(str(self.threshold_spin.value())),
             "confidence_threshold": ConfigVar(str(self.confidence_spin.value())),
+            "interval": ConfigVar(str(self.cycle_widget.interval_value())),
+            "pause": ConfigVar("0"),
+            "cycle_enabled": ConfigVar(self.cycle_widget.is_cycle_enabled()),
             "key": ConfigVar(self.key_input.key()),
             "delay_min": ConfigVar(str(self.delay_min_spin.value())),
             "delay_max": ConfigVar(str(self.delay_max_spin.value())),

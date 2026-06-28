@@ -95,6 +95,7 @@ class BackgroundMonitor:
         self.recognition_type = "ocr"
         self.interval = 5.0
         self.pause = 180
+        self.cycle_enabled = True
         
         self.ocr_config = {}
         self.image_config = {}
@@ -207,22 +208,21 @@ class BackgroundMonitor:
         """异步监控主循环"""
         self.app.logging_manager.debug("BG",
             f"组{self.group_index} 协程监控开始: type={self.recognition_type}, "
-            f"interval={self.interval}s, pause={self.pause}s")
+            f"interval={self.interval}s, 循环={'开' if self.cycle_enabled else '关'}")
         frame_count = 0
         try:
-            await asyncio.sleep(self.interval)
+            interval = self.interval
+            if interval <= 0:
+                import random
+                interval = random.uniform(0.25, 0.3)
+            await asyncio.sleep(interval)
 
             while self.is_running:
                 try:
-                    current_time = time.time()
-                    if current_time - self.last_trigger_time < self.pause:
-                        await asyncio.sleep(0.5)
-                        continue
-
                     region = self._get_current_region()
                     if not region:
                         self.app.logging_manager.debug("BG", f"组{self.group_index} 无有效区域")
-                        await asyncio.sleep(self.interval)
+                        await asyncio.sleep(interval)
                         continue
 
                     self.app.logging_manager.debug("BG",
@@ -235,11 +235,14 @@ class BackgroundMonitor:
                         self.app.logging_manager.log_message(
                             f"后台监控组{self.group_index+1} 匹配成功: pos={click_position}")
                         await run_in_executor(self.trigger_actions, click_position)
-                        self.last_trigger_time = current_time
                     else:
                         self.app.logging_manager.debug("BG", f"组{self.group_index} 未匹配")
 
-                    await asyncio.sleep(self.interval)
+                    if not self.cycle_enabled:
+                        self.app.logging_manager.debug("BG", f"组{self.group_index} 单次执行完成，退出")
+                        break
+
+                    await asyncio.sleep(interval)
 
                     frame_count += 1
                     if self.memory_monitor.gc_if_needed(frame_count):
@@ -646,6 +649,10 @@ class BackgroundManager:
         monitor.click_offset = int(_safe_get(group, "click_offset", "0"))
         monitor.click_mode = _safe_get(group, "click_mode", "physical")
         monitor.alarm_enabled = _safe_get(group, "alarm", False)
+        cycle = _safe_get(group, "cycle_enabled", True)
+        if isinstance(cycle, str):
+            cycle = cycle.lower() in ("true", "1")
+        monitor.cycle_enabled = bool(cycle)
 
     def run_once(self, index: int) -> dict:
         """单次测试：识别 + 执行动作。"""

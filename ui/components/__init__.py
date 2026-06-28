@@ -16,3 +16,4 @@ from ui.components.combo_box import ComboBox
 from ui.components.confirm_dialog import ConfirmDialog
 from ui.components.group_action_bar import GroupActionBar
 from ui.components.group_edit_header import GroupEditHeader, ValueChip
+from ui.components.cycle_control import CycleControlWidget

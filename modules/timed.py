@@ -44,9 +44,16 @@ class TimedModule:
                 interval = int(_get_val(g["interval"]))
             except (ValueError, TypeError):
                 interval = 10
+            try:
+                cycle = _get_val(g.get("cycle_enabled", "true"))
+                if isinstance(cycle, str):
+                    cycle = cycle.lower() in ("true", "1")
+            except (ValueError, TypeError):
+                cycle = True
             gd = {
                 "index": i,
                 "interval": interval,
+                "cycle_enabled": bool(cycle),
                 "key": _get_val(g["key"]),
                 "alarm": _get_val(g["alarm"]),
                 "click_enabled": _get_val(g["click_enabled"]),
@@ -100,6 +107,7 @@ class TimedModule:
     async def _timed_group_loop(self, g):
         self.app.logging_manager.debug("TIMED",
             f"定时组{g['index']+1} 协程开始: 间隔={g['interval']}s, "
+            f"循环={'开' if g['cycle_enabled'] else '关'}, "
             f"key={g['key']!r}, click=({g['pos_x']},{g['pos_y']})")
         try:
             while not (self._loop and self._loop.is_closed()):
@@ -116,6 +124,10 @@ class TimedModule:
 
                     self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 触发执行")
                     await run_in_executor(self._execute_group_actions, g["index"])
+
+                    if not g["cycle_enabled"]:
+                        self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 单次执行完成，退出")
+                        break
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
