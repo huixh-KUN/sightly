@@ -189,16 +189,6 @@ class BackgroundPanel(QWidget):
             )
             self._edit_window.show()
 
-    def _on_edit_window_closed(self, idx, editor):
-        if 0 <= idx < len(self.groups_data):
-            cfg = editor.collect_config()
-            plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
-            plain["enabled"] = self.groups_data[idx].get("enabled", True)
-            self.groups_data[idx] = plain
-            if idx < len(self.list_items):
-                self.list_items[idx].set_data(plain)
-        self._edit_window = None
-
     def set_enabled(self, enabled):
         self._view_only = not enabled
 

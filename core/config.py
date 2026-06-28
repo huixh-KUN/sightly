@@ -85,46 +85,6 @@ class ConfigManager:
                 return default
         return value
     
-    def get_full_config(self):
-        """获取完整的配置数据结构
-        Returns:
-            dict: 完整的配置字典
-        """
-        # 获取各部分配置
-        timed_groups_config = self._get_timed_config()
-        number_regions_config = self._get_number_config()
-
-        # 完整的配置数据结构，确保所有配置项都被保存
-        config = {
-            'version': self.app.version,  # 使用应用版本号
-            'last_save_time': datetime.datetime.now().isoformat(),
-            # 基本OCR配置
-            'ocr': self._get_ocr_config(),
-            # Tesseract配置
-            'tesseract': self._get_tesseract_config(),
-            # 定时功能配置
-            'timed_key_press': {
-                'groups': timed_groups_config
-            },
-            # 数字识别配置
-            'number_recognition': {
-                'regions': number_regions_config
-            },
-            # 图像检测配置
-            'image_detection': self._get_image_detection_config(),
-            # 后台监控配置
-            'background_monitor': self._get_background_config(),
-            # 快捷键配置 - 新增
-            'shortcuts': self._get_shortcuts_config(),
-            # 报警功能配置
-            'alarm': self._get_alarm_config(),
-            # 首页功能状态勾选框配置
-            'home_checkboxes': self._get_home_checkboxes_config(),
-            # 脚本和颜色识别配置
-            'script': self._get_script_config()
-        }
-        return config
-    
     def load_tesseract_config(self, config):
         """加载Tesseract配置"""
         tesseract_path = self.get_config_value(config, 'tesseract.path')
@@ -520,23 +480,6 @@ class ConfigManager:
                 self.app.combo_after_delay.set(str(int(script_config['combo_after_delay'])))
             except (ValueError, TypeError):
                 self.app.combo_after_delay.set('300')
-    
-    def defer_save_config(self):
-        from PySide6.QtCore import QTimer
-
-        if not hasattr(self.app, '_save_config_timer'):
-            self.app._save_config_timer = None
-
-        if self.app._save_config_timer:
-            try:
-                self.app._save_config_timer.stop()
-            except Exception as e:
-                self.app.logging_manager.error("CONFIG", f"取消保存定时器失败: {e}")
-
-        try:
-            self.app._save_config_timer = QTimer.singleShot(1000, self.app.save_config)
-        except Exception as e:
-            self.app.logging_manager.error("CONFIG", f"设置保存定时器失败: {e}")
     
     def _get_timed_config(self):
         """获取定时功能配置"""
