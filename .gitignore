@@ -92,3 +92,9 @@ TODO.md
 
 # Generated presentations
 slides/
+
+# Skill resources (not part of sightly)
+.html-ppt-source/
+
+# Duplicate opencode configs in change/
+change/.opencode/
