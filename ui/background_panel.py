@@ -441,12 +441,15 @@ class BackgroundGroupWidget(QFrame):
             except (ValueError, TypeError):
                 pass
             ref = cfg.get("reference_image", "")
+            self._logging_manager.debug("BG", f"set_config image: reference_image={ref!r}")
             if isinstance(ref, str) and ref and os.path.exists(ref):
+                self._logging_manager.debug("BG", f"  → 文件存在，加载: {ref}")
                 pixmap = QPixmap(ref)
                 if not pixmap.isNull():
                     self.template_pixmap = pixmap
                     self.template_picker.set_pixmap(pixmap)
             elif hasattr(ref, 'isNull') and ref and not ref.isNull():
+                self._logging_manager.debug("BG", f"  → 直接使用 QPixmap")
                 self.template_pixmap = ref
                 self.template_picker.set_pixmap(ref)
         elif self.monitor_type == "color":

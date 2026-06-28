@@ -614,8 +614,10 @@ class MainWindow(QMainWindow):
                 if not isinstance(g, dict) or _unwrap(g.get("type")) != "image":
                     continue
                 pixmap = _unwrap(g.get("template_image"))
+                self.logging_manager.debug("CONFIG", f"  后台 image 组 {i}: template_image={'有' if pixmap and hasattr(pixmap, 'save') and not pixmap.isNull() else '无'} ref={_unwrap(g.get('reference_image', ''))}")
                 if pixmap and hasattr(pixmap, "save") and not pixmap.isNull():
                     path = self.app_state.save_template("background", i, pixmap)
+                    self.logging_manager.debug("CONFIG", f"  已保存模板到: {path}")
                     g["reference_image"] = path
                 else:
                     ref = _unwrap(g.get("reference_image", ""))
