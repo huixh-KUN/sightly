@@ -263,10 +263,8 @@ class TimedModule:
         groups = getattr(self.app, 'timed_groups', [])
         if 0 <= group_index < len(groups):
             group = groups[group_index]
-            group["position_x"].set(pos_x)
-            group["position_y"].set(pos_y)
-            if "position_var" in group:
-                group["position_var"].set(f"{pos_x},{pos_y}")
+            group["position_x"] = str(pos_x)
+            group["position_y"] = str(pos_y)
         if hasattr(self, '_pos_callback') and self._pos_callback:
             try:
                 self._pos_callback(pos_x, pos_y)
