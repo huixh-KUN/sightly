@@ -108,11 +108,7 @@ def _on_region_complete(app, selection_type, region_index, x1, y1, x2, y2):
         if not hasattr(app, 'color_recognition_manager'):
             from modules.color import ColorRecognitionManager
             app.color_recognition_manager = ColorRecognitionManager(app)
-        if not app.color_recognition_manager.color_recognition:
-            from modules.color import ColorRecognition
-            app.color_recognition_manager.color_recognition = ColorRecognition(app)
-        app.color_recognition_manager.color_recognition.set_region(region)
-        app.color_recognition_region = region
+        app.color_recognition_manager.set_region(region)
         app.logging_manager.log_message(f"已选择颜色识别区域: {region}")
 
     else:

@@ -136,6 +136,12 @@ class ColorRecognitionManager:
         from utils.region import _start_selection
         _start_selection(self.app, "color", 0)
 
+    def set_region(self, region):
+        if not self.color_recognition:
+            self.color_recognition = ColorRecognition(self.app)
+        self.color_recognition.set_region(region)
+        self.app.color_recognition_region = region
+
     def select_color(self):
         def on_color_selected(color):
             r, g, b = color

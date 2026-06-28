@@ -12,15 +12,15 @@ class KeyEventExecutor:
     delay_min/max 表示按键按住的时长范围（毫秒）
     """
     
-    def __init__(self, input_controller, delay_min_var, delay_max_var, priority=0):
+    def __init__(self, input_controller, delay_min, delay_max, priority=0):
         self.input_controller = input_controller
-        self.delay_min_var = delay_min_var
-        self.delay_max_var = delay_max_var
+        self.delay_min = delay_min
+        self.delay_max = delay_max
         self.priority = priority
     
     def execute_keypress(self, key):
-        delay_min = max(1, int(self.delay_min_var.get()))
-        delay_max = max(delay_min, int(self.delay_max_var.get()))
+        delay_min = max(1, int(self.delay_min))
+        delay_max = max(delay_min, int(self.delay_max))
         
         hold_delay = random.randint(delay_min, delay_max) / 1000
         

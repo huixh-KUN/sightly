@@ -195,10 +195,10 @@ class ImageDetection:
 
         if key:
             from modules.input import KeyEventExecutor
-            delay_min_var = group["delay_min"]
-            delay_max_var = group["delay_max"]
+            delay_min = int(safe_group_get(group, "delay_min", 300))
+            delay_max = int(safe_group_get(group, "delay_max", 500))
             executor = KeyEventExecutor(
-                self.app.input_controller, delay_min_var, delay_max_var, self.PRIORITY)
+                self.app.input_controller, delay_min, delay_max, self.PRIORITY)
             executor.execute_keypress(key)
             self.app.logging_manager.log_message(f"检测组{self.group_index+1}按下了 {key} 键")
 

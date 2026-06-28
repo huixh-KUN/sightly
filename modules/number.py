@@ -207,10 +207,8 @@ class NumberModule:
             f"数字识别{group_index+1}触发按键: {key}"
         )
         from modules.input import KeyEventExecutor
-        delay_min_var = type("", (), {"get": lambda: str(delay_min)})()
-        delay_max_var = type("", (), {"get": lambda: str(delay_max)})()
         executor = KeyEventExecutor(
-            self.app.input_controller, delay_min_var, delay_max_var, self.PRIORITY
+            self.app.input_controller, delay_min, delay_max, self.PRIORITY
         )
         executor.execute_keypress(key)
         self.app.logging_manager.log_message(

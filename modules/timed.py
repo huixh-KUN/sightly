@@ -136,10 +136,8 @@ class TimedModule:
 
     def _execute_keypress(self, key, group_index, delay_min, delay_max):
         from modules.input import KeyEventExecutor
-        delay_min_var = type("", (), {"get": lambda: str(delay_min)})()
-        delay_max_var = type("", (), {"get": lambda: str(delay_max)})()
         executor = KeyEventExecutor(
-            self.app.input_controller, delay_min_var, delay_max_var, self.PRIORITY
+            self.app.input_controller, delay_min, delay_max, self.PRIORITY
         )
         executor.execute_keypress(key)
         self.app.logging_manager.log_message(
