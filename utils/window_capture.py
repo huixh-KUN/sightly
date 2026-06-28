@@ -323,86 +323,21 @@ def get_window_process_name(hwnd: int) -> Optional[str]:
     """
     获取窗口所属进程名（不含路径）
 
-    通过 GetWindowThreadProcessId + OpenProcess + GetModuleBaseName 获取。
-    优先用 PROCESS_QUERY_LIMITED_INFORMATION（Vista+），失败回退到 CreateToolhelp32Snapshot。
-
     Args:
         hwnd: 窗口句柄
 
     Returns:
         str: 进程名（如 "MuMuPlayer.exe"），失败返回 None
     """
-    from ctypes import wintypes
-
     try:
-        pid = wintypes.DWORD()
-        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        if not pid.value:
+        import win32process
+        import psutil
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        if not pid:
             return None
-
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        handle = ctypes.windll.kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value
-        )
-        if handle:
-            try:
-                exe_name = ctypes.create_unicode_buffer(260)
-                size = wintypes.DWORD(260)
-                psapi = ctypes.windll.psapi
-                if psapi.GetModuleBaseNameW(handle, None, exe_name, size):
-                    return exe_name.value
-            finally:
-                ctypes.windll.kernel32.CloseHandle(handle)
-
-        # 回退：通过 CreateToolhelp32Snapshot 枚举进程
-        return _get_process_name_by_pid(pid.value)
+        return psutil.Process(pid).name()
     except Exception as e:
         logging.getLogger(__name__).error(f"get_window_process_name 失败: {e}")
-        return None
-
-
-def _get_process_name_by_pid(pid: int) -> Optional[str]:
-    """通过 CreateToolhelp32Snapshot 按 PID 查进程名"""
-    from ctypes import wintypes
-
-    TH32CS_SNAPPROCESS = 0x00000002
-    MAX_PATH = 260
-
-    class PROCESSENTRY32W(ctypes.Structure):
-        _fields_ = [
-            ("dwSize", wintypes.DWORD),
-            ("cntUsage", wintypes.DWORD),
-            ("th32ProcessID", wintypes.DWORD),
-            ("th32DefaultHeapID", ctypes.POINTER(wintypes.ULONG)),
-            ("th32ModuleID", wintypes.DWORD),
-            ("cntThreads", wintypes.DWORD),
-            ("th32ParentProcessID", wintypes.DWORD),
-            ("pcPriClassBase", wintypes.LONG),
-            ("dwFlags", wintypes.DWORD),
-            ("szExeFile", wintypes.CHAR * MAX_PATH),
-        ]
-
-    try:
-        snapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        if snapshot == ctypes.c_void_p(-1).value:
-            return None
-
-        try:
-            pe = PROCESSENTRY32W()
-            pe.dwSize = ctypes.sizeof(PROCESSENTRY32W)
-            if not ctypes.windll.kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
-                return None
-
-            while True:
-                if pe.th32ProcessID == pid:
-                    return pe.szExeFile.decode("utf-8", errors="replace")
-                if not ctypes.windll.kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
-                    break
-            return None
-        finally:
-            ctypes.windll.kernel32.CloseHandle(snapshot)
-    except Exception as e:
-        logging.getLogger(__name__).error(f"_get_process_name_by_pid 失败: {e}")
         return None
 
 
