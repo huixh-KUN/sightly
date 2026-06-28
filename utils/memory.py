@@ -1,5 +1,6 @@
 import gc
 import ctypes
+import logging
 from ctypes import wintypes
 
 
@@ -22,7 +23,8 @@ class MemoryMonitor:
                 kernel32.CloseHandle(handle)
                 return PROCESS_MEMORY_COUNTERS[8] / (1024 * 1024)
             return 0.0
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"get_memory_usage 失败: {e}")
             return 0.0
 
     def gc_if_needed(self, frame_count):

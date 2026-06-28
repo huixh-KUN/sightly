@@ -371,7 +371,8 @@ class ScriptExecutor:
                     key_name = key.char
                 except AttributeError:
                     key_name = key.name
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
                     return
                 key_name = pynput_to_pyautogui_map.get(key_name, key_name)
                 if key_name == _get_record_hotkey():
@@ -385,8 +386,8 @@ class ScriptExecutor:
                             "type": "keydown", "key": key_name, "delay": delay
                         })
                         pressed_keys.add(key_name)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.app.logging_manager.error("SCRIPT", f"录制按键事件追加失败: {e}")
 
             def on_key_release(key):
                 if not self.is_recording:
@@ -397,7 +398,8 @@ class ScriptExecutor:
                     key_name = key.char
                 except AttributeError:
                     key_name = key.name
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
                     return
                 key_name = pynput_to_pyautogui_map.get(key_name, key_name)
                 if key_name == _get_record_hotkey():
@@ -411,8 +413,8 @@ class ScriptExecutor:
                             "type": "keyup", "key": key_name, "delay": delay
                         })
                         pressed_keys.remove(key_name)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.app.logging_manager.error("SCRIPT", f"录制按键释放事件追加失败: {e}")
 
             def on_mouse_move(x, y):
                 if not self.is_recording:
@@ -432,7 +434,8 @@ class ScriptExecutor:
                 self.last_event_time = current_time
                 try:
                     button_name = button.name
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制鼠标按钮名解析失败: {e}")
                     return
                 mouse_x, mouse_y = last_mouse_position if last_mouse_position else (x, y)
                 try:
@@ -443,8 +446,8 @@ class ScriptExecutor:
                         "type": f"mouse_{'down' if pressed else 'up'}",
                         "button": button_name, "x": int(mouse_x), "y": int(mouse_y), "delay": 0
                     })
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制鼠标事件追加失败: {e}")
 
             time.sleep(0.5)
             self.recording_grace_period = False
@@ -482,20 +485,20 @@ class ScriptExecutor:
             try:
                 self.keyboard_listener.stop()
                 self.keyboard_listener = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("SCRIPT", f"停止 keyboard_listener 失败: {e}")
         if hasattr(self, 'mouse_listener') and self.mouse_listener:
             try:
                 self.mouse_listener.stop()
                 self.mouse_listener = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("SCRIPT", f"停止 mouse_listener 失败: {e}")
         if hasattr(self, 'key_listener') and self.key_listener:
             try:
                 self.key_listener.stop_listening()
                 self.key_listener = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("SCRIPT", f"停止 key_listener 失败: {e}")
         self.cleanup_resources()
         start = time.time()
         while any([
@@ -537,10 +540,10 @@ class ScriptExecutor:
                 elif hasattr(self.app, 'script_text'):
                     try:
                         self.app.script_text = script_content
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        self.app.logging_manager.error("SCRIPT", f"写入 script_text 失败: {e}")
+        except Exception as e:
+            self.app.logging_manager.error("SCRIPT", f"generate_recorded_script 失败: {e}")
 
 
 

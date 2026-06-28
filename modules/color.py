@@ -152,7 +152,8 @@ class ColorRecognitionManager:
             if hasattr(self.app, 'color_commands'):
                 try:
                     commands = self.app.color_commands
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("COLOR", f"读取 color_commands 失败: {e}")
                     commands = ""
         except ValueError:
             QMessageBox.warning(None, "警告", "颜色设置参数格式错误，请检查！")

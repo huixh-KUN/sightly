@@ -131,7 +131,8 @@ class TimedModule:
             return False
         try:
             return bool(groups[index]["enabled"])
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("TIMED", f"_check_group_enabled 失败: {e}")
             return False
 
     def _execute_keypress(self, key, group_index, delay_min, delay_max):

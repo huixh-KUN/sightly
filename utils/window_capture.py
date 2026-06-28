@@ -41,7 +41,8 @@ def find_window_by_title(keyword: str) -> Optional[int]:
     try:
         win32gui.EnumWindows(enum_windows_callback, None)
         return found_hwnd
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"find_window_by_title 失败: {e}")
         return None
 
 
@@ -74,7 +75,8 @@ def find_all_windows_by_title(keyword: str) -> List[Tuple[int, str]]:
     try:
         win32gui.EnumWindows(enum_windows_callback, None)
         return results
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"find_all_windows_by_title 失败: {e}")
         return []
 
 
@@ -90,7 +92,8 @@ def get_window_rect(hwnd: int) -> Optional[tuple]:
     """
     try:
         return win32gui.GetWindowRect(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_rect 失败: {e}")
         return None
 
 
@@ -106,7 +109,8 @@ def get_window_title(hwnd: int) -> Optional[str]:
     """
     try:
         return win32gui.GetWindowText(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_title 失败: {e}")
         return None
 
 
@@ -122,7 +126,8 @@ def is_window_minimized(hwnd: int) -> bool:
     """
     try:
         return win32gui.IsIconic(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"is_window_minimized 失败: {e}")
         return True
 
 
@@ -140,7 +145,8 @@ def restore_window(hwnd: int) -> bool:
         if win32gui.IsIconic(hwnd):
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
         return True
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"restore_window 失败: {e}")
         return False
 
 
@@ -202,10 +208,11 @@ def capture_window(hwnd: int) -> Optional[Image.Image]:
         )
         
         return img
-        
-    except Exception:
+
+    except Exception as e:
+        logging.getLogger(__name__).error(f"capture_window 失败: {e}")
         return None
-    
+
     finally:
         # 先恢复原对象，保证 DeleteObject 成功
         if saveDC and old_bitmap:
@@ -269,8 +276,9 @@ def capture_window_region(hwnd: int, region: tuple) -> Optional[Image.Image]:
             return None
         
         return full_image.crop((x1, y1, x2, y2))
-        
-    except Exception:
+
+    except Exception as e:
+        logging.getLogger(__name__).error(f"capture_window_region 失败: {e}")
         return None
     finally:
         full_image.close()
@@ -289,7 +297,8 @@ def get_window_size(hwnd: int) -> Optional[Tuple[int, int]]:
     try:
         rect = win32gui.GetWindowRect(hwnd)
         return (rect[2] - rect[0], rect[3] - rect[1])
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_size 失败: {e}")
         return None
 
 
@@ -305,7 +314,8 @@ def get_window_class_name(hwnd: int) -> Optional[str]:
     """
     try:
         return win32gui.GetClassName(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_class_name 失败: {e}")
         return None
 
 
@@ -345,7 +355,8 @@ def get_window_process_name(hwnd: int) -> Optional[str]:
 
         # 回退：通过 CreateToolhelp32Snapshot 枚举进程
         return _get_process_name_by_pid(pid.value)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_process_name 失败: {e}")
         return None
 
 
@@ -389,7 +400,8 @@ def _get_process_name_by_pid(pid: int) -> Optional[str]:
             return None
         finally:
             ctypes.windll.kernel32.CloseHandle(snapshot)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"_get_process_name_by_pid 失败: {e}")
         return None
 
 
@@ -430,7 +442,8 @@ def find_window_by_class_and_process(class_name: str, process_name: str) -> Opti
 
     try:
         win32gui.EnumWindows(enum_callback, None)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"find_window_by_class_and_process 失败: {e}")
         return None
 
     return candidates[0] if candidates else None

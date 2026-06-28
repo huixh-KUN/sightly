@@ -1,3 +1,4 @@
+import logging
 import win32gui
 from typing import Optional, Tuple
 
@@ -76,5 +77,6 @@ class WindowCoordinate:
         try:
             rect = win32gui.GetWindowRect(hwnd)
             return (rect[2] - rect[0], rect[3] - rect[1])
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"get_window_size 失败: {e}")
             return None

@@ -97,3 +97,8 @@ class LoggingManager:
 
         if self.clear_callback:
             self.clear_callback()
+
+    def get_log_buffer(self):
+        """返回日志缓冲区的快照副本"""
+        with self._update_lock:
+            return list(self._log_buffer)

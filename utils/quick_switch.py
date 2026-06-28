@@ -49,7 +49,8 @@ class QuickSwitchBackend:
         """保存当前前台窗口"""
         try:
             self._original_fg_window = win32gui.GetForegroundWindow()
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"_save_foreground_window 失败: {e}")
             self._original_fg_window = None
     
     def _restore_foreground_window(self) -> None:
@@ -116,7 +117,8 @@ class QuickSwitchBackend:
             time.sleep(0.1)
             time.sleep(0.2)
             return True
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"_switch_to_target 失败: {e}")
             try:
                 win32gui.SetWindowPos(self.hwnd, win32con.HWND_NOTOPMOST, 0, 0, 0, 0,
                                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)

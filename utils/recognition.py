@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 from typing import Optional, Tuple, List
 
@@ -77,10 +78,11 @@ class OCRRecognizer:
             
             del img_array
             return None
-            
-        except Exception:
+
+        except Exception as e:
+            logging.getLogger(__name__).error(f"find_keyword_position 失败: {e}")
             return None
-    
+
     @staticmethod
     def get_text(image, language: str = "eng") -> Optional[str]:
         try:
@@ -99,8 +101,9 @@ class OCRRecognizer:
                 texts.append(text)
             
             return '\n'.join(texts) if texts else None
-            
-        except Exception:
+
+        except Exception as e:
+            logging.getLogger(__name__).error(f"get_text 失败: {e}")
             return None
 
 
@@ -251,7 +254,8 @@ class ColorRecognizer:
             
             pixel = img_array[y, x]
             return tuple(pixel[:3])
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"get_pixel_color 失败: {e}")
             return None
 
 
@@ -298,7 +302,8 @@ class NumberRecognizer:
             
             filtered = "".join(c for c in text if c in whitelist)
             return filtered if filtered else None
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"NumberRecognizer.recognize 失败: {e}")
             return None
     
     @staticmethod
@@ -351,7 +356,8 @@ class NumberRecognizer:
                     m = re.search(r'(\d+)', cleaned)
                     if m:
                         number = int(m.group(1))
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"parse_number 失败: {e}")
             number = None
         
         if cache is not None and number is not None:

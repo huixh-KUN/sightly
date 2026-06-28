@@ -262,7 +262,8 @@ class BackgroundMonitor:
         
         try:
             return capture_window_region(self.hwnd, region)
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("BG", f"_capture_region 失败: {e}")
             return None
     
     def _recognize(self, image) -> tuple:
@@ -566,13 +567,13 @@ class BackgroundManager:
                         nonlocal hwnd
                         hwnd = h
                         return False
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("BG", f"auto_reconnect 枚举回调失败: {e}")
                 return True
             try:
                 win32gui.EnumWindows(enum_cb, None)
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("BG", f"auto_reconnect EnumWindows 失败: {e}")
         self._log("BG",
             f"auto_reconnect: class={window_class}, process={window_process}, "
             f"title={window_title}, found={hwnd}")

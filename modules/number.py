@@ -190,7 +190,8 @@ class NumberModule:
             return False
         try:
             return bool(regions[index]["enabled"])
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("NUMBER", f"_check_region_enabled 失败: {e}")
             return False
 
     def _safe_get_alarm(self, index):
@@ -198,8 +199,8 @@ class NumberModule:
         if index < len(regions):
             try:
                 return regions[index]["alarm"]
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("NUMBER", f"_safe_get_alarm 失败: {e}")
         return False
 
     def _execute_keypress(self, key, group_index, delay_min, delay_max):
@@ -226,7 +227,8 @@ class NumberModule:
             return {"matched": False, "executed": False, "detail": "未设置识别区域"}
         try:
             confidence = float(rc.get("confidence_threshold", "0.3"))
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("NUMBER", f"置信度阈值转换失败: {e}")
             confidence = 0.3
         screenshot = self.take_screenshot(region)
         if screenshot is None:
