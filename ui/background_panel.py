@@ -471,7 +471,6 @@ class BackgroundGroupWidget(QFrame):
             "delay_min": "100",
             "delay_max": "200",
             "interval": str(self.cycle_widget.interval_value()),
-            "pause": "0",
             "cycle_enabled": self.cycle_widget.is_cycle_enabled(),
         }
         if self.monitor_type == "ocr":

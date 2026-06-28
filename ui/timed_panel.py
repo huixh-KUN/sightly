@@ -262,7 +262,6 @@ class TimedGroupWidget(QFrame):
             "name": self.header.title_edit.text(),
             "enabled": self._enabled,
             "interval": str(self.cycle_widget.interval_value()),
-            "pause": "0",
             "cycle_enabled": self.cycle_widget.is_cycle_enabled(),
             "key": self.key_input.key(),
             "delay_min": str(self.delay_min_spin.value()),
