@@ -1,0 +1,5 @@
+name: fix-memory-leak
+description: 修复图像资源内存泄漏，消除长时间运行的内存增长问题
+status: draft
+created: 2026-06-26
+schema: spec-driven

@@ -86,3 +86,10 @@ sightly_config.json
 AGENTS.md
 SESSION.md
 TODO.md
+
+# CodeGraph index (generated)
+.codegraph/
+
+# Generated presentations
+slides/
+.html-ppt-source/

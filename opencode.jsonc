@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md", "项目命名规范.md", "架构文档.md"],
+  "agent": {
+    "explore": {
+      "mcp": { "codegraph": true }
+    },
+    "general": {
+      "mcp": { "codegraph": true }
+    }
+  }
+}
