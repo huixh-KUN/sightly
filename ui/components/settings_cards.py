@@ -193,7 +193,7 @@ class AboutCard(QFrame):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        version = QLabel("版本: 0.2.0")
+        version = QLabel("版本: 1.0.0")
         version.setAlignment(Qt.AlignCenter)
         layout.addWidget(version)
 

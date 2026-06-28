@@ -15,7 +15,7 @@ if os.path.exists(voice_dir):
 
 setup(
     name='sightly',
-    version='0.2.0',
+    version='1.0.0',
     description='灵眸 Sightly - 屏幕自动化识别系统',
     author='Sightly Team',
     packages=find_packages(exclude=['tests', 'tests.*']),
