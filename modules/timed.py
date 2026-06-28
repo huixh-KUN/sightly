@@ -7,7 +7,7 @@ from typing import Optional
 from core.priority_lock import get_module_priority
 from core.click_handler import ClickHandler
 
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 
 
 
@@ -68,8 +68,7 @@ class TimedModule:
             return
 
         self._groups_data = groups
-        self._thread = threading.Thread(target=self._run_async, daemon=True)
-        self._thread.start()
+        self._thread, self._loop = create_async_thread(self._async_main)
 
     def stop_timed_tasks(self):
         if self._loop and self._loop.is_running():
@@ -78,16 +77,6 @@ class TimedModule:
                     task.cancel()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=3)
-
-    def _run_async(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
 
     async def _async_main(self):
         tasks = []
@@ -142,15 +131,14 @@ class TimedModule:
             return False
         try:
             return bool(groups[index]["enabled"])
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("TIMED", f"_check_group_enabled 失败: {e}")
             return False
 
     def _execute_keypress(self, key, group_index, delay_min, delay_max):
         from modules.input import KeyEventExecutor
-        delay_min_var = type("", (), {"get": lambda: str(delay_min)})()
-        delay_max_var = type("", (), {"get": lambda: str(delay_max)})()
         executor = KeyEventExecutor(
-            self.app.input_controller, delay_min_var, delay_max_var, self.PRIORITY
+            self.app.input_controller, delay_min, delay_max, self.PRIORITY
         )
         executor.execute_keypress(key)
         self.app.logging_manager.log_message(
@@ -162,14 +150,14 @@ class TimedModule:
         if index >= len(groups):
             return []
         g = groups[index]
-        key = _get_val(g.get("key", ""))
-        click_enabled = _get_val(g.get("click_enabled", False))
-        alarm = _get_val(g.get("alarm", False))
-        pos_x = int(_get_val(g.get("position_x", 0)))
-        pos_y = int(_get_val(g.get("position_y", 0)))
-        delay_min = int(_get_val(g.get("delay_min", 100)))
-        delay_max = int(_get_val(g.get("delay_max", 200)))
-        click_offset = int(_get_val(g.get("click_offset"), 0))
+        key = g.get("key", "")
+        click_enabled = g.get("click_enabled", False)
+        alarm = g.get("alarm", False)
+        pos_x = int(g.get("position_x", 0))
+        pos_y = int(g.get("position_y", 0))
+        delay_min = int(g.get("delay_min", 100))
+        delay_max = int(g.get("delay_max", 200))
+        click_offset = int(g.get("click_offset", 0))
 
         result_parts = []
         if alarm:
@@ -276,10 +264,8 @@ class TimedModule:
         groups = getattr(self.app, 'timed_groups', [])
         if 0 <= group_index < len(groups):
             group = groups[group_index]
-            group["position_x"].set(pos_x)
-            group["position_y"].set(pos_y)
-            if "position_var" in group:
-                group["position_var"].set(f"{pos_x},{pos_y}")
+            group["position_x"] = str(pos_x)
+            group["position_y"] = str(pos_y)
         if hasattr(self, '_pos_callback') and self._pos_callback:
             try:
                 self._pos_callback(pos_x, pos_y)

@@ -13,7 +13,7 @@ from utils.screenshot import ScreenshotManager
 from utils.recognition import OCRRecognizer
 from core.priority_lock import get_module_priority
 from core.click_handler import ClickHandler
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 from utils.memory import MemoryMonitor
 
 
@@ -56,8 +56,7 @@ class OCRModule:
             QMessageBox.warning(None, "警告", "请至少启用一个识别组并选择区域")
             return
 
-        self._thread = threading.Thread(target=self._run_async, daemon=True)
-        self._thread.start()
+        self._thread, self._loop = create_async_thread(self._async_main)
 
     def stop_monitoring(self):
         if self._loop and self._loop.is_running():
@@ -67,16 +66,6 @@ class OCRModule:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=3)
         self._last_texts.clear()
-
-    def _run_async(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
 
     async def _async_main(self):
         tasks = []
@@ -457,9 +446,9 @@ class OCRModule:
         group = self.app.ocr_groups[group_index]
         
         from modules.input import KeyEventExecutor
-        delay_min_var = group["delay_min"]
-        delay_max_var = group["delay_max"]
-        executor = KeyEventExecutor(self.app.input_controller, delay_min_var, delay_max_var, self.PRIORITY)
+        delay_min = int(group.get("delay_min", 1))
+        delay_max = int(group.get("delay_max", 3))
+        executor = KeyEventExecutor(self.app.input_controller, delay_min, delay_max, self.PRIORITY)
         executor.execute_keypress(key)
         
         self.app.logging_manager.log_message(f"识别组{group_index+1}按下了 {key} 键")

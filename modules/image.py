@@ -10,7 +10,7 @@ from PySide6.QtWidgets import QMessageBox, QFileDialog
 from PySide6.QtCore import Qt, QTimer
 
 from core.config import safe_group_get
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 
 try:
     import cv2
@@ -195,10 +195,10 @@ class ImageDetection:
 
         if key:
             from modules.input import KeyEventExecutor
-            delay_min_var = group["delay_min"]
-            delay_max_var = group["delay_max"]
+            delay_min = int(safe_group_get(group, "delay_min", 300))
+            delay_max = int(safe_group_get(group, "delay_max", 500))
             executor = KeyEventExecutor(
-                self.app.input_controller, delay_min_var, delay_max_var, self.PRIORITY)
+                self.app.input_controller, delay_min, delay_max, self.PRIORITY)
             executor.execute_keypress(key)
             self.app.logging_manager.log_message(f"检测组{self.group_index+1}按下了 {key} 键")
 
@@ -223,10 +223,6 @@ class ImageDetectionManager:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
 
-    def select_region(self, group_index):
-        from utils.region import _start_selection
-        _start_selection(self.app, "image", group_index)
-
     def select_reference_image(self, group_index):
         file_path, _ = QFileDialog.getOpenFileName(
             None, "选择参考图像（模板）",
@@ -247,8 +243,6 @@ class ImageDetectionManager:
                 return
             group["template_image"] = template
             group["reference_image"] = file_path
-            if "image_path_var" in group:
-                group["image_path_var"].set(os.path.basename(file_path))
             if "image_preview" in group and group["image_preview"]:
                 self._update_image_preview(group, file_path)
         except Exception as e:
@@ -341,18 +335,7 @@ class ImageDetectionManager:
         self.app.logging_manager.debug("IMAGE", f"start_all_detection: 启动了 {started} 组")
 
         if self.image_detections:
-            self._thread = threading.Thread(target=self._run_async, daemon=True)
-            self._thread.start()
-
-    def _run_async(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
+            self._thread, self._loop = create_async_thread(self._async_main)
 
     async def _async_main(self):
         tasks = []

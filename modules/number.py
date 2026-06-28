@@ -9,7 +9,7 @@ from utils.screenshot import ScreenshotManager
 from utils.recognition import NumberRecognizer
 from utils.image import _preprocess_image
 from core.priority_lock import get_module_priority
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 from utils.memory import MemoryMonitor
 
 
@@ -87,8 +87,7 @@ class NumberModule:
             return
 
         self._groups_data = groups
-        self._thread = threading.Thread(target=self._run_async, daemon=True)
-        self._thread.start()
+        self._thread, self._loop = create_async_thread(self._async_main)
 
     def stop_number_recognition(self):
         if self._loop and self._loop.is_running():
@@ -99,16 +98,6 @@ class NumberModule:
             self._thread.join(timeout=3)
         self._last_results.clear()
         self._number_cache.clear()
-
-    def _run_async(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
 
     async def _async_main(self):
         tasks = []
@@ -201,7 +190,8 @@ class NumberModule:
             return False
         try:
             return bool(regions[index]["enabled"])
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("NUMBER", f"_check_region_enabled 失败: {e}")
             return False
 
     def _safe_get_alarm(self, index):
@@ -209,8 +199,8 @@ class NumberModule:
         if index < len(regions):
             try:
                 return regions[index]["alarm"]
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("NUMBER", f"_safe_get_alarm 失败: {e}")
         return False
 
     def _execute_keypress(self, key, group_index, delay_min, delay_max):
@@ -218,10 +208,8 @@ class NumberModule:
             f"数字识别{group_index+1}触发按键: {key}"
         )
         from modules.input import KeyEventExecutor
-        delay_min_var = type("", (), {"get": lambda: str(delay_min)})()
-        delay_max_var = type("", (), {"get": lambda: str(delay_max)})()
         executor = KeyEventExecutor(
-            self.app.input_controller, delay_min_var, delay_max_var, self.PRIORITY
+            self.app.input_controller, delay_min, delay_max, self.PRIORITY
         )
         executor.execute_keypress(key)
         self.app.logging_manager.log_message(
@@ -239,7 +227,8 @@ class NumberModule:
             return {"matched": False, "executed": False, "detail": "未设置识别区域"}
         try:
             confidence = float(rc.get("confidence_threshold", "0.3"))
-        except Exception:
+        except Exception as e:
+            self.app.logging_manager.error("NUMBER", f"置信度阈值转换失败: {e}")
             confidence = 0.3
         screenshot = self.take_screenshot(region)
         if screenshot is None:

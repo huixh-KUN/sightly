@@ -24,111 +24,10 @@ pynput_to_pyautogui_map = {
     'win_r': 'winright',
 }
 
-_SKIP_TOGGLE = object()
-
-def _get_script_text(app):
-    """统一获取脚本文本，兼容 PySide6 和 tkinter 两套面板"""
-    # PySide6 面板
-    panel = getattr(app, 'panels', {}).get('script')
-    if panel and hasattr(panel, '_script_editor'):
-        try:
-            return panel._script_editor.toPlainText()
-        except Exception:
-            pass
-    # tkinter 旧面板
-    if hasattr(app, 'script_text'):
-        try:
-            return app.script_text
-        except Exception:
-            pass
-    return ""
-
 
 def _set_status_text(app, text):
     if hasattr(app, 'status_label') and app.status_label:
         QTimer.singleShot(0, lambda: app.status_label.setText(text))
-
-
-class ScriptModule:
-    PRIORITY = get_module_priority('script')
-
-    def __init__(self, app):
-        self.app = app
-
-    def start(self, start_color_recognition=True):
-        if getattr(self.app, 'system_stopped', False):
-            self.app.logging_manager.log_message("系统已完全停止，拒绝执行启动命令")
-            return
-        if not hasattr(self.app, 'script_executor'):
-            self.app.script_executor = ScriptExecutor(self.app)
-        script_content = _get_script_text(self.app)
-        if not script_content.strip():
-            self.app.logging_manager.log_message("脚本内容为空，跳过执行")
-            return
-        self.app.script_executor.run_script(script_content)
-        self.app.logging_manager.log_message("脚本已启动")
-        if start_color_recognition:
-            try:
-                if self.app.app_state.is_module_enabled('color'):
-                    self.app.color_manager.start_color_recognition()
-            except Exception:
-                pass
-
-    def stop(self, stop_color_recognition=True):
-        executor = getattr(self.app, 'script_executor', None)
-        if executor and getattr(executor, 'is_running', False):
-            executor.stop_script()
-        self.app.logging_manager.log_message("脚本已停止")
-        if stop_color_recognition:
-            try:
-                self.app.color_manager.stop_color_recognition()
-            except Exception:
-                pass
-
-    def start_script(self, start_color_recognition=True):
-        if getattr(self.app, 'system_stopped', False):
-            self.app.logging_manager.log_message("系统已完全停止，拒绝执行StartScript命令")
-            return
-        if not hasattr(self.app, 'script_executor'):
-            self.app.script_executor = ScriptExecutor(self.app)
-        script_content = _get_script_text(self.app)
-        if not script_content.strip():
-            QMessageBox.warning(None, "警告", "脚本内容为空，请先编写脚本！")
-            return
-        self.app.script_executor.run_script(script_content)
-        _set_status_text(self.app, "脚本执行中...")
-        self.app.logging_manager.log_message("脚本已启动")
-        if start_color_recognition:
-            try:
-                if self.app.app_state.is_module_enabled('color'):
-                    self.app.color_manager.start_color_recognition()
-                    self.app.logging_manager.log_message("颜色识别已自动启动")
-            except Exception:
-                pass
-
-    def stop_script(self, stop_color_recognition=True):
-        executor = getattr(self.app, 'script_executor', None)
-        if executor and getattr(executor, 'is_running', False):
-            executor.stop_script()
-            _set_status_text(self.app, "脚本已停止")
-        if stop_color_recognition:
-            try:
-                self.app.color_manager.stop_color_recognition()
-            except Exception:
-                pass
-
-    def start_recording(self):
-        if not hasattr(self.app, 'script_executor'):
-            self.app.script_executor = ScriptExecutor(self.app)
-        self.app.script_executor.start_recording()
-        _set_status_text(self.app, "录制中...")
-        self.app.alarm_module.play_start_sound()
-
-    def stop_recording(self):
-        if hasattr(self.app, 'script_executor'):
-            self.app.script_executor.stop_recording()
-            _set_status_text(self.app, "录制已停止")
-            self.app.alarm_module.play_stop_sound()
 
 
 class ScriptExecutor:
@@ -340,11 +239,6 @@ class ScriptExecutor:
             delay_time = int(match.group(1))
             return {"type": "delay", "time": delay_time}
 
-        if line.strip().lower() == "stopscript":
-            return {"type": "stopscript"}
-        elif line.strip().lower() == "startscript":
-            return {"type": "startscript"}
-
         return None
 
     def execute_command(self, command):
@@ -418,28 +312,6 @@ class ScriptExecutor:
                     sleep_time = min(0.1, delay_time - elapsed_time)
                     time.sleep(sleep_time)
                     elapsed_time = time.time() - start_time
-            elif command["type"] == "stopscript":
-                if not self.is_running:
-                    return
-                while self.is_paused:
-                    time.sleep(0.1)
-                    if not self.is_running:
-                        return
-                if not self.is_running:
-                    return
-                self.app.logging_manager.log_message("执行: 停止脚本")
-                QTimer.singleShot(0, lambda: self.app.script.stop(stop_color_recognition=False))
-            elif command["type"] == "startscript":
-                if not self.is_running:
-                    return
-                while self.is_paused:
-                    time.sleep(0.1)
-                    if not self.is_running:
-                        return
-                if not self.is_running:
-                    return
-                self.app.logging_manager.log_message("执行: 启动脚本")
-                QTimer.singleShot(0, lambda: self.app.script.start(start_color_recognition=False))
         except Exception as e:
             error_msg = f"执行命令出错: {str(e)}"
             self.app.logging_manager.error("SCRIPT", error_msg)
@@ -484,20 +356,9 @@ class ScriptExecutor:
                 self.generate_recorded_script()
                 return
 
-            _record_hotkey = _SKIP_TOGGLE
+            _record_hotkey = "f6"
 
             def _get_record_hotkey():
-                nonlocal _record_hotkey
-                if _record_hotkey is _SKIP_TOGGLE:
-                    val = None
-                    if hasattr(self.app, 'record_hotkey_var'):
-                        try:
-                            val = self.app.record_hotkey_var.get()
-                        except Exception:
-                            pass
-                    if not val:
-                        val = "f6"
-                    _record_hotkey = val.lower()
                 return _record_hotkey
 
             def on_key_press(key):
@@ -510,7 +371,8 @@ class ScriptExecutor:
                     key_name = key.char
                 except AttributeError:
                     key_name = key.name
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
                     return
                 key_name = pynput_to_pyautogui_map.get(key_name, key_name)
                 if key_name == _get_record_hotkey():
@@ -524,8 +386,8 @@ class ScriptExecutor:
                             "type": "keydown", "key": key_name, "delay": delay
                         })
                         pressed_keys.add(key_name)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.app.logging_manager.error("SCRIPT", f"录制按键事件追加失败: {e}")
 
             def on_key_release(key):
                 if not self.is_recording:
@@ -536,7 +398,8 @@ class ScriptExecutor:
                     key_name = key.char
                 except AttributeError:
                     key_name = key.name
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
                     return
                 key_name = pynput_to_pyautogui_map.get(key_name, key_name)
                 if key_name == _get_record_hotkey():
@@ -550,8 +413,8 @@ class ScriptExecutor:
                             "type": "keyup", "key": key_name, "delay": delay
                         })
                         pressed_keys.remove(key_name)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        self.app.logging_manager.error("SCRIPT", f"录制按键释放事件追加失败: {e}")
 
             def on_mouse_move(x, y):
                 if not self.is_recording:
@@ -571,7 +434,8 @@ class ScriptExecutor:
                 self.last_event_time = current_time
                 try:
                     button_name = button.name
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制鼠标按钮名解析失败: {e}")
                     return
                 mouse_x, mouse_y = last_mouse_position if last_mouse_position else (x, y)
                 try:
@@ -582,8 +446,8 @@ class ScriptExecutor:
                         "type": f"mouse_{'down' if pressed else 'up'}",
                         "button": button_name, "x": int(mouse_x), "y": int(mouse_y), "delay": 0
                     })
-                except Exception:
-                    pass
+                except Exception as e:
+                    self.app.logging_manager.error("SCRIPT", f"录制鼠标事件追加失败: {e}")
 
             time.sleep(0.5)
             self.recording_grace_period = False
@@ -621,20 +485,20 @@ class ScriptExecutor:
             try:
                 self.keyboard_listener.stop()
                 self.keyboard_listener = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("SCRIPT", f"停止 keyboard_listener 失败: {e}")
         if hasattr(self, 'mouse_listener') and self.mouse_listener:
             try:
                 self.mouse_listener.stop()
                 self.mouse_listener = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("SCRIPT", f"停止 mouse_listener 失败: {e}")
         if hasattr(self, 'key_listener') and self.key_listener:
             try:
                 self.key_listener.stop_listening()
                 self.key_listener = None
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("SCRIPT", f"停止 key_listener 失败: {e}")
         self.cleanup_resources()
         start = time.time()
         while any([
@@ -676,17 +540,10 @@ class ScriptExecutor:
                 elif hasattr(self.app, 'script_text'):
                     try:
                         self.app.script_text = script_content
-                    except Exception:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        self.app.logging_manager.error("SCRIPT", f"写入 script_text 失败: {e}")
+        except Exception as e:
+            self.app.logging_manager.error("SCRIPT", f"generate_recorded_script 失败: {e}")
 
 
-def _get_record_hotkey(app):
-    val = None
-    if hasattr(app, 'record_hotkey_var'):
-        try:
-            val = app.record_hotkey_var.get()
-        except Exception:
-            pass
-    return (val or "f6").lower()
+

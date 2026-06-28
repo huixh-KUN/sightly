@@ -12,7 +12,7 @@ from PySide6.QtCore import QTimer
 from utils.screenshot import ScreenshotManager
 from utils.recognition import ColorRecognizer
 from core.priority_lock import get_module_priority
-from core.async_utils import run_in_executor
+from core.async_utils import run_in_executor, create_async_thread
 from utils.memory import MemoryMonitor
 
 
@@ -131,23 +131,11 @@ class ColorRecognitionManager:
         self._thread: Optional[threading.Thread] = None
         self.screenshot_manager = ScreenshotManager()
 
-    def select_color_region(self):
-        self.app.logging_manager.log_message("开始选择颜色识别区域...")
-        from utils.region import _start_selection
-        _start_selection(self.app, "color", 0)
-
-    def select_color(self):
-        def on_color_selected(color):
-            r, g, b = color
-            self.app.target_color = color
-            if hasattr(self.app, 'color_var'):
-                self.app.color_var.set(f"RGB({r}, {g}, {b})")
-            if hasattr(self.app, 'color_display'):
-                try:
-                    color_hex = f"#{r:02x}{g:02x}{b:02x}"
-                    self.app.color_display.setStyleSheet(f"background-color: {color_hex}; border-radius: 4px;")
-                except Exception as e:
-                    self.app.logging_manager.error("COLOR", f"更新颜色显示失败: {e}")
+    def set_region(self, region):
+        if not self.color_recognition:
+            self.color_recognition = ColorRecognition(self.app)
+        self.color_recognition.set_region(region)
+        self.app.color_recognition_region = region
 
     def start_color_recognition(self):
         if not self.color_recognition:
@@ -164,7 +152,8 @@ class ColorRecognitionManager:
             if hasattr(self.app, 'color_commands'):
                 try:
                     commands = self.app.color_commands
-                except Exception:
+                except Exception as e:
+                    self.app.logging_manager.error("COLOR", f"读取 color_commands 失败: {e}")
                     commands = ""
         except ValueError:
             QMessageBox.warning(None, "警告", "颜色设置参数格式错误，请检查！")
@@ -178,19 +167,8 @@ class ColorRecognitionManager:
         self.color_recognition.start_recognition(target_color, tolerance, interval, commands)
 
         if self.color_recognition.is_running:
-            self._thread = threading.Thread(target=self._run_async, daemon=True)
-            self._thread.start()
+            self._thread, self._loop = create_async_thread(self._async_main)
             _set_status_text(self.app, "颜色识别中...")
-
-    def _run_async(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        self._loop = loop
-        try:
-            loop.run_until_complete(self._async_main())
-        finally:
-            loop.close()
-            self._loop = None
 
     async def _async_main(self):
         if self.color_recognition and self.color_recognition.is_running:

@@ -4,6 +4,7 @@
 保持与现有代码的完全兼容
 """
 import os
+import logging
 import threading
 import time
 from typing import Optional
@@ -46,7 +47,8 @@ def _get_win32_input(app=None):
     try:
         from .win32_input import Win32InputBackend
         return Win32InputBackend(app=app)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"_get_win32_input 失败: {e}")
         return None
 
 

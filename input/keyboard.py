@@ -79,8 +79,8 @@ def stop_old_listener(app):
     if hasattr(app, '_listener_health_timer') and app._listener_health_timer:
         try:
             app._listener_health_timer.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            app.logging_manager.error("HOTKEY", f"停止健康检查定时器失败: {e}")
     if hasattr(app, 'global_listener') and app.global_listener:
         try:
             app.global_listener.stop()
@@ -185,7 +185,8 @@ def setup_global_shortcuts(app):
             def _check_listener():
                 try:
                     alive = app.global_listener.running
-                except Exception:
+                except Exception as e:
+                    app.logging_manager.error("HOTKEY", f"健康检查读取 listener.running 失败: {e}")
                     alive = False
                 app.logging_manager.debug("HOTKEY", f"健康检查: listener_alive={alive}")
                 if not alive:

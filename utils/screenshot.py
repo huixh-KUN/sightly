@@ -1,5 +1,6 @@
 import threading
 import time
+import logging
 from PIL import ImageGrab
 from core.priority_lock import PriorityLock
 
@@ -28,7 +29,8 @@ def get_virtual_screen_offset():
         min_x = min(monitor.x for monitor in monitors)
         min_y = min(monitor.y for monitor in monitors)
         return (min_x, min_y)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_virtual_screen_offset 失败: {e}")
         return (0, 0)
 
 
@@ -84,7 +86,8 @@ class ScreenshotManager:
                     old.close()
                 self.last_time = current_time
                 return self.last_full_screenshot.copy()
-            except Exception:
+            except Exception as e:
+                logging.getLogger(__name__).error(f"get_full_screenshot 失败: {e}")
                 return None
     
     def get_region_screenshot(self, region, priority: int = 0):
@@ -116,7 +119,8 @@ class ScreenshotManager:
             bottom = max(y1, y2) - offset_y
             
             return full_screenshot.crop((left, top, right, bottom))
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"get_region_screenshot 失败: {e}")
             return None
         finally:
             full_screenshot.close()

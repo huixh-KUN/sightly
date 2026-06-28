@@ -41,7 +41,8 @@ def find_window_by_title(keyword: str) -> Optional[int]:
     try:
         win32gui.EnumWindows(enum_windows_callback, None)
         return found_hwnd
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"find_window_by_title 失败: {e}")
         return None
 
 
@@ -74,7 +75,8 @@ def find_all_windows_by_title(keyword: str) -> List[Tuple[int, str]]:
     try:
         win32gui.EnumWindows(enum_windows_callback, None)
         return results
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"find_all_windows_by_title 失败: {e}")
         return []
 
 
@@ -90,7 +92,8 @@ def get_window_rect(hwnd: int) -> Optional[tuple]:
     """
     try:
         return win32gui.GetWindowRect(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_rect 失败: {e}")
         return None
 
 
@@ -106,7 +109,8 @@ def get_window_title(hwnd: int) -> Optional[str]:
     """
     try:
         return win32gui.GetWindowText(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_title 失败: {e}")
         return None
 
 
@@ -122,7 +126,8 @@ def is_window_minimized(hwnd: int) -> bool:
     """
     try:
         return win32gui.IsIconic(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"is_window_minimized 失败: {e}")
         return True
 
 
@@ -140,7 +145,8 @@ def restore_window(hwnd: int) -> bool:
         if win32gui.IsIconic(hwnd):
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
         return True
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"restore_window 失败: {e}")
         return False
 
 
@@ -202,10 +208,11 @@ def capture_window(hwnd: int) -> Optional[Image.Image]:
         )
         
         return img
-        
-    except Exception:
+
+    except Exception as e:
+        logging.getLogger(__name__).error(f"capture_window 失败: {e}")
         return None
-    
+
     finally:
         # 先恢复原对象，保证 DeleteObject 成功
         if saveDC and old_bitmap:
@@ -269,8 +276,9 @@ def capture_window_region(hwnd: int, region: tuple) -> Optional[Image.Image]:
             return None
         
         return full_image.crop((x1, y1, x2, y2))
-        
-    except Exception:
+
+    except Exception as e:
+        logging.getLogger(__name__).error(f"capture_window_region 失败: {e}")
         return None
     finally:
         full_image.close()
@@ -289,7 +297,8 @@ def get_window_size(hwnd: int) -> Optional[Tuple[int, int]]:
     try:
         rect = win32gui.GetWindowRect(hwnd)
         return (rect[2] - rect[0], rect[3] - rect[1])
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_size 失败: {e}")
         return None
 
 
@@ -305,7 +314,8 @@ def get_window_class_name(hwnd: int) -> Optional[str]:
     """
     try:
         return win32gui.GetClassName(hwnd)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_class_name 失败: {e}")
         return None
 
 
@@ -313,83 +323,21 @@ def get_window_process_name(hwnd: int) -> Optional[str]:
     """
     获取窗口所属进程名（不含路径）
 
-    通过 GetWindowThreadProcessId + OpenProcess + GetModuleBaseName 获取。
-    优先用 PROCESS_QUERY_LIMITED_INFORMATION（Vista+），失败回退到 CreateToolhelp32Snapshot。
-
     Args:
         hwnd: 窗口句柄
 
     Returns:
         str: 进程名（如 "MuMuPlayer.exe"），失败返回 None
     """
-    from ctypes import wintypes
-
     try:
-        pid = wintypes.DWORD()
-        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        if not pid.value:
+        import win32process
+        import psutil
+        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+        if not pid:
             return None
-
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        handle = ctypes.windll.kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value
-        )
-        if handle:
-            try:
-                exe_name = ctypes.create_unicode_buffer(260)
-                size = wintypes.DWORD(260)
-                if ctypes.windll.kernel32.GetModuleBaseNameW(handle, None, exe_name, size):
-                    return exe_name.value
-            finally:
-                ctypes.windll.kernel32.CloseHandle(handle)
-
-        # 回退：通过 CreateToolhelp32Snapshot 枚举进程
-        return _get_process_name_by_pid(pid.value)
-    except Exception:
-        return None
-
-
-def _get_process_name_by_pid(pid: int) -> Optional[str]:
-    """通过 CreateToolhelp32Snapshot 按 PID 查进程名"""
-    from ctypes import wintypes
-
-    TH32CS_SNAPPROCESS = 0x00000002
-    MAX_PATH = 260
-
-    class PROCESSENTRY32W(ctypes.Structure):
-        _fields_ = [
-            ("dwSize", wintypes.DWORD),
-            ("cntUsage", wintypes.DWORD),
-            ("th32ProcessID", wintypes.DWORD),
-            ("th32DefaultHeapID", ctypes.POINTER(wintypes.ULONG)),
-            ("th32ModuleID", wintypes.DWORD),
-            ("cntThreads", wintypes.DWORD),
-            ("th32ParentProcessID", wintypes.DWORD),
-            ("pcPriClassBase", wintypes.LONG),
-            ("dwFlags", wintypes.DWORD),
-            ("szExeFile", wintypes.CHAR * MAX_PATH),
-        ]
-
-    try:
-        snapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        if snapshot == ctypes.c_void_p(-1).value:
-            return None
-
-        try:
-            pe = PROCESSENTRY32W()
-            pe.dwSize = ctypes.sizeof(PROCESSENTRY32W)
-            if not ctypes.windll.kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
-                return None
-
-            while True:
-                if pe.th32ProcessID == pid:
-                    return pe.szExeFile.decode("utf-8", errors="replace")
-                if not ctypes.windll.kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
-                    break
-            return None
-        finally:
-            ctypes.windll.kernel32.CloseHandle(snapshot)
-    except Exception:
+        return psutil.Process(pid).name()
+    except Exception as e:
+        logging.getLogger(__name__).error(f"get_window_process_name 失败: {e}")
         return None
 
 
@@ -413,24 +361,29 @@ def find_window_by_class_and_process(class_name: str, process_name: str) -> Opti
     candidates = []
 
     def enum_callback(hwnd, _):
-        if not win32gui.IsWindowVisible(hwnd):
-            return True
+        result = True
+        try:
+            if not win32gui.IsWindowVisible(hwnd):
+                return True
 
-        cls = win32gui.GetClassName(hwnd)
-        if cls and cls.lower() == class_name.lower():
-            if process_name:
-                proc = get_window_process_name(hwnd)
-                if proc and proc.lower() == process_name.lower():
+            cls = win32gui.GetClassName(hwnd)
+            if cls and cls.lower() == class_name.lower():
+                if process_name:
+                    proc = get_window_process_name(hwnd)
+                    if proc and proc.lower() == process_name.lower():
+                        candidates.append(hwnd)
+                        result = False
+                else:
                     candidates.append(hwnd)
-                    return False  # 找到即停
-            else:
-                candidates.append(hwnd)
-                return False
-        return True
+                    result = False
+        finally:
+            ctypes.windll.kernel32.SetLastError(0)
+        return result
 
     try:
         win32gui.EnumWindows(enum_callback, None)
-    except Exception:
+    except Exception as e:
+        logging.getLogger(__name__).error(f"find_window_by_class_and_process 失败: {e}")
         return None
 
     return candidates[0] if candidates else None

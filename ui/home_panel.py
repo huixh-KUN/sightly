@@ -28,7 +28,7 @@ class HomePanel(QWidget):
         self.app.logging_manager.log_callback = self.log_viewer.log
         self.app.logging_manager.error_callback = self.log_viewer.log_error
         self.app.logging_manager.clear_callback = self.log_viewer.clear
-        buffer = list(self.app.logging_manager._log_buffer)
+        buffer = self.app.logging_manager.get_log_buffer()
         if buffer:
             self.log_viewer.append_batch([line.rstrip('\n') for line in buffer])
         self.ws_combo.currentTextChanged.connect(self._on_ws_selected)

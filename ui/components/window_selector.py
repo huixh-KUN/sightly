@@ -1,3 +1,4 @@
+import logging
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QPushButton, QListWidget, QListWidgetItem, QDialog
@@ -58,7 +59,8 @@ class WindowSelector(QWidget):
         try:
             import win32gui
             title = win32gui.GetWindowText(hwnd)
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"set_window_by_hwnd 获取标题失败: {e}")
             title = ""
         self._hwnd = hwnd
         self._title = title
@@ -128,5 +130,6 @@ class WindowSelector(QWidget):
                 self._preview.setPixmap(scaled)
             else:
                 self._preview.setText("截取失败")
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).error(f"窗口预览截取失败: {e}")
             self._preview.setText("截取失败")

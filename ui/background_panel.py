@@ -240,8 +240,8 @@ class BackgroundPanel(QWidget):
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             import psutil
             self._window_process = psutil.Process(pid).name()
-        except Exception:
-            pass
+        except Exception as e:
+            self.app.logging_manager.error("BG", f"获取窗口类名/进程名失败: {e}")
         self.window_selected.emit(hwnd, title)
         if self._edit_window and hasattr(self._edit_window._editor, 'set_target_hwnd'):
             self._edit_window._editor.set_target_hwnd(hwnd)
@@ -257,8 +257,8 @@ class BackgroundPanel(QWidget):
                 _, pid = win32process.GetWindowThreadProcessId(hwnd)
                 import psutil
                 self._window_process = psutil.Process(pid).name()
-            except Exception:
-                pass
+            except Exception as e:
+                self.app.logging_manager.error("BG", f"自动重连后获取窗口信息失败: {e}")
             self._window_selector.set_window_by_hwnd(hwnd)
 
 
