@@ -613,12 +613,14 @@ class MainWindow(QMainWindow):
             for i, g in enumerate(bg_list):
                 if not isinstance(g, dict) or _unwrap(g.get("type")) != "image":
                     continue
-                pixmap = _unwrap(g.get("reference_image"))
+                pixmap = _unwrap(g.get("template_image"))
                 if pixmap and hasattr(pixmap, "save") and not pixmap.isNull():
                     path = self.app_state.save_template("background", i, pixmap)
                     g["reference_image"] = path
                 else:
-                    g.pop("reference_image", None)
+                    ref = _unwrap(g.get("reference_image", ""))
+                    if not (isinstance(ref, str) and ref and os.path.exists(ref)):
+                        g.pop("reference_image", None)
             # 图像检测
             img_list = config.get("image", [])
             for i, g in enumerate(img_list):
