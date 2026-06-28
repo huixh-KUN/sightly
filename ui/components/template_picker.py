@@ -100,9 +100,6 @@ class TemplatePicker(QFrame):
             w.activateWindow()
 
     def _on_captured(self, pixmap):
-        null = pixmap is None or pixmap.isNull()
-        has_source = self._manager.has_template()
-        print(f"[TEMPLATE_PICKER] _on_captured: pixmap_null={null}, manager_has_template={has_source}")
         if self._manager.load_from_pixmap(pixmap):
             self.template_selected.emit(self._manager.current_template())
 
