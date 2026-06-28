@@ -39,7 +39,6 @@ QMainWindow, QWidget {
 QMainWindow > QWidget { background-color: #121212; }
 #headerBar { background-color: #1A1A1A; border-bottom: 1px solid #3C4043; min-height: 56px; max-height: 56px; }
 #headerTitle { color: #8AB4F8; font-size: 20px; font-weight: 500; letter-spacing: -0.5px; }
-#versionBadge { color: #5F6368; font-size: 11px; background-color: #2C2C2C; border: none; border-radius: 12px; padding: 2px 10px; margin-left: 8px; }
 #statusDot { background-color: #81C784; border-radius: 5px; min-width: 10px; max-width: 10px; min-height: 10px; max-height: 10px; }
 #statusLabel { color: #9AA0A6; font-size: 13px; margin-left: 6px; }
 #sidebar { background-color: #1A1A1A; border-right: 1px solid #3C4043; min-width: 200px; max-width: 200px; }
@@ -192,7 +191,6 @@ QMainWindow, QWidget {
 QMainWindow > QWidget { background-color: #F0F0F0; }
 #headerBar { background-color: #E8E8E8; border-bottom: 1px solid #D0D0D0; min-height: 56px; max-height: 56px; }
 #headerTitle { color: #1976D2; font-size: 20px; font-weight: 500; letter-spacing: -0.5px; }
-#versionBadge { color: #BDBDBD; font-size: 11px; background-color: #F5F5F5; border: none; border-radius: 12px; padding: 2px 10px; margin-left: 8px; }
 #statusDot { background-color: #4CAF50; border-radius: 5px; min-width: 10px; max-width: 10px; min-height: 10px; max-height: 10px; }
 #statusLabel { color: #757575; font-size: 13px; margin-left: 6px; }
 #sidebar { background-color: #E8E8E8; border-right: 1px solid #D0D0D0; min-width: 200px; max-width: 200px; }

@@ -601,11 +601,10 @@ class MainWindow(QMainWindow):
 
     def _save_template_images(self, config):
         def _unwrap(v):
-            return v.get() if hasattr(v, 'get') else v
+            return v
         try:
             if not self.app_state.current:
                 return
-            # 后台监控 image 类型
             bg_raw = config.get("background", [])
             bg_list = bg_raw.get("groups", bg_raw) if isinstance(bg_raw, dict) else bg_raw
             for i, g in enumerate(bg_list):
@@ -621,7 +620,6 @@ class MainWindow(QMainWindow):
                     ref = _unwrap(g.get("reference_image", ""))
                     if not (isinstance(ref, str) and ref and os.path.exists(ref)):
                         g.pop("reference_image", None)
-            # 图像检测
             img_list = config.get("image", [])
             for i, g in enumerate(img_list):
                 if not isinstance(g, dict):

@@ -379,7 +379,6 @@ class GroupListItem(QFrame):
 
 
 class GroupEditWindow(QDialog):
-    config_changed = Signal(int, dict)
 
     def __init__(self, group_data: dict, group_index: int, group_type: str, panel=None, parent=None,
                  logging_manager=None, target_hwnd=0, app_state=None):
@@ -483,7 +482,7 @@ class GroupEditWindow(QDialog):
         cfg = self._editor.collect_config()
         if self._panel:
             if 0 <= self._group_index < len(self._panel.groups_data):
-                plain = {k: (v.get() if hasattr(v, 'get') else v) for k, v in cfg.items()}
+                plain = dict(cfg)
                 plain["enabled"] = self._panel.groups_data[self._group_index].get("enabled", True)
                 self._panel.groups_data[self._group_index] = plain
                 if self._group_index < len(self._panel.list_items):

@@ -468,8 +468,6 @@ class BackgroundGroupWidget(QFrame):
             "click_enabled": self.click_toggle.isChecked(),
             "click_mode": "physical" if self.click_mode_combo.currentIndex() == 0 else "virtual",
             "click_offset": str(self.offset_spin.value()),
-            "delay_min": "100",
-            "delay_max": "200",
             "interval": str(self.cycle_widget.interval_value()),
             "cycle_enabled": self.cycle_widget.is_cycle_enabled(),
         }

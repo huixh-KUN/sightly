@@ -68,11 +68,7 @@ def _find_content_hwnd(parent_hwnd):
 
 
 def _safe_get(group, key, default):
-    """Safe dict.get() that avoids tkinter variable creation when no tk root exists."""
-    if key in group:
-        val = group[key]
-        return val.get() if hasattr(val, 'get') else val
-    return default
+    return group.get(key, default)
 
 class BackgroundMonitor:
     """

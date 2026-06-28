@@ -267,8 +267,7 @@ class ImageDetectionManager:
             self.app.logging_manager.error("IMAGE", f"更新图像预览失败: {e}")
 
     def _safe_get(self, group, key, default=None):
-        v = group.get(key, default)
-        return v.get() if hasattr(v, 'get') else v
+        return group.get(key, default)
 
     def start_detection(self, group_index):
         groups = getattr(self.app, 'image_groups', [])
