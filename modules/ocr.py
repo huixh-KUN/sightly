@@ -12,12 +12,12 @@ from utils.image import _preprocess_image
 from utils.screenshot import ScreenshotManager
 from utils.recognition import OCRRecognizer
 from core.priority_lock import get_module_priority
-from core.click_handler import ClickHandler
+from core.click_worker import ClickWorker
 from core.async_utils import run_in_executor, create_async_thread
 from utils.memory import MemoryMonitor
 
 
-class OCRModule:
+class OCRManager:
     """
     OCR模块，负责文字识别核心逻辑
     优先级: 3 (Number=6 > Timed=5 > Image=4 > OCR=3 > Color=2 > Script=1)
@@ -25,34 +25,47 @@ class OCRModule:
 
     PRIORITY = get_module_priority('ocr')
 
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, controller):
+        self.controller = controller
+        self.groups = []
         self.last_recognition_times = {}
         self.last_trigger_times = {}
-        self.click_handler = ClickHandler(app)
+        self.click_handler = ClickWorker(controller)
         self.screenshot_manager = ScreenshotManager()
         self.memory_monitor = MemoryMonitor()
         self._last_texts = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
 
+    def set_config(self, config):
+        self.groups = config if isinstance(config, list) else []
+
+    def collect_config(self):
+        return self.groups
+
+    def start(self):
+        self.start_monitoring()
+
+    def stop(self):
+        self.stop_monitoring()
+
     def start_monitoring(self):
         """开始监控（异步协程版）"""
-        self.app.logging_manager.debug("OCR", "start_monitoring 开始")
-        if not self.app.tesseract_available:
-            self.app.logging_manager.debug("OCR", "Tesseract OCR引擎未配置")
+        self.controller.logging_manager.debug("OCR", "start_monitoring 开始")
+        if not self.controller.is_tesseract_available:
+            self.controller.logging_manager.debug("OCR", "Tesseract OCR引擎未配置")
             QMessageBox.information(None, "提示",
                 "Tesseract OCR引擎未配置，请在设置中配置Tesseract路径后使用文字识别功能！")
             return
 
         has_enabled_group = False
-        for group in self.app.ocr_groups:
+        for group in self.groups:
             if group["enabled"] and safe_group_get(group, "region", None):
                 has_enabled_group = True
                 break
 
         if not has_enabled_group:
-            self.app.logging_manager.debug("OCR", "无已启用的识别组")
+            self.controller.logging_manager.debug("OCR", "无已启用的识别组")
             QMessageBox.warning(None, "警告", "请至少启用一个识别组并选择区域")
             return
 
@@ -69,7 +82,7 @@ class OCRModule:
 
     async def _async_main(self):
         tasks = []
-        for i, group in enumerate(self.app.ocr_groups):
+        for i, group in enumerate(self.groups):
             if group["enabled"] and safe_group_get(group, "region", None):
                 t = asyncio.create_task(self._ocr_group_loop(i, group))
                 tasks.append(t)
@@ -86,7 +99,7 @@ class OCRModule:
         cycle = group.get("cycle_enabled", True)
         if isinstance(cycle, str):
             cycle = cycle.lower() in ("true", "1")
-        self.app.logging_manager.debug("OCR",
+        self.controller.logging_manager.debug("OCR",
             f"识别组{group_index+1} 协程开始: keywords={group.get('keywords', '')}, "
             f"循环={'开' if cycle else '关'}")
         try:
@@ -108,7 +121,7 @@ class OCRModule:
                         await asyncio.sleep(1)
                         continue
 
-                    self.app.logging_manager.debug("OCR",
+                    self.controller.logging_manager.debug("OCR",
                         f"识别组{group_index+1} 开始识别: interval={group_interval}")
                     last_hash, frame_count = await run_in_executor(
                         self._do_ocr_group, group, group_index, last_hash, frame_count
@@ -116,18 +129,18 @@ class OCRModule:
                     self.last_recognition_times[group_index] = time.time()
 
                     if not cycle:
-                        self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 单次执行完成，退出")
+                        self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 单次执行完成，退出")
                         break
                     frame_count += 1
                     if self.memory_monitor.gc_if_needed(frame_count):
-                        self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 触发 GC")
+                        self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 触发 GC")
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
-                    self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: {str(e)}")
+                    self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: {str(e)}")
                     await asyncio.sleep(5)
         except asyncio.CancelledError:
-            self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 协程取消")
+            self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 协程取消")
 
     def _do_ocr_group(self, group, group_index, last_hash, frame_count):
         """同步执行单个OCR组的识别（在线程池中运行），返回更新后的 (last_hash, frame_count)"""
@@ -139,12 +152,12 @@ class OCRModule:
 
     def _validate_ocr_group_input(self, group, group_index):
         if not group:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")
             return False, None, None, None, None
 
         region = safe_group_get(group, "region", None)
         if not region:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未设置识别区域")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未设置识别区域")
             return False, None, None, None, None
 
         keywords_str = safe_group_get(group, "keywords", "").strip()
@@ -158,7 +171,7 @@ class OCRModule:
             if len(region) != 4:
                 raise ValueError("区域坐标格式错误")
         except (ValueError, TypeError) as e:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
             return False, None, None, None, None
 
         left = min(x1, x2)
@@ -167,23 +180,23 @@ class OCRModule:
         bottom = max(y1, y2)
 
         if (right - left) < 10 or (bottom - top) < 10:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 识别区域太小")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 识别区域太小")
             return False, None, None, None, None
 
         return True, left, top, right, bottom
     
     def _capture_screen_region(self, left, top, right, bottom, group_index):
         try:
-            self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图请求: ({left},{top})-({right},{bottom})")
+            self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 截图请求: ({left},{top})-({right},{bottom})")
             screenshot = self.screenshot_manager.get_region_screenshot((left, top, right, bottom), priority=self.PRIORITY)
             if screenshot:
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图成功: {screenshot.size}")
+                self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 截图成功: {screenshot.size}")
             else:
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图返回 None")
+                self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 截图返回 None")
             return screenshot
         except Exception as e:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 屏幕截图失败 - {str(e)}")
-            self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图异常: {e}")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 屏幕截图失败 - {str(e)}")
+            self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 截图异常: {e}")
             return None
     
     def _recognize_on_processed_image(
@@ -201,21 +214,21 @@ class OCRModule:
         if keywords_str:
             keywords = [kw.strip().lower() for kw in keywords_str.split(",") if kw.strip()]
             if log_results:
-                self.app.logging_manager.log_message(
+                self.controller.logging_manager.log_message(
                     f"识别组{group_index+1}: 开始OCR识别，关键词: {keywords}"
                 )
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 开始OCR识别")
+                self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 开始OCR识别")
             text = OCRRecognizer.get_text(processed_image, current_lang)
             result["text"] = text or ""
             if not text:
                 result["detail"] = "OCR未识别到文字"
                 if log_results:
-                    self.app.logging_manager.log_message(f"识别组{group_index+1}: OCR未识别到文字")
+                    self.controller.logging_manager.log_message(f"识别组{group_index+1}: OCR未识别到文字")
                 return result
             if log_results:
                 last_text = self._last_texts.get(group_index)
                 if text.strip() != last_text:
-                    self.app.logging_manager.log_message(
+                    self.controller.logging_manager.log_message(
                         f"识别组{group_index+1}识别结果: '{text.strip()[:60]}'"
                     )
                     self._last_texts[group_index] = text.strip()
@@ -239,21 +252,21 @@ class OCRModule:
                     f"识别文本: '{text.strip()[:60]}'"
                 )
                 if log_results:
-                    self.app.logging_manager.log_message(
+                    self.controller.logging_manager.log_message(
                         f"识别组{group_index+1}: 关键词匹配成功 - {matched_keywords}"
                     )
             else:
                 result["detail"] = f"未匹配到关键词；识别文本: '{text.strip()[:60]}'"
         else:
             if log_results:
-                self.app.logging_manager.log_message(f"识别组{group_index+1}: 开始OCR识别（无关键词）")
+                self.controller.logging_manager.log_message(f"识别组{group_index+1}: 开始OCR识别（无关键词）")
             text = OCRRecognizer.get_text(processed_image, current_lang)
             result["text"] = text or ""
             if text:
                 if log_results:
                     last_text = self._last_texts.get(group_index)
                     if text.strip() != last_text:
-                        self.app.logging_manager.log_message(
+                        self.controller.logging_manager.log_message(
                             f"识别组{group_index+1}识别结果: '{text.strip()[:60]}'"
                         )
                         self._last_texts[group_index] = text.strip()
@@ -288,7 +301,7 @@ class OCRModule:
             rec["executed"] = False
             return rec
         except Exception as e:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}测试识别失败: {e}")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}测试识别失败: {e}")
             return {"matched": False, "executed": False, "detail": str(e)}
         finally:
             if processed_image is not None:
@@ -309,7 +322,7 @@ class OCRModule:
         )
 
     def test_group(self, index) -> dict:
-        groups = getattr(self.app, 'ocr_groups', [])
+        groups = getattr(self.controller, 'ocr_groups', [])
         if index >= len(groups):
             return {"matched": False, "executed": False, "detail": "组索引越界"}
         group = groups[index]
@@ -333,10 +346,10 @@ class OCRModule:
         screenshot = None
         processed_image = None
         try:
-            if not self.app.is_running:
+            if not self.controller.is_running:
                 return
 
-            self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 开始处理")
+            self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 开始处理")
 
             valid, region, keywords_str, current_lang, click_enabled = self._validate_ocr_group_input(group, group_index)
             if not valid:
@@ -346,18 +359,18 @@ class OCRModule:
             if not valid:
                 return
 
-            self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 区域: ({left},{top})-({right},{bottom})")
+            self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 区域: ({left},{top})-({right},{bottom})")
 
             screenshot = self._capture_screen_region(left, top, right, bottom, group_index)
             if not screenshot:
-                self.app.logging_manager.error("OCR", f"识别组{group_index+1}: 截图失败或为空")
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图失败或为空")
+                self.controller.logging_manager.error("OCR", f"识别组{group_index+1}: 截图失败或为空")
+                self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 截图失败或为空")
                 return
 
             region_w = right - left
             region_h = bottom - top
-            self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 截图成功: 尺寸={screenshot.size}, 模式={screenshot.mode}")
-            self.app.logging_manager.log_message(f"识别组{group_index+1}: 截图完成 ({region_w}x{region_h})")
+            self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 截图成功: 尺寸={screenshot.size}, 模式={screenshot.mode}")
+            self.controller.logging_manager.log_message(f"识别组{group_index+1}: 截图完成 ({region_w}x{region_h})")
 
             current_hash = imagehash.average_hash(screenshot.resize((64, 64)))
             
@@ -372,8 +385,8 @@ class OCRModule:
 
             processed_image = _preprocess_image(screenshot, group_index)
             if not processed_image:
-                self.app.logging_manager.error("OCR", f"识别组{group_index+1}: 图像预处理失败")
-                self.app.logging_manager.debug("OCR", f"识别组{group_index+1} 图像预处理失败")
+                self.controller.logging_manager.error("OCR", f"识别组{group_index+1}: 图像预处理失败")
+                self.controller.logging_manager.debug("OCR", f"识别组{group_index+1} 图像预处理失败")
                 return
 
             rec = self._recognize_on_processed_image(
@@ -387,17 +400,17 @@ class OCRModule:
             if rec.get("matched"):
                 if click_enabled and rec.get("click_pos"):
                     click_pos = rec["click_pos"]
-                    self.app.logging_manager.log_message(
+                    self.controller.logging_manager.log_message(
                         f"识别组{group_index+1}: 点击位置 ({click_pos[0]}, {click_pos[1]})"
                     )
                 self.execute_group_actions(group, group_index, rec, for_test=False)
             elif keywords_str:
-                self.app.logging_manager.log_message(f"识别组{group_index+1}: 未匹配到关键词")
+                self.controller.logging_manager.log_message(f"识别组{group_index+1}: 未匹配到关键词")
 
         except Exception as e:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未知错误 - {str(e)}")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未知错误 - {str(e)}")
             import traceback
-            self.app.logging_manager.error("OCR", f"错误详情: {traceback.format_exc()}")
+            self.controller.logging_manager.error("OCR", f"错误详情: {traceback.format_exc()}")
         finally:
             if processed_image is not None:
                 del processed_image
@@ -407,7 +420,7 @@ class OCRModule:
     
     def _validate_trigger_input(self, group, group_index):
         if not group:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 组配置为空")
             return False, None, None, None
 
         key = safe_group_get(group, "key", "")
@@ -415,7 +428,7 @@ class OCRModule:
         region = safe_group_get(group, "region", None)
 
         if not key:
-            self.app.logging_manager.log_message(f"识别组{group_index+1}警告: 未设置触发按键")
+            self.controller.logging_manager.log_message(f"识别组{group_index+1}警告: 未设置触发按键")
 
         return True, key, alarm_enabled, region
     
@@ -424,7 +437,7 @@ class OCRModule:
             return click_pos
 
         if not region:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未设置识别区域，无法计算点击位置")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 未设置识别区域，无法计算点击位置")
             return None, None
 
         try:
@@ -433,44 +446,44 @@ class OCRModule:
             click_y = (y1 + y2) // 2
             return click_x, click_y
         except (ValueError, TypeError) as e:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 区域坐标无效 - {str(e)}")
             return None, None
     
     def _execute_key_press(self, key, group_index, *, for_test=False):
-        if not for_test and (not self.app.is_running or getattr(self.app, 'system_stopped', False)):
+        if not for_test and (not self.controller.is_running or getattr(self.controller, 'system_stopped', False)):
             return
 
         if not key:
             return
 
-        group = self.app.ocr_groups[group_index]
+        group = self.groups[group_index]
         
-        from modules.input import KeyEventExecutor
+        from modules.key_event_worker import KeyEventWorker
         delay_min = int(group.get("delay_min", 1))
         delay_max = int(group.get("delay_max", 3))
-        executor = KeyEventExecutor(self.app.input_controller, delay_min, delay_max, self.PRIORITY)
+        executor = KeyEventWorker(self.controller.input_controller, delay_min, delay_max, self.PRIORITY)
         executor.execute_keypress(key)
         
-        self.app.logging_manager.log_message(f"识别组{group_index+1}按下了 {key} 键")
+        self.controller.logging_manager.log_message(f"识别组{group_index+1}按下了 {key} 键")
         self.last_trigger_times[group_index] = time.time()
     
     def _play_alarm_if_enabled(self, alarm_enabled, group_index):
         try:
             if alarm_enabled:
-                self.app.alarm_module.play_alarm_sound(True)
+                self.controller.alarm_module.play_alarm_sound(True)
         except Exception as e:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 播放报警声音失败 - {str(e)}")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 播放报警声音失败 - {str(e)}")
     
     def trigger_action_for_group(self, group, group_index, click_enabled, click_pos=None, *, for_test=False):
         try:
-            if not for_test and (not self.app.is_running or getattr(self.app, 'system_stopped', False)):
+            if not for_test and (not self.controller.is_running or getattr(self.controller, 'system_stopped', False)):
                 return
 
             valid, key, alarm_enabled, region = self._validate_trigger_input(group, group_index)
             if not valid:
                 return
 
-            self.app.logging_manager.log_message(f"识别组{group_index+1}触发动作，按键: {key}")
+            self.controller.logging_manager.log_message(f"识别组{group_index+1}触发动作，按键: {key}")
 
             if click_enabled:
                 click_x, click_y = self._calculate_click_position(click_pos, region, group_index)
@@ -487,9 +500,9 @@ class OCRModule:
 
             self._execute_key_press(key, group_index, for_test=for_test)
         except Exception as e:
-            self.app.logging_manager.error("OCR", f"识别组{group_index+1}错误: 触发动作失败 - {str(e)}")
+            self.controller.logging_manager.error("OCR", f"识别组{group_index+1}错误: 触发动作失败 - {str(e)}")
             import traceback
-            self.app.logging_manager.error("OCR", f"错误详情: {traceback.format_exc()}")
+            self.controller.logging_manager.error("OCR", f"错误详情: {traceback.format_exc()}")
 
         if 'alarm_enabled' in locals():
             self._play_alarm_if_enabled(alarm_enabled, group_index)

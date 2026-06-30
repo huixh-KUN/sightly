@@ -10,8 +10,8 @@ from utils.window_capture import find_window_by_title, get_window_rect
 class QuickSwitchBackend:
     """快速窗口切换后台操作实现"""
     
-    def __init__(self, app=None):
-        self.app = app
+    def __init__(self, controller=None):
+        self.controller = controller
         self.hwnd: Optional[int] = None
         self.switch_delay: float = 0.05
         self.restore_delay: float = 0.02
@@ -20,8 +20,8 @@ class QuickSwitchBackend:
     
     def _get_input_controller(self):
         """获取输入控制器"""
-        if self._input_controller is None and self.app:
-            self._input_controller = self.app.input_controller
+        if self._input_controller is None and self.controller:
+            self._input_controller = self.controller.input_controller
         return self._input_controller
     
     def find_window(self, title_keyword: str) -> Tuple[bool, Optional[str]]:

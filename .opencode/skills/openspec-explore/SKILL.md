@@ -1,6 +1,6 @@
 ---
 name: openspec-explore
-description: "探索/分析模式：帮助用户梳理需求、分析问题、方案对比、架构设计。当用户说'帮我想想''分析一下''探讨方案''怎么设计'时触发。A thinking partner for exploring ideas, investigating problems, and clarifying requirements."
+description: Enter explore mode - a thinking partner for exploring ideas, investigating problems, and clarifying requirements. Use when the user wants to think through something before or during a change.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:

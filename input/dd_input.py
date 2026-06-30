@@ -107,14 +107,14 @@ VK_CODE_MAP = {
 }
 
 
-class DDVirtualInput(BaseInputController):
+class DDInputBackend(BaseInputController):
     """DD虚拟键盘输入控制器"""
     
-    def __init__(self, app=None, dll_path: str = None):
+    def __init__(self, controller=None, dll_path: str = None):
         self._dd_dll = None
         self._available = False
         self._dll_path = dll_path
-        self.app = app
+        self.controller = controller
         self._vk_cache = {}
         
         self._load_dd_dll()
@@ -169,8 +169,8 @@ class DDVirtualInput(BaseInputController):
     
     def _log(self, message: str):
         """日志输出"""
-        if self.app and hasattr(self.app, 'logging_manager'):
-            self.app.logging_manager.log_message(message)
+        if self.controller and hasattr(self.controller, 'logging_manager'):
+            self.controller.logging_manager.log_message(message)
     
     def _get_dd_code(self, key: str) -> int:
         """

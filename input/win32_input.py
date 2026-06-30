@@ -173,8 +173,8 @@ def _send_mouse_button(button, down=True):
 class Win32InputBackend(BaseInputController):
     """纯 Windows API 输入后端，无任何外部依赖"""
 
-    def __init__(self, app=None):
-        self.app = app
+    def __init__(self, controller=None):
+        self.controller = controller
         self._log("Win32InputBackend 初始化完成")
 
     @property
@@ -186,8 +186,8 @@ class Win32InputBackend(BaseInputController):
         return True
 
     def _log(self, message: str):
-        if self.app and hasattr(self.app, 'logging_manager'):
-            self.app.logging_manager.log_message(message)
+        if self.controller and hasattr(self.controller, 'logging_manager'):
+            self.controller.logging_manager.log_message(message)
 
     def key_down(self, key: str, priority: int = 0) -> bool:
         vk = _to_vk(key)

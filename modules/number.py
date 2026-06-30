@@ -30,13 +30,14 @@ class _LRUCacheDict(OrderedDict):
             self.popitem(last=False)
 
 
-class NumberModule:
+class NumberManager:
     """数字识别模块 - 优先级最高(6)"""
 
     PRIORITY = get_module_priority('number')
 
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, controller):
+        self.controller = controller
+        self.regions = []
         self.screenshot_manager = ScreenshotManager()
         self.memory_monitor = MemoryMonitor()
         self._last_results = {}
@@ -44,9 +45,21 @@ class NumberModule:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
 
+    def set_config(self, config):
+        self.regions = config if isinstance(config, list) else []
+
+    def collect_config(self):
+        return self.regions
+
+    def start(self):
+        self.start_number_recognition()
+
+    def stop(self):
+        self.stop_number_recognition()
+
     def start_number_recognition(self):
         groups = []
-        regions = getattr(self.app, 'number_regions', [])
+        regions = self.regions
         for i, rc in enumerate(regions):
             if not rc["enabled"]:
                 continue
@@ -111,7 +124,7 @@ class NumberModule:
                 pass
 
     async def _number_group_loop(self, g):
-        self.app.logging_manager.debug("NUMBER",
+        self.controller.logging_manager.debug("NUMBER",
             f"数字识别组{g['index']+1} 协程开始: 阈值={g['threshold']}, "
             f"置信度={g['confidence_threshold']}, 循环={'开' if g['cycle_enabled'] else '关'}, "
             f"间隔={g['interval']}s")
@@ -119,7 +132,7 @@ class NumberModule:
         try:
             while not (self._loop and self._loop.is_closed()):
                 if not self._check_group_enabled(g["index"]):
-                    self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 已禁用，退出")
+                    self.controller.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 已禁用，退出")
                     break
                 try:
                     interval = g["interval"]
@@ -127,34 +140,34 @@ class NumberModule:
                         import random
                         interval = random.uniform(0.25, 0.3)
                     await asyncio.sleep(interval)
-                    self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 截图")
+                    self.controller.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 截图")
                     screenshot = await run_in_executor(self.take_screenshot, g["region"])
                     if screenshot is None:
-                        self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 截图为空")
+                        self.controller.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 截图为空")
                         continue
-                    self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 开始OCR")
+                    self.controller.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 开始OCR")
                     text = await run_in_executor(
                         self.ocr_number, screenshot, g["confidence_threshold"]
                     )
                     screenshot.close()
                     del screenshot
                     number = NumberRecognizer.parse_number(text, self._number_cache)
-                    self.app.logging_manager.debug("NUMBER",
+                    self.controller.logging_manager.debug("NUMBER",
                         f"数字识别组{g['index']+1} raw='{text}', parsed={number}")
                     if number is not None:
                         last = self._last_results.get(g["index"])
                         if number != last:
-                            self.app.logging_manager.log_message(
+                            self.controller.logging_manager.log_message(
                                 f"数字识别{g['index']+1}解析结果: {number}"
                             )
                             self._last_results[g["index"]] = number
 
                         if number < g["threshold"]:
-                            self.app.logging_manager.debug("NUMBER",
+                            self.controller.logging_manager.debug("NUMBER",
                                 f"数字识别组{g['index']+1} 低于阈值 {g['threshold']}, 触发动作")
                             alarm = self._safe_get_alarm(g["index"])
                             if alarm:
-                                await run_in_executor(self.app.alarm_module.play_alarm_sound, alarm)
+                                await run_in_executor(self.controller.alarm_module.play_alarm_sound, alarm)
                             if g["key"]:
                                 await run_in_executor(
                                     self._execute_keypress, g["key"], g["index"],
@@ -163,62 +176,62 @@ class NumberModule:
                     else:
                         last = self._last_results.get(g["index"])
                         if text != last:
-                            self.app.logging_manager.log_message(
+                            self.controller.logging_manager.log_message(
                                 f"数字识别{g['index']+1}结果: '{text}'"
                             )
                             self._last_results[g["index"]] = text
                     
                     if not g["cycle_enabled"]:
-                        self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 单次执行完成，退出")
+                        self.controller.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 单次执行完成，退出")
                         break
                     frame_count += 1
                     if self.memory_monitor.gc_if_needed(frame_count):
-                        self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 触发 GC")
+                        self.controller.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 触发 GC")
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
-                    self.app.logging_manager.error("NUMBER",
+                    self.controller.logging_manager.error("NUMBER",
                         f"数字识别{g['index']+1}错误: {str(e)}"
                     )
                     await asyncio.sleep(5)
         except asyncio.CancelledError:
-            self.app.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 协程取消")
+            self.controller.logging_manager.debug("NUMBER", f"数字识别组{g['index']+1} 协程取消")
 
     def _check_group_enabled(self, index):
-        regions = getattr(self.app, 'number_regions', [])
+        regions = self.regions
         if index >= len(regions):
             return False
         try:
             return bool(regions[index]["enabled"])
         except Exception as e:
-            self.app.logging_manager.error("NUMBER", f"_check_region_enabled 失败: {e}")
+            self.controller.logging_manager.error("NUMBER", f"_check_region_enabled 失败: {e}")
             return False
 
     def _safe_get_alarm(self, index):
-        regions = getattr(self.app, 'number_regions', [])
+        regions = self.regions
         if index < len(regions):
             try:
                 return regions[index]["alarm"]
             except Exception as e:
-                self.app.logging_manager.error("NUMBER", f"_safe_get_alarm 失败: {e}")
+                self.controller.logging_manager.error("NUMBER", f"_safe_get_alarm 失败: {e}")
         return False
 
     def _execute_keypress(self, key, group_index, delay_min, delay_max):
-        self.app.logging_manager.log_message(
+        self.controller.logging_manager.log_message(
             f"数字识别{group_index+1}触发按键: {key}"
         )
-        from modules.input import KeyEventExecutor
-        executor = KeyEventExecutor(
-            self.app.input_controller, delay_min, delay_max, self.PRIORITY
+        from modules.key_event_worker import KeyEventWorker
+        executor = KeyEventWorker(
+            self.controller.input_controller, delay_min, delay_max, self.PRIORITY
         )
         executor.execute_keypress(key)
-        self.app.logging_manager.log_message(
+        self.controller.logging_manager.log_message(
             f"数字识别{group_index+1}按下了 {key} 键，"
             f"按住时长范围: {delay_min}-{delay_max} 毫秒"
         )
 
     def test_group(self, index) -> dict:
-        regions = getattr(self.app, 'number_regions', [])
+        regions = self.regions
         if index >= len(regions):
             return {"matched": False, "executed": False, "detail": "组索引越界"}
         rc = regions[index]
@@ -228,7 +241,7 @@ class NumberModule:
         try:
             confidence = float(rc.get("confidence_threshold", "0.3"))
         except Exception as e:
-            self.app.logging_manager.error("NUMBER", f"置信度阈值转换失败: {e}")
+            self.controller.logging_manager.error("NUMBER", f"置信度阈值转换失败: {e}")
             confidence = 0.3
         screenshot = self.take_screenshot(region)
         if screenshot is None:
@@ -256,7 +269,7 @@ class NumberModule:
                 region, priority=self.PRIORITY
             )
         except Exception as e:
-            self.app.logging_manager.error("NUMBER",
+            self.controller.logging_manager.error("NUMBER",
                 f"数字识别错误: 屏幕截图失败 - {str(e)}"
             )
             return None

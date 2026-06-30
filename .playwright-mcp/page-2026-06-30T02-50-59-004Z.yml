@@ -1,0 +1,97 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "FreeModel" [ref=e5] [cursor=pointer]:
+        - /url: "#"
+        - img [ref=e7]
+        - generic [ref=e9]:
+          - emphasis [ref=e10]: Free
+          - text: Model
+      - generic [ref=e11]:
+        - button "登录" [ref=e12] [cursor=pointer]
+        - button "免费试用 →" [ref=e13] [cursor=pointer]
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]: 完成认证 · 免费畅享一个月 Pro
+      - heading "最前沿 AI， 免费一个月 认证即享。" [level=1] [ref=e17]:
+        - text: 最前沿 AI，
+        - emphasis [ref=e18]: 免费一个月
+        - text: 认证即享。
+      - paragraph [ref=e19]: 注册并完成新账号认证，即可免费获得一个月 Pro 账号，通过一个兼容 OpenAI 的接口调用我们最新的模型。
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - generic [ref=e22]: 1 个月
+          - text: 认证即享 Pro
+        - generic [ref=e23]:
+          - generic [ref=e24]: 前沿
+          - text: 最新 AI 模型
+        - generic [ref=e25]:
+          - generic [ref=e26]: "1"
+          - text: 兼容 OpenAI 的 API
+    - complementary [ref=e27]:
+      - generic [ref=e28]:
+        - heading "登录 FreeModel" [level=2] [ref=e30]
+        - link "使用 Google 登录" [ref=e31] [cursor=pointer]:
+          - /url: /api/auth/google/redirect
+          - img [ref=e32]
+          - text: 使用 Google 登录
+        - generic [ref=e38]: 或
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - generic [ref=e41]: 邮箱地址
+            - textbox "邮箱地址" [ref=e42]:
+              - /placeholder: you@company.com
+          - button "发送验证码" [ref=e43] [cursor=pointer]
+        - paragraph [ref=e44]:
+          - text: 继续即表示您同意我们的
+          - link "服务条款" [ref=e45] [cursor=pointer]:
+            - /url: /terms
+          - text: 和
+          - link "隐私政策" [ref=e46] [cursor=pointer]:
+            - /url: /privacy
+          - text: .
+  - generic [ref=e48]:
+    - generic [ref=e49]:
+      - heading "你所需要的一切。 免费一个月。" [level=2] [ref=e50]:
+        - text: 你所需要的一切。
+        - emphasis [ref=e51]: 免费一个月。
+      - paragraph [ref=e52]: 完成新账号认证，免费解锁整整一个月 Pro。
+    - generic [ref=e53]:
+      - generic [ref=e54]:
+        - img [ref=e56]
+        - heading "免费一个月 Pro" [level=3] [ref=e59]
+        - paragraph [ref=e60]: 完成新账号认证，即可免费获得整整一个月 Pro，无需绑定支付方式，即刻开始构建。
+      - generic [ref=e61]:
+        - img [ref=e63]
+        - heading "前沿模型" [level=3] [ref=e67]
+        - paragraph [ref=e68]: 调用我们最新的模型，通过单一简洁的 API 接口即可完成。
+      - generic [ref=e69]:
+        - img [ref=e71]
+        - heading "兼容 OpenAI" [level=3] [ref=e74]
+        - paragraph [ref=e75]: OpenAI API 的即插即用替代品，与你现有的所有 SDK 和工具完美兼容。
+  - contentinfo [ref=e76]:
+    - generic [ref=e77]:
+      - generic [ref=e78]:
+        - link "FreeModel" [ref=e79] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=e81]
+          - generic [ref=e83]:
+            - emphasis [ref=e84]: Free
+            - text: Model
+        - paragraph [ref=e85]: 最强模型，一个简洁 API 全包。专为快速交付的开发者打造。
+      - generic [ref=e86]:
+        - heading "产品" [level=4] [ref=e87]
+        - list [ref=e88]:
+          - listitem [ref=e89]:
+            - link "定价" [ref=e90] [cursor=pointer]:
+              - /url: "#features"
+      - generic [ref=e91]:
+        - heading "法律" [level=4] [ref=e92]
+        - list [ref=e93]:
+          - listitem [ref=e94]:
+            - link "隐私政策" [ref=e95] [cursor=pointer]:
+              - /url: /privacy
+          - listitem [ref=e96]:
+            - link "服务条款" [ref=e97] [cursor=pointer]:
+              - /url: /terms
+    - generic [ref=e98]: © 2026 freemodel.dev — 保留所有权利。

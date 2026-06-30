@@ -30,11 +30,11 @@ def _set_status_text(app, text):
         QTimer.singleShot(0, lambda: app.status_label.setText(text))
 
 
-class ScriptExecutor:
+class ScriptWorker:
     PRIORITY = get_module_priority('script')
 
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, controller):
+        self.controller = controller
         self.resources = []
         self.is_running = False
         self.is_paused = False
@@ -54,7 +54,7 @@ class ScriptExecutor:
             try:
                 cleanup_func(resource)
             except Exception as e:
-                self.app.logging_manager.error("SCRIPT", f"资源清理失败: {e}")
+                self.controller.logging_manager.error("SCRIPT", f"资源清理失败: {e}")
         self.resources.clear()
 
     def _optimize_delay(self, command, next_command=None):
@@ -83,7 +83,7 @@ class ScriptExecutor:
                     if command:
                         commands.append(command)
                 if not commands:
-                    self.app.logging_manager.log_message("脚本中没有有效命令！")
+                    self.controller.logging_manager.log_message("脚本中没有有效命令！")
                     self.is_running = False
                     return
                 while self.is_running:
@@ -111,28 +111,28 @@ class ScriptExecutor:
                                 try:
                                     if command["type"] == "keydown":
                                         if key not in pressed_keys:
-                                            self.app.input_controller.key_down(key, priority=self.PRIORITY)
+                                            self.controller.input_controller.key_down(key, priority=self.PRIORITY)
                                             pressed_keys.add(key)
                                     elif command["type"] == "keyup":
                                         if key in pressed_keys:
-                                            self.app.input_controller.key_up(key, priority=self.PRIORITY)
+                                            self.controller.input_controller.key_up(key, priority=self.PRIORITY)
                                             pressed_keys.remove(key)
                                 except Exception as e:
-                                    self.app.logging_manager.error("SCRIPT", f"执行按键 {key} 时出错: {str(e)}")
+                                    self.controller.logging_manager.error("SCRIPT", f"执行按键 {key} 时出错: {str(e)}")
                         else:
                             next_cmd = commands[i + 1] if i + 1 < len(commands) else None
                             self._execute_with_optimization(command, next_cmd)
             except Exception as e:
                 error_msg = f"脚本执行出错: {str(e)}"
-                self.app.logging_manager.error("SCRIPT", error_msg)
-                _set_status_text(self.app, f"执行错误: {str(e)}")
+                self.controller.logging_manager.error("SCRIPT", error_msg)
+                _set_status_text(self.controller, f"执行错误: {str(e)}")
             finally:
                 for key in pressed_keys:
                     try:
-                        self.app.input_controller.key_up(key, priority=self.PRIORITY)
-                        self.app.logging_manager.log_message(f"确保抬起: {key}")
+                        self.controller.input_controller.key_up(key, priority=self.PRIORITY)
+                        self.controller.logging_manager.log_message(f"确保抬起: {key}")
                     except Exception as e:
-                        self.app.logging_manager.error("SCRIPT", f"抬起按键 {key} 时出错: {str(e)}")
+                        self.controller.logging_manager.error("SCRIPT", f"抬起按键 {key} 时出错: {str(e)}")
                 self.is_running = False
 
         self.execution_thread = threading.Thread(target=execute, daemon=True)
@@ -151,7 +151,7 @@ class ScriptExecutor:
                     if command:
                         commands.append(command)
                 if not commands:
-                    self.app.logging_manager.log_message("脚本中没有有效命令！")
+                    self.controller.logging_manager.log_message("脚本中没有有效命令！")
                     self.is_running = False
                     return
                 for i, command in enumerate(commands):
@@ -177,28 +177,28 @@ class ScriptExecutor:
                                 break
                             if command["type"] == "keydown":
                                 if key not in pressed_keys:
-                                    self.app.input_controller.key_down(key, priority=self.PRIORITY)
+                                    self.controller.input_controller.key_down(key, priority=self.PRIORITY)
                                     pressed_keys.add(key)
                             elif command["type"] == "keyup":
                                 if key in pressed_keys:
-                                    self.app.input_controller.key_up(key, priority=self.PRIORITY)
+                                    self.controller.input_controller.key_up(key, priority=self.PRIORITY)
                                     pressed_keys.remove(key)
                     else:
                         next_cmd = commands[i + 1] if i + 1 < len(commands) else None
                         self._execute_with_optimization(command, next_cmd)
             except Exception as e:
                 error_msg = f"脚本执行出错: {str(e)}"
-                self.app.logging_manager.error("SCRIPT", error_msg)
-                _set_status_text(self.app, f"执行错误: {str(e)}")
+                self.controller.logging_manager.error("SCRIPT", error_msg)
+                _set_status_text(self.controller, f"执行错误: {str(e)}")
             finally:
                 for key in pressed_keys:
                     try:
-                        self.app.input_controller.key_up(key, priority=self.PRIORITY)
-                        self.app.logging_manager.log_message(f"确保抬起: {key}")
+                        self.controller.input_controller.key_up(key, priority=self.PRIORITY)
+                        self.controller.logging_manager.log_message(f"确保抬起: {key}")
                     except Exception as e:
-                        self.app.logging_manager.error("SCRIPT", f"抬起按键 {key} 时出错: {str(e)}")
+                        self.controller.logging_manager.error("SCRIPT", f"抬起按键 {key} 时出错: {str(e)}")
                 self.is_running = False
-                self.app.logging_manager.log_message("脚本执行完成")
+                self.controller.logging_manager.log_message("脚本执行完成")
 
         self.execution_thread = threading.Thread(target=execute, daemon=True)
         self.execution_thread.start()
@@ -256,9 +256,9 @@ class ScriptExecutor:
                     if not self.is_running:
                         break
                     if command["type"] == "keydown":
-                        self.app.input_controller.key_down(key, priority=self.PRIORITY)
+                        self.controller.input_controller.key_down(key, priority=self.PRIORITY)
                     else:
-                        self.app.input_controller.key_up(key, priority=self.PRIORITY)
+                        self.controller.input_controller.key_up(key, priority=self.PRIORITY)
             elif command["type"] in ["mouse_down", "mouse_up"]:
                 button = command["button"]
                 count = int(command["count"])
@@ -272,9 +272,9 @@ class ScriptExecutor:
                     if not self.is_running:
                         break
                     if command["type"] == "mouse_down":
-                        self.app.input_controller.mouse_down(button=button, priority=self.PRIORITY)
+                        self.controller.input_controller.mouse_down(button=button, priority=self.PRIORITY)
                     else:
-                        self.app.input_controller.mouse_up(button=button, priority=self.PRIORITY)
+                        self.controller.input_controller.mouse_up(button=button, priority=self.PRIORITY)
             elif command["type"] == "click":
                 button = command["button"]
                 count = int(command["count"])
@@ -287,17 +287,17 @@ class ScriptExecutor:
                             break
                     if not self.is_running:
                         break
-                    self.app.input_controller.mouse_down(button=button, priority=self.PRIORITY)
+                    self.controller.input_controller.mouse_down(button=button, priority=self.PRIORITY)
                     time.sleep(0.05)
-                    self.app.input_controller.mouse_up(button=button, priority=self.PRIORITY)
+                    self.controller.input_controller.mouse_up(button=button, priority=self.PRIORITY)
             elif command["type"] == "moveto":
                 x = int(command["x"])
                 y = int(command["y"])
                 if self.is_running and not self.is_paused:
-                    self.app.input_controller.move_to(x, y, priority=self.PRIORITY)
+                    self.controller.input_controller.move_to(x, y, priority=self.PRIORITY)
             elif command["type"] == "delay":
                 delay_time = command["time"] / 1000
-                self.app.logging_manager.log_message(f"执行: 延迟 {delay_time}秒")
+                self.controller.logging_manager.log_message(f"执行: 延迟 {delay_time}秒")
                 start_time = time.time()
                 elapsed_time = 0
                 while elapsed_time < delay_time:
@@ -314,9 +314,9 @@ class ScriptExecutor:
                     elapsed_time = time.time() - start_time
         except Exception as e:
             error_msg = f"执行命令出错: {str(e)}"
-            self.app.logging_manager.error("SCRIPT", error_msg)
+            self.controller.logging_manager.error("SCRIPT", error_msg)
             import traceback
-            self.app.logging_manager.error("SCRIPT", f"错误详情: {traceback.format_exc()}")
+            self.controller.logging_manager.error("SCRIPT", f"错误详情: {traceback.format_exc()}")
             return
 
     def pause_script(self):
@@ -372,7 +372,7 @@ class ScriptExecutor:
                 except AttributeError:
                     key_name = key.name
                 except Exception as e:
-                    self.app.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
+                    self.controller.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
                     return
                 key_name = pynput_to_pyautogui_map.get(key_name, key_name)
                 if key_name == _get_record_hotkey():
@@ -387,7 +387,7 @@ class ScriptExecutor:
                         })
                         pressed_keys.add(key_name)
                     except Exception as e:
-                        self.app.logging_manager.error("SCRIPT", f"录制按键事件追加失败: {e}")
+                        self.controller.logging_manager.error("SCRIPT", f"录制按键事件追加失败: {e}")
 
             def on_key_release(key):
                 if not self.is_recording:
@@ -399,7 +399,7 @@ class ScriptExecutor:
                 except AttributeError:
                     key_name = key.name
                 except Exception as e:
-                    self.app.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
+                    self.controller.logging_manager.error("SCRIPT", f"录制按键名解析失败: {e}")
                     return
                 key_name = pynput_to_pyautogui_map.get(key_name, key_name)
                 if key_name == _get_record_hotkey():
@@ -414,7 +414,7 @@ class ScriptExecutor:
                         })
                         pressed_keys.remove(key_name)
                     except Exception as e:
-                        self.app.logging_manager.error("SCRIPT", f"录制按键释放事件追加失败: {e}")
+                        self.controller.logging_manager.error("SCRIPT", f"录制按键释放事件追加失败: {e}")
 
             def on_mouse_move(x, y):
                 if not self.is_recording:
@@ -435,7 +435,7 @@ class ScriptExecutor:
                 try:
                     button_name = button.name
                 except Exception as e:
-                    self.app.logging_manager.error("SCRIPT", f"录制鼠标按钮名解析失败: {e}")
+                    self.controller.logging_manager.error("SCRIPT", f"录制鼠标按钮名解析失败: {e}")
                     return
                 mouse_x, mouse_y = last_mouse_position if last_mouse_position else (x, y)
                 try:
@@ -447,11 +447,11 @@ class ScriptExecutor:
                         "button": button_name, "x": int(mouse_x), "y": int(mouse_y), "delay": 0
                     })
                 except Exception as e:
-                    self.app.logging_manager.error("SCRIPT", f"录制鼠标事件追加失败: {e}")
+                    self.controller.logging_manager.error("SCRIPT", f"录制鼠标事件追加失败: {e}")
 
             time.sleep(0.5)
             self.recording_grace_period = False
-            self.app.logging_manager.log_message("🔴 开始录制操作...")
+            self.controller.logging_manager.log_message("🔴 开始录制操作...")
 
             try:
                 keyboard_listener = keyboard.Listener(on_press=on_key_press, on_release=on_key_release)
@@ -470,7 +470,7 @@ class ScriptExecutor:
             finally:
                 self.cleanup_resources()
                 self.generate_recorded_script()
-                self.app.logging_manager.log_message("🟢 录制完成")
+                self.controller.logging_manager.log_message("🟢 录制完成")
 
         self.recording_thread = threading.Thread(target=record, daemon=True)
         self.recording_thread.start()
@@ -486,19 +486,19 @@ class ScriptExecutor:
                 self.keyboard_listener.stop()
                 self.keyboard_listener = None
             except Exception as e:
-                self.app.logging_manager.error("SCRIPT", f"停止 keyboard_listener 失败: {e}")
+                self.controller.logging_manager.error("SCRIPT", f"停止 keyboard_listener 失败: {e}")
         if hasattr(self, 'mouse_listener') and self.mouse_listener:
             try:
                 self.mouse_listener.stop()
                 self.mouse_listener = None
             except Exception as e:
-                self.app.logging_manager.error("SCRIPT", f"停止 mouse_listener 失败: {e}")
+                self.controller.logging_manager.error("SCRIPT", f"停止 mouse_listener 失败: {e}")
         if hasattr(self, 'key_listener') and self.key_listener:
             try:
                 self.key_listener.stop_listening()
                 self.key_listener = None
             except Exception as e:
-                self.app.logging_manager.error("SCRIPT", f"停止 key_listener 失败: {e}")
+                self.controller.logging_manager.error("SCRIPT", f"停止 key_listener 失败: {e}")
         self.cleanup_resources()
         start = time.time()
         while any([
@@ -509,7 +509,7 @@ class ScriptExecutor:
             time.sleep(0.01)
 
     def generate_recorded_script(self):
-        current_platform = getattr(self.app, 'platform_adapter', None)
+        current_platform = getattr(self.controller, 'platform_adapter', None)
         if current_platform:
             current_platform = getattr(current_platform, 'platform', 'windows')
 
@@ -534,16 +534,16 @@ class ScriptExecutor:
                         event_types[event["type"]] += 1
 
             if script_content:
-                panel = getattr(self.app, 'panels', {}).get('script')
+                panel = getattr(self.controller, 'panels', {}).get('script')
                 if panel and hasattr(panel, '_script_editor'):
                     QTimer.singleShot(0, lambda: panel._script_editor.insertPlainText(script_content))
-                elif hasattr(self.app, 'script_text'):
+                elif hasattr(self.controller, 'script_text'):
                     try:
-                        self.app.script_text = script_content
+                        self.controller.script_text = script_content
                     except Exception as e:
-                        self.app.logging_manager.error("SCRIPT", f"写入 script_text 失败: {e}")
+                        self.controller.logging_manager.error("SCRIPT", f"写入 script_text 失败: {e}")
         except Exception as e:
-            self.app.logging_manager.error("SCRIPT", f"generate_recorded_script 失败: {e}")
+            self.controller.logging_manager.error("SCRIPT", f"generate_recorded_script 失败: {e}")
 
 
 

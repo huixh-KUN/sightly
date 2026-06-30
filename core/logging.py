@@ -9,8 +9,8 @@ from PySide6.QtCore import QTimer
 class LoggingManager:
     MAX_LOG_LINES = 500
 
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, controller):
+        self.controller = controller
         self._log_buffer = deque(maxlen=self.MAX_LOG_LINES)
         self._pending_logs = []
         self._update_lock = threading.Lock()
@@ -18,7 +18,7 @@ class LoggingManager:
         self.error_callback = None
         self.clear_callback = None
 
-        log_dir = os.path.dirname(self.app.log_file_path)
+        log_dir = os.path.dirname(self.controller.log_file_path)
         os.makedirs(log_dir, exist_ok=True)
         self._debug_log_path = os.path.join(log_dir, "sightly_debug.log")
         self._debug_lock = threading.Lock()
@@ -47,7 +47,7 @@ class LoggingManager:
         except Exception as exc:
             pass
         try:
-            with open(self.app.log_file_path, 'a', encoding='utf-8') as f:
+            with open(self.controller.log_file_path, 'a', encoding='utf-8') as f:
                 f.write(entry)
         except Exception as exc:
             pass
@@ -64,7 +64,7 @@ class LoggingManager:
         log_entry = f"[{timestamp}] {message}\n"
 
         try:
-            with open(self.app.log_file_path, 'a', encoding='utf-8') as f:
+            with open(self.controller.log_file_path, 'a', encoding='utf-8') as f:
                 f.write(log_entry)
         except Exception as e:
             pass

@@ -1,0 +1,192 @@
+- generic [ref=f9e3]:
+  - complementary [ref=f9e4]:
+    - link "FreeModel" [ref=f9e5] [cursor=pointer]:
+      - /url: /
+      - img [ref=f9e7]
+      - generic [ref=f9e9]:
+        - text: Free
+        - emphasis [ref=f9e10]: Model
+    - generic [ref=f9e11]:
+      - generic [ref=f9e12]: 工作区
+      - button "主页" [ref=f9e13] [cursor=pointer]:
+        - img [ref=f9e14]
+        - text: 主页
+      - button "API 密钥" [ref=f9e18] [cursor=pointer]:
+        - img [ref=f9e19]
+        - text: API 密钥
+      - button "用量" [ref=f9e22] [cursor=pointer]:
+        - img [ref=f9e23]
+        - text: 用量
+      - button "日志" [ref=f9e26] [cursor=pointer]:
+        - img [ref=f9e27]
+        - text: 日志
+      - button "套餐管理" [ref=f9e30] [cursor=pointer]:
+        - img [ref=f9e31]
+        - text: 套餐管理
+    - generic [ref=f9e33]:
+      - generic [ref=f9e34]: 账户
+      - button "推荐赚钱" [ref=f9e35] [cursor=pointer]:
+        - img [ref=f9e36]
+        - text: 推荐赚钱
+      - button "个人资料" [ref=f9e38] [cursor=pointer]:
+        - img [ref=f9e39]
+        - text: 个人资料
+      - button "文档" [ref=f9e42] [cursor=pointer]:
+        - img [ref=f9e43]
+        - text: 文档
+    - button "1 1934406903 已认证账号 1934406903@qq.com" [ref=f9e49] [cursor=pointer]:
+      - generic [ref=f9e50]: "1"
+      - generic [ref=f9e51]:
+        - generic [ref=f9e52]:
+          - generic [ref=f9e53]: "1934406903"
+          - generic "已认证账号" [ref=f9e54]:
+            - img [ref=f9e55]
+        - generic [ref=f9e57]: 1934406903@qq.com
+      - img [ref=f9e58]
+  - main [ref=f9e60]:
+    - generic [ref=f9e162]:
+      - generic [ref=f9e163]:
+        - generic [ref=f9e164]:
+          - generic [ref=f9e165]: § API
+          - heading "API 密钥" [level=1] [ref=f9e166]:
+            - text: API
+            - emphasis [ref=f9e167]: 密钥
+          - paragraph [ref=f9e168]: 使用密钥验证 API 请求。切勿在客户端代码中暴露您的密钥。
+        - generic [ref=f9e169]:
+          - button "创建密钥" [ref=f9e170] [cursor=pointer]:
+            - img [ref=f9e171]
+            - text: 创建密钥
+          - generic [ref=f9e173]: 0 / 5
+      - table [ref=f9e175]:
+        - rowgroup [ref=f9e176]:
+          - row "名称 密钥 创建时间 最后使用 今日用量" [ref=f9e177]:
+            - columnheader "名称" [ref=f9e178]
+            - columnheader "密钥" [ref=f9e179]
+            - columnheader "创建时间" [ref=f9e180]
+            - columnheader "最后使用" [ref=f9e181]
+            - columnheader "今日用量" [ref=f9e182]
+            - columnheader [ref=f9e183]
+        - rowgroup [ref=f9e184]:
+          - row "暂无 API 密钥 创建密钥以开始发送 API 请求 创建密钥" [ref=f9e185]:
+            - cell "暂无 API 密钥 创建密钥以开始发送 API 请求 创建密钥" [ref=f9e186]:
+              - generic [ref=f9e187]:
+                - img [ref=f9e188]
+                - generic [ref=f9e192]: 暂无 API 密钥
+                - generic [ref=f9e193]: 创建密钥以开始发送 API 请求
+                - button "创建密钥" [ref=f9e194] [cursor=pointer]:
+                  - img [ref=f9e195]
+                  - text: 创建密钥
+      - generic [ref=f9e197]:
+        - generic [ref=f9e198]:
+          - generic [ref=f9e199]: API 线路
+          - generic [ref=f9e200]: 将以下地址作为请求的 Base URL。
+        - generic [ref=f9e201]:
+          - generic [ref=f9e202]:
+            - generic [ref=f9e203]: Anthropic 格式
+            - generic [ref=f9e204]: Anthropic
+          - generic [ref=f9e205]: 原生 Claude API 格式，适用于 Claude Code、Cline 及 Anthropic SDK 应用。
+          - table [ref=f9e207]:
+            - rowgroup [ref=f9e208]:
+              - row "节点 接入地址" [ref=f9e209]:
+                - columnheader "节点" [ref=f9e210]
+                - columnheader "接入地址" [ref=f9e211]
+                - columnheader [ref=f9e212]
+            - rowgroup [ref=f9e213]:
+              - row "claude-t0 https://cc.freemodel.dev Copy claude-t0" [ref=f9e214]:
+                - cell "claude-t0" [ref=f9e215]:
+                  - generic [ref=f9e217]: claude-t0
+                - cell "https://cc.freemodel.dev" [ref=f9e218]:
+                  - generic [ref=f9e219]: https://cc.freemodel.dev
+                - cell "Copy claude-t0" [ref=f9e220]:
+                  - button "Copy claude-t0" [ref=f9e221] [cursor=pointer]:
+                    - img [ref=f9e222]
+              - row "claude-t1 T1+ •••••••••••••••••••••••••••• 充值解锁 T1+" [ref=f9e225]:
+                - cell "claude-t1 T1+" [ref=f9e226]:
+                  - generic [ref=f9e227]:
+                    - generic [ref=f9e228]: claude-t1
+                    - generic [ref=f9e229]: T1+
+                - cell "••••••••••••••••••••••••••••" [ref=f9e230]:
+                  - generic [ref=f9e231]:
+                    - img [ref=f9e232]
+                    - generic [ref=f9e235]: ••••••••••••••••••••••••••••
+                - cell "充值解锁 T1+" [ref=f9e236]:
+                  - button "充值解锁 T1+" [ref=f9e237] [cursor=pointer]
+        - generic [ref=f9e239]:
+          - generic [ref=f9e240]:
+            - code [ref=f9e241]: /v1/messages
+            - generic [ref=f9e242]: Anthropic 原生 Messages 接口，支持流式输出、工具调用、图片识别和扩展思考，适用于 Claude Code、Cline 及所有 Anthropic SDK 应用。
+          - generic [ref=f9e243]:
+            - img [ref=f9e244]
+            - button "Claude Code 配置文档" [ref=f9e247] [cursor=pointer]
+        - generic [ref=f9e248]:
+          - generic [ref=f9e249]:
+            - generic [ref=f9e250]: OpenAI 格式
+            - generic [ref=f9e251]: OpenAI
+          - generic [ref=f9e252]: 兼容 ChatGPT SDK、Cursor、ChatBox 等所有 OpenAI 生态工具。
+          - table [ref=f9e254]:
+            - rowgroup [ref=f9e255]:
+              - row "节点 接入地址" [ref=f9e256]:
+                - columnheader "节点" [ref=f9e257]
+                - columnheader "接入地址" [ref=f9e258]
+                - columnheader [ref=f9e259]
+            - rowgroup [ref=f9e260]:
+              - row "默认线路 https://api.freemodel.dev Copy 默认线路" [ref=f9e261]:
+                - cell "默认线路" [ref=f9e262]:
+                  - generic [ref=f9e264]: 默认线路
+                - cell "https://api.freemodel.dev" [ref=f9e265]:
+                  - generic [ref=f9e266]: https://api.freemodel.dev
+                - cell "Copy 默认线路" [ref=f9e267]:
+                  - button "Copy 默认线路" [ref=f9e268] [cursor=pointer]:
+                    - img [ref=f9e269]
+              - row "openai-t1-sg T1+ •••••••••••••••••••••••••••• 充值解锁 T1+" [ref=f9e272]:
+                - cell "openai-t1-sg T1+" [ref=f9e273]:
+                  - generic [ref=f9e274]:
+                    - generic [ref=f9e275]: openai-t1-sg
+                    - generic [ref=f9e276]: T1+
+                - cell "••••••••••••••••••••••••••••" [ref=f9e277]:
+                  - generic [ref=f9e278]:
+                    - img [ref=f9e279]
+                    - generic [ref=f9e282]: ••••••••••••••••••••••••••••
+                - cell "充值解锁 T1+" [ref=f9e283]:
+                  - button "充值解锁 T1+" [ref=f9e284] [cursor=pointer]
+              - row "openai-t2-sg T2+ ••••••••••••••••••••••• 充值解锁 T2+" [ref=f9e285]:
+                - cell "openai-t2-sg T2+" [ref=f9e286]:
+                  - generic [ref=f9e287]:
+                    - generic [ref=f9e288]: openai-t2-sg
+                    - generic [ref=f9e289]: T2+
+                - cell "•••••••••••••••••••••••" [ref=f9e290]:
+                  - generic [ref=f9e291]:
+                    - img [ref=f9e292]
+                    - generic [ref=f9e295]: •••••••••••••••••••••••
+                - cell "充值解锁 T2+" [ref=f9e296]:
+                  - button "充值解锁 T2+" [ref=f9e297] [cursor=pointer]
+        - generic [ref=f9e299]:
+          - generic [ref=f9e300]:
+            - code [ref=f9e301]: /v1/chat/completions
+            - generic [ref=f9e302]: 经典对话补全接口，无状态，每次请求需携带完整的 messages 历史，兼容所有 OpenAI SDK 和工具。
+          - generic [ref=f9e303]:
+            - code [ref=f9e304]: /v1/responses
+            - generic [ref=f9e305]: 新版 Responses 接口，通过 previous_response_id 支持有状态多轮对话，内置文件搜索、代码解释器等工具，流式事件更丰富。
+          - generic [ref=f9e306]:
+            - img [ref=f9e307]
+            - button "Codex 配置文档" [ref=f9e310] [cursor=pointer]
+        - text: 保护好密钥安全。API 密钥如同密码——任何持有者均可调用 API 并消耗您的额度。如有泄露请立即轮换。
+  - generic [ref=f9e312]:
+    - generic [ref=f9e313]: § 新建密钥
+    - heading "创建 API 密钥" [level=2] [ref=f9e314]:
+      - text: 创建
+      - emphasis [ref=f9e315]: API 密钥
+    - paragraph [ref=f9e316]: 给密钥起一个描述性名称，便于日后识别。密钥只显示一次。
+    - generic [ref=f9e317]:
+      - generic [ref=f9e318]:
+        - generic [ref=f9e319]: 密钥名称
+        - textbox "密钥名称" [ref=f9e320]:
+          - /placeholder: 例如：生产环境、测试环境、本地开发
+          - text: opencode
+      - generic [ref=f9e324]: Service temporarily unavailable, please retry
+      - generic [ref=f9e321]:
+        - button "取消" [ref=f9e322] [cursor=pointer]
+        - button "创建密钥" [active] [ref=f9e323] [cursor=pointer]
+  - button "TG群" [ref=f9e158] [cursor=pointer]:
+    - img [ref=f9e159]
+    - generic [ref=f9e161]: TG群

@@ -5,7 +5,7 @@ from typing import Optional
 
 
 from core.priority_lock import get_module_priority
-from core.click_handler import ClickHandler
+from core.click_worker import ClickWorker
 
 from core.async_utils import run_in_executor, create_async_thread
 
@@ -13,7 +13,7 @@ from core.async_utils import run_in_executor, create_async_thread
 
 
 
-class TimedModule:
+class TimedManager:
     """
     定时任务模块
     优先级: 5 (Number=6 > Timed=5 > Image=4 > OCR=3 > Color=2 > Script=1)
@@ -21,19 +21,32 @@ class TimedModule:
 
     PRIORITY = get_module_priority('timed')
 
-    def __init__(self, app):
-        self.app = app
-        self.click_handler = ClickHandler(app)
+    def __init__(self, controller):
+        self.controller = controller
+        self.groups = []
+        self.click_handler = ClickWorker(controller)
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
 
+    def set_config(self, config):
+        self.groups = config if isinstance(config, list) else []
+
+    def collect_config(self):
+        return self.groups
+
+    def start(self):
+        self.start_timed_tasks()
+
+    def stop(self):
+        self.stop_timed_tasks()
+
     def start_timed_tasks(self):
         groups = []
-        app_groups = getattr(self.app, 'timed_groups', [])
-        self.app.logging_manager.debug("TIMED", f"开始定时任务: 共 {len(app_groups)} 组")
+        app_groups = self.groups
+        self.controller.logging_manager.debug("TIMED", f"开始定时任务: 共 {len(app_groups)} 组")
         for i, g in enumerate(app_groups):
             enabled = g["enabled"]
-            self.app.logging_manager.debug("TIMED", f"  组{i+1}: enabled={enabled}")
+            self.controller.logging_manager.debug("TIMED", f"  组{i+1}: enabled={enabled}")
             if not enabled:
                 continue
             try:
@@ -59,12 +72,12 @@ class TimedModule:
                 "delay_min": int(g.get("delay_min", 100)),
                 "delay_max": int(g.get("delay_max", 200)),
             }
-            self.app.logging_manager.debug("TIMED",
+            self.controller.logging_manager.debug("TIMED",
                 f"  组{i+1} 已启用: interval={interval}s, key={gd['key']!r}, "
                 f"click=({gd['pos_x']},{gd['pos_y']}), alarm={gd['alarm']}")
             groups.append(gd)
         if not groups:
-            self.app.logging_manager.debug("TIMED", "无启用的定时组")
+            self.controller.logging_manager.debug("TIMED", "无启用的定时组")
             return
 
         self._groups_data = groups
@@ -90,14 +103,14 @@ class TimedModule:
                 pass
 
     async def _timed_group_loop(self, g):
-        self.app.logging_manager.debug("TIMED",
+        self.controller.logging_manager.debug("TIMED",
             f"定时组{g['index']+1} 协程开始: 间隔={g['interval']}s, "
             f"循环={'开' if g['cycle_enabled'] else '关'}, "
             f"key={g['key']!r}, click=({g['pos_x']},{g['pos_y']})")
         try:
             while not (self._loop and self._loop.is_closed()):
                 if not self._check_group_enabled(g["index"]):
-                    self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 已禁用，退出")
+                    self.controller.logging_manager.debug("TIMED", f"定时组{g['index']+1} 已禁用，退出")
                     break
                 try:
                     for _ in range(g["interval"]):
@@ -107,46 +120,46 @@ class TimedModule:
                     if self._loop and self._loop.is_closed():
                         return
 
-                    self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 触发执行")
+                    self.controller.logging_manager.debug("TIMED", f"定时组{g['index']+1} 触发执行")
                     await run_in_executor(self._execute_group_actions, g["index"])
 
                     if not g["cycle_enabled"]:
-                        self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 单次执行完成，退出")
+                        self.controller.logging_manager.debug("TIMED", f"定时组{g['index']+1} 单次执行完成，退出")
                         break
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
                     import platform
                     plat = platform.system()
-                    self.app.logging_manager.error("TIMED",
+                    self.controller.logging_manager.error("TIMED",
                         f"[{plat}] 定时任务{g['index']+1}错误: {str(e)}"
                     )
                     await asyncio.sleep(5)
         except asyncio.CancelledError:
-            self.app.logging_manager.debug("TIMED", f"定时组{g['index']+1} 协程取消")
+            self.controller.logging_manager.debug("TIMED", f"定时组{g['index']+1} 协程取消")
 
     def _check_group_enabled(self, index):
-        groups = getattr(self.app, 'timed_groups', [])
+        groups = self.groups
         if index >= len(groups):
             return False
         try:
             return bool(groups[index]["enabled"])
         except Exception as e:
-            self.app.logging_manager.error("TIMED", f"_check_group_enabled 失败: {e}")
+            self.controller.logging_manager.error("TIMED", f"_check_group_enabled 失败: {e}")
             return False
 
     def _execute_keypress(self, key, group_index, delay_min, delay_max):
-        from modules.input import KeyEventExecutor
-        executor = KeyEventExecutor(
-            self.app.input_controller, delay_min, delay_max, self.PRIORITY
+        from modules.key_event_worker import KeyEventWorker
+        executor = KeyEventWorker(
+            self.controller.input_controller, delay_min, delay_max, self.PRIORITY
         )
         executor.execute_keypress(key)
-        self.app.logging_manager.log_message(
+        self.controller.logging_manager.log_message(
             f"定时任务{group_index+1}按下了 {key} 键"
         )
 
     def _execute_group_actions(self, index, *, for_test=False) -> list:
-        groups = getattr(self.app, 'timed_groups', [])
+        groups = self.groups
         if index >= len(groups):
             return []
         g = groups[index]
@@ -162,10 +175,10 @@ class TimedModule:
         result_parts = []
         if alarm:
             try:
-                self.app.alarm_module.play_alarm_sound(True)
+                self.controller.alarm_module.play_alarm_sound(True)
                 result_parts.append("报警")
             except Exception as e:
-                self.app.logging_manager.error("TIMED", f"测试报警失败: {e}")
+                self.controller.logging_manager.error("TIMED", f"测试报警失败: {e}")
         if click_enabled and pos_x != 0 and pos_y != 0:
             try:
                 self.click_handler.execute_click(
@@ -175,13 +188,13 @@ class TimedModule:
                 )
                 result_parts.append(f"点击 ({pos_x},{pos_y})")
             except Exception as e:
-                self.app.logging_manager.error("TIMED", f"测试点击失败: {e}")
+                self.controller.logging_manager.error("TIMED", f"测试点击失败: {e}")
         if key:
             try:
                 self._execute_keypress(key, index, delay_min, delay_max)
                 result_parts.append(f"按键 {key}")
             except Exception as e:
-                self.app.logging_manager.error("TIMED", f"测试按键失败: {e}")
+                self.controller.logging_manager.error("TIMED", f"测试按键失败: {e}")
         return result_parts
 
     def test_group(self, index) -> dict:
@@ -196,11 +209,11 @@ class TimedModule:
         return self.test_group(index)
 
     def start_timed_position_selection(self, group_index, on_selected=None):
-        self.app.logging_manager.log_message(
+        self.controller.logging_manager.log_message(
             f"开始定时组{group_index+1}屏幕位置选择..."
         )
-        self.app.is_selecting = True
-        self.app.current_timed_group = group_index
+        self.controller.is_selecting = True
+        self.controller.current_timed_group = group_index
         self._pos_callback = on_selected
 
         from PySide6.QtWidgets import QWidget, QApplication
@@ -258,10 +271,10 @@ class TimedModule:
         self._overlay = _ClickOverlay(self, group_index)
 
     def _on_position_selected(self, group_index, pos_x, pos_y):
-        self.app.logging_manager.log_message(
+        self.controller.logging_manager.log_message(
             f"定时组{group_index+1}已选择位置: {pos_x},{pos_y}"
         )
-        groups = getattr(self.app, 'timed_groups', [])
+        groups = self.groups
         if 0 <= group_index < len(groups):
             group = groups[group_index]
             group["position_x"] = str(pos_x)
@@ -270,14 +283,14 @@ class TimedModule:
             try:
                 self._pos_callback(pos_x, pos_y)
             except Exception as e:
-                self.app.logging_manager.error("TIMED", f"位置回调失败: {e}")
+                self.controller.logging_manager.error("TIMED", f"位置回调失败: {e}")
             self._pos_callback = None
         self._cancel_selection()
 
     def _cancel_selection(self):
-        if hasattr(self.app, 'cancel_selection') and callable(self.app.cancel_selection):
+        if hasattr(self.controller, 'cancel_selection') and callable(self.controller.cancel_selection):
             try:
-                self.app.cancel_selection()
+                self.controller.cancel_selection()
             except Exception as e:
-                self.app.logging_manager.error("TIMED", f"取消选择失败: {e}")
-        self.app.is_selecting = False
+                self.controller.logging_manager.error("TIMED", f"取消选择失败: {e}")
+        self.controller.is_selecting = False

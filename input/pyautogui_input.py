@@ -20,12 +20,12 @@ _KEY_MAP = {
 def _map_key(k): return _KEY_MAP.get(k.lower(), k.lower())
 
 
-class PyAutoGUIInput(BaseInputController):
+class PyAutoGUIInputBackend(BaseInputController):
     """PyAutoGUI输入控制器"""
     
-    def __init__(self, app=None):
+    def __init__(self, controller=None):
         self._available = True
-        self.app = app
+        self.controller = controller
         pyautogui.FAILSAFE = False
     
     @property
@@ -38,8 +38,8 @@ class PyAutoGUIInput(BaseInputController):
     
     def _log(self, message: str):
         """日志输出"""
-        if self.app and hasattr(self.app, 'logging_manager'):
-            self.app.logging_manager.log_message(message)
+        if self.controller and hasattr(self.controller, 'logging_manager'):
+            self.controller.logging_manager.log_message(message)
     
     def key_down(self, key: str, priority: int = 0) -> bool:
         try:

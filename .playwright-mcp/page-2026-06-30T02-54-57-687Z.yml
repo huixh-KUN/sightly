@@ -1,0 +1,97 @@
+- generic [ref=f6e2]:
+  - banner [ref=f6e3]:
+    - generic [ref=f6e4]:
+      - link "FreeModel" [ref=f6e5] [cursor=pointer]:
+        - /url: "#"
+        - img [ref=f6e7]
+        - generic [ref=f6e9]:
+          - emphasis [ref=f6e10]: Free
+          - text: Model
+      - generic [ref=f6e11]:
+        - button "登录" [ref=f6e12] [cursor=pointer]
+        - button "免费试用 →" [ref=f6e13] [cursor=pointer]
+  - generic [ref=f6e14]:
+    - generic [ref=f6e15]:
+      - generic [ref=f6e16]: 完成认证 · 免费畅享一个月 Pro
+      - heading "最前沿 AI， 免费一个月 认证即享。" [level=1] [ref=f6e17]:
+        - text: 最前沿 AI，
+        - emphasis [ref=f6e18]: 免费一个月
+        - text: 认证即享。
+      - paragraph [ref=f6e19]: 注册并完成新账号认证，即可免费获得一个月 Pro 账号，通过一个兼容 OpenAI 的接口调用我们最新的模型。
+      - generic [ref=f6e20]:
+        - generic [ref=f6e21]:
+          - generic [ref=f6e22]: 1 个月
+          - text: 认证即享 Pro
+        - generic [ref=f6e23]:
+          - generic [ref=f6e24]: 前沿
+          - text: 最新 AI 模型
+        - generic [ref=f6e25]:
+          - generic [ref=f6e26]: "1"
+          - text: 兼容 OpenAI 的 API
+    - complementary [ref=f6e27]:
+      - generic [ref=f6e102]:
+        - generic [ref=f6e103]:
+          - heading "查看您的邮箱" [level=2] [ref=f6e104]
+          - paragraph [ref=f6e105]:
+            - text: 我们已向以下邮箱发送了 6 位验证码：
+            - generic [ref=f6e106]:
+              - generic [ref=f6e107]: 1934406903@qq.com
+              - button "更改" [ref=f6e108] [cursor=pointer]
+        - generic [ref=f6e109]:
+          - textbox [ref=f6e110]: "4"
+          - textbox [ref=f6e111]: "3"
+          - textbox [ref=f6e112]: "6"
+          - textbox [ref=f6e113]: "2"
+          - textbox [ref=f6e114]: "2"
+          - textbox [ref=f6e115]: "7"
+        - paragraph [ref=f6e121]: Invalid or expired code
+        - button "验证并继续" [ref=f6e116] [cursor=pointer]
+        - paragraph [ref=f6e117]:
+          - text: 没有收到？
+          - button "重新发送" [disabled] [ref=f6e118]
+          - generic [ref=f6e122]: · 29 秒后
+  - generic [ref=f6e48]:
+    - generic [ref=f6e49]:
+      - heading "你所需要的一切。 免费一个月。" [level=2] [ref=f6e50]:
+        - text: 你所需要的一切。
+        - emphasis [ref=f6e51]: 免费一个月。
+      - paragraph [ref=f6e52]: 完成新账号认证，免费解锁整整一个月 Pro。
+    - generic [ref=f6e53]:
+      - generic [ref=f6e54]:
+        - img [ref=f6e56]
+        - heading "免费一个月 Pro" [level=3] [ref=f6e59]
+        - paragraph [ref=f6e60]: 完成新账号认证，即可免费获得整整一个月 Pro，无需绑定支付方式，即刻开始构建。
+      - generic [ref=f6e61]:
+        - img [ref=f6e63]
+        - heading "前沿模型" [level=3] [ref=f6e67]
+        - paragraph [ref=f6e68]: 调用我们最新的模型，通过单一简洁的 API 接口即可完成。
+      - generic [ref=f6e69]:
+        - img [ref=f6e71]
+        - heading "兼容 OpenAI" [level=3] [ref=f6e74]
+        - paragraph [ref=f6e75]: OpenAI API 的即插即用替代品，与你现有的所有 SDK 和工具完美兼容。
+  - contentinfo [ref=f6e76]:
+    - generic [ref=f6e77]:
+      - generic [ref=f6e78]:
+        - link "FreeModel" [ref=f6e79] [cursor=pointer]:
+          - /url: "#"
+          - img [ref=f6e81]
+          - generic [ref=f6e83]:
+            - emphasis [ref=f6e84]: Free
+            - text: Model
+        - paragraph [ref=f6e85]: 最强模型，一个简洁 API 全包。专为快速交付的开发者打造。
+      - generic [ref=f6e86]:
+        - heading "产品" [level=4] [ref=f6e87]
+        - list [ref=f6e88]:
+          - listitem [ref=f6e89]:
+            - link "定价" [ref=f6e90] [cursor=pointer]:
+              - /url: "#features"
+      - generic [ref=f6e91]:
+        - heading "法律" [level=4] [ref=f6e92]
+        - list [ref=f6e93]:
+          - listitem [ref=f6e94]:
+            - link "隐私政策" [ref=f6e95] [cursor=pointer]:
+              - /url: /privacy
+          - listitem [ref=f6e96]:
+            - link "服务条款" [ref=f6e97] [cursor=pointer]:
+              - /url: /terms
+    - generic [ref=f6e98]: © 2026 freemodel.dev — 保留所有权利。

@@ -1,10 +1,10 @@
 import time
 import random
 
-from core.click_handler import parse_combo_key
+from core.click_worker import parse_combo_key
 
 
-class KeyEventExecutor:
+class KeyEventWorker:
     """
     统一按键执行器类，支持单键和组合键
     

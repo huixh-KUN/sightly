@@ -1,6 +1,6 @@
 ---
 name: openspec-sync-specs
-description: "同步增量规格：将 change 中的变更同步到主规格文档。当用户说'同步规格''更新文档''把变更写到主文档'时触发。Sync delta specs from a change to main specs without archiving."
+description: Sync delta specs from a change to main specs. Use when the user wants to update main specs with changes from a delta spec, without archiving the change.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:

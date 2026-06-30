@@ -20,12 +20,12 @@ except ImportError:
 
 from utils.screenshot import ScreenshotManager
 from utils.recognition import ImageRecognizer
-from core.click_handler import ClickHandler
+from core.click_worker import ClickWorker
 from core.priority_lock import get_module_priority
 from utils.memory import MemoryMonitor
 
 
-class ImageDetection:
+class ImageDetectionWorker:
     """
     图像检测类 - 使用模板匹配（异步协程版）
     优先级: 4 (Number=6 > Timed=5 > Image=4 > OCR=3 > Color=2 > Script=1)
@@ -33,8 +33,8 @@ class ImageDetection:
 
     PRIORITY = get_module_priority('image')
 
-    def __init__(self, app, group_index=0):
-        self.app = app
+    def __init__(self, controller, group_index=0):
+        self.controller = controller
         self.group_index = group_index
         self.is_running = False
         self._task = None
@@ -46,7 +46,7 @@ class ImageDetection:
         self.pause = 180
         self.cycle_enabled = True
         self.commands = ""
-        self.click_handler = ClickHandler(app)
+        self.click_handler = ClickWorker(controller)
         self.last_trigger_time = 0
         self.last_match_pos = None
         self.screenshot_manager = ScreenshotManager()
@@ -64,17 +64,17 @@ class ImageDetection:
         self.last_trigger_time = 0
 
         if not CV2_AVAILABLE:
-            self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 启动失败: OpenCV 不可用")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 启动失败: OpenCV 不可用")
             return
         if self.template_image is None:
-            self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 启动失败: 未设置模板图像")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 启动失败: 未设置模板图像")
             return
         if not self.region:
-            self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 启动失败: 未设置检测区域")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 启动失败: 未设置检测区域")
             return
 
         self.is_running = True
-        self.app.logging_manager.debug("IMAGE",
+        self.controller.logging_manager.debug("IMAGE",
             f"检测组{self.group_index+1} 启动: 阈值={self.threshold:.2f}, "
             f"间隔={self.interval}s, 暂停={self.pause}s, 模板={self.template_path}")
 
@@ -86,7 +86,7 @@ class ImageDetection:
 
     async def _detect_async(self):
         """异步检测循环"""
-        self.app.logging_manager.debug("IMAGE",
+        self.controller.logging_manager.debug("IMAGE",
             f"检测组{self.group_index+1} 协程开始: 间隔={self.interval}s, "
             f"循环={'开' if self.cycle_enabled else '关'}")
         frame_count = 0
@@ -97,59 +97,59 @@ class ImageDetection:
                     import random
                     interval = random.uniform(0.25, 0.3)
                 await asyncio.sleep(interval)
-                self.app.logging_manager.debug("IMAGE",
+                self.controller.logging_manager.debug("IMAGE",
                     f"检测组{self.group_index+1} 开始检测循环")
                 match_result = await run_in_executor(self.detect_image)
                 if match_result:
                     abs_x, abs_y, score = match_result
-                    self.app.logging_manager.log_message(
+                    self.controller.logging_manager.log_message(
                         f"检测组{self.group_index+1} 匹配成功: 位置=({abs_x},{abs_y}), 得分={score:.3f}")
                     await run_in_executor(self.execute_commands, match_result)
                     self.last_trigger_time = time.time()
                     await asyncio.sleep(5)
                 else:
-                    self.app.logging_manager.debug("IMAGE",
+                    self.controller.logging_manager.debug("IMAGE",
                         f"检测组{self.group_index+1} 未匹配")
 
                 if not self.cycle_enabled:
-                    self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 单次执行完成，退出")
+                    self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 单次执行完成，退出")
                     break
                 frame_count += 1
                 if self.memory_monitor.gc_if_needed(frame_count):
-                    self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 触发 GC")
+                    self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 触发 GC")
         except asyncio.CancelledError:
-            self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 协程取消")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 协程取消")
             self.is_running = False
 
     def detect_image(self):
         if not self.region:
-            self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} detect_image: 无区域")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} detect_image: 无区域")
             return None
         if self.template_image is None:
-            self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} detect_image: 无模板")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} detect_image: 无模板")
             return None
         if not CV2_AVAILABLE:
-            self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} detect_image: OpenCV 不可用")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} detect_image: OpenCV 不可用")
             return None
         screenshot = None
         try:
             screenshot = self.screenshot_manager.get_region_screenshot(
                 self.region, priority=self.PRIORITY)
             if not screenshot:
-                self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 截图为空")
+                self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 截图为空")
                 return None
             if screenshot.size[0] == 0 or screenshot.size[1] == 0:
-                self.app.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 截图尺寸为零: {screenshot.size}")
+                self.controller.logging_manager.debug("IMAGE", f"检测组{self.group_index+1} 截图尺寸为零: {screenshot.size}")
                 return None
-            self.app.logging_manager.debug("IMAGE",
+            self.controller.logging_manager.debug("IMAGE",
                 f"检测组{self.group_index+1} 截图成功: {screenshot.size}, "
                 f"区域={self.region}, 阈值={self.threshold:.2f}")
             matched, click_pos, score = ImageRecognizer.match_template(
                 screenshot, self.template_image, self.threshold,
-                log_func=self.app.logging_manager.log_message,
+                log_func=self.controller.logging_manager.log_message,
                 group_index=self.group_index
             )
-            self.app.logging_manager.debug("IMAGE",
+            self.controller.logging_manager.debug("IMAGE",
                 f"检测组{self.group_index+1} 匹配结果: matched={matched}, "
                 f"click_pos={click_pos}, score={score}")
             if matched and click_pos:
@@ -159,9 +159,9 @@ class ImageDetection:
                 return (abs_x, abs_y, score)
             return None
         except Exception as e:
-            self.app.logging_manager.error("IMAGE", f"图像检测失败: {e}")
+            self.controller.logging_manager.error("IMAGE", f"图像检测失败: {e}")
             import traceback
-            self.app.logging_manager.error("IMAGE", f"错误详情: {traceback.format_exc()}")
+            self.controller.logging_manager.error("IMAGE", f"错误详情: {traceback.format_exc()}")
             return None
         finally:
             if screenshot is not None:
@@ -171,13 +171,13 @@ class ImageDetection:
     def execute_commands(self, match_result, *, for_test=False):
         if not match_result:
             return
-        if not for_test and (not self.app.is_running or getattr(self.app, 'system_stopped', False)):
+        if not for_test and (not self.controller.is_running or getattr(self.controller, 'system_stopped', False)):
             return
 
         abs_x, abs_y, match_score = match_result
         group = None
-        if hasattr(self.app, 'image_groups') and self.group_index < len(self.app.image_groups):
-            group = self.app.image_groups[self.group_index]
+        if hasattr(self.controller, 'image_manager') and self.group_index < len(self.controller.image_manager.groups):
+            group = self.controller.image_manager.groups[self.group_index]
         if not group:
             return
 
@@ -194,34 +194,47 @@ class ImageDetection:
             )
 
         if key:
-            from modules.input import KeyEventExecutor
+            from modules.key_event_worker import KeyEventWorker
             delay_min = int(safe_group_get(group, "delay_min", 300))
             delay_max = int(safe_group_get(group, "delay_max", 500))
-            executor = KeyEventExecutor(
-                self.app.input_controller, delay_min, delay_max, self.PRIORITY)
+            executor = KeyEventWorker(
+                self.controller.input_controller, delay_min, delay_max, self.PRIORITY)
             executor.execute_keypress(key)
-            self.app.logging_manager.log_message(f"检测组{self.group_index+1}按下了 {key} 键")
+            self.controller.logging_manager.log_message(f"检测组{self.group_index+1}按下了 {key} 键")
 
         if alarm_enabled:
             try:
-                self.app.alarm_module.play_alarm_sound(True)
+                self.controller.alarm_module.play_alarm_sound(True)
             except Exception as e:
-                self.app.logging_manager.error("IMAGE", f"播放报警声音失败: {e}")
+                self.controller.logging_manager.error("IMAGE", f"播放报警声音失败: {e}")
 
         if self.commands:
-            from modules.script import ScriptExecutor
-            temp_executor = ScriptExecutor(self.app)
+            from modules.script import ScriptWorker
+            temp_executor = ScriptWorker(self.controller)
             temp_executor.run_script_once(self.commands)
 
 
 class ImageDetectionManager:
     """图像检测管理器类（异步协程版）"""
 
-    def __init__(self, app):
-        self.app = app
-        self.image_detections: dict[int, ImageDetection] = {}
+    def __init__(self, controller):
+        self.controller = controller
+        self.groups = []
+        self.image_detections: dict[int, ImageDetectionWorker] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
+
+    def set_config(self, config):
+        self.groups = config if isinstance(config, list) else []
+
+    def collect_config(self):
+        return self.groups
+
+    def start(self):
+        self.start_all_detection()
+
+    def stop(self):
+        self.stop_all_detection()
 
     def select_reference_image(self, group_index):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -230,9 +243,9 @@ class ImageDetectionManager:
         )
         if not file_path:
             return
-        if group_index >= len(getattr(self.app, 'image_groups', [])):
+        if group_index >= len(self.groups):
             return
-        group = self.app.image_groups[group_index]
+        group = self.groups[group_index]
         try:
             if not CV2_AVAILABLE:
                 QMessageBox.warning(None, "错误", "OpenCV未安装，无法使用图像检测功能")
@@ -258,19 +271,19 @@ class ImageDetectionManager:
                 if isinstance(preview, QLabel):
                     preview.setPixmap(pixmap.scaled(60, 40, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         except Exception as e:
-            self.app.logging_manager.error("IMAGE", f"更新图像预览失败: {e}")
+            self.controller.logging_manager.error("IMAGE", f"更新图像预览失败: {e}")
 
     def _safe_get(self, group, key, default=None):
         return group.get(key, default)
 
     def start_detection(self, group_index):
-        groups = getattr(self.app, 'image_groups', [])
+        groups = self.groups
         if group_index >= len(groups):
-            self.app.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 组索引越界")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 组索引越界")
             return
         group = groups[group_index]
         if not self._safe_get(group, "enabled", False):
-            self.app.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未启用")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未启用")
             return
         if group.get("template_image") is None:
             ref_path = self._safe_get(group, "reference_image", "")
@@ -278,21 +291,21 @@ class ImageDetectionManager:
                 template = cv2.imdecode(np.fromfile(ref_path, dtype=np.uint8), cv2.IMREAD_COLOR)
                 if template is not None:
                     group["template_image"] = template
-                    self.app.logging_manager.debug("IMAGE",
+                    self.controller.logging_manager.debug("IMAGE",
                         f"检测组{group_index+1} 从路径加载模板: {ref_path}")
                 else:
-                    self.app.logging_manager.debug("IMAGE",
+                    self.controller.logging_manager.debug("IMAGE",
                         f"检测组{group_index+1} 启动: 无法加载参考图像 {ref_path}")
                     return
             else:
-                self.app.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未设置参考图像")
+                self.controller.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未设置参考图像")
                 return
         region = self._safe_get(group, "region")
         if not region:
-            self.app.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未设置检测区域")
+            self.controller.logging_manager.debug("IMAGE", f"检测组{group_index+1} 启动: 未设置检测区域")
             return
         if group_index not in self.image_detections:
-            self.image_detections[group_index] = ImageDetection(self.app, group_index)
+            self.image_detections[group_index] = ImageDetectionWorker(self.controller, group_index)
         detection = self.image_detections[group_index]
         detection.set_region(region)
         detection.template_image = group["template_image"]
@@ -305,17 +318,17 @@ class ImageDetectionManager:
         if isinstance(cycle, str):
             cycle = cycle.lower() in ("true", "1")
         detection.start_detection(threshold, interval, pause, commands, cycle_enabled=bool(cycle))
-        _set_status_text(self.app, f"图像检测组{group_index + 1}运行中...")
+        _set_status_text(self.controller, f"图像检测组{group_index + 1}运行中...")
 
     def stop_detection(self, group_index):
         if group_index in self.image_detections:
             self.image_detections[group_index].stop_detection()
             del self.image_detections[group_index]
-        _set_status_text(self.app, "图像检测已停止")
+        _set_status_text(self.controller, "图像检测已停止")
 
     def start_all_detection(self):
         has_enabled = False
-        for group in getattr(self.app, 'image_groups', []):
+        for group in self.groups:
             if self._safe_get(group, "enabled", False):
                 has_enabled = True
                 break
@@ -324,15 +337,15 @@ class ImageDetectionManager:
             return
 
         started = 0
-        for i, group in enumerate(getattr(self.app, 'image_groups', [])):
+        for i, group in enumerate(self.groups):
             if self._safe_get(group, "enabled", False):
                 if not self._safe_get(group, "region"):
-                    self.app.logging_manager.debug("IMAGE", f"检测组{i+1} 跳过: 无区域")
+                    self.controller.logging_manager.debug("IMAGE", f"检测组{i+1} 跳过: 无区域")
                     continue
                 self.start_detection(i)
                 started += 1
 
-        self.app.logging_manager.debug("IMAGE", f"start_all_detection: 启动了 {started} 组")
+        self.controller.logging_manager.debug("IMAGE", f"start_all_detection: 启动了 {started} 组")
 
         if self.image_detections:
             self._thread, self._loop = create_async_thread(self._async_main)
@@ -351,7 +364,7 @@ class ImageDetectionManager:
                 pass
 
     def test_group(self, index) -> dict:
-        groups = getattr(self.app, 'image_groups', [])
+        groups = self.groups
         if index >= len(groups):
             return {"matched": False, "executed": False, "detail": "组索引越界"}
         group = groups[index]
@@ -369,7 +382,7 @@ class ImageDetectionManager:
             else:
                 return {"matched": False, "executed": False, "detail": "未设置模板图片"}
         threshold = float(self._safe_get(group, "threshold", "80")) / 100.0
-        det = ImageDetection(self.app, index)
+        det = ImageDetectionWorker(self.controller, index)
         det.set_region(self._safe_get(group, "region"))
         det.template_image = template
         det.threshold = threshold
@@ -394,7 +407,7 @@ class ImageDetectionManager:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=3)
         self.image_detections.clear()
-        _set_status_text(self.app, "图像检测已停止")
+        _set_status_text(self.controller, "图像检测已停止")
 
 
 def _set_status_text(app, text):

@@ -1,0 +1,163 @@
+- generic [ref=f9e3]:
+  - complementary [ref=f9e4]:
+    - link "FreeModel" [ref=f9e5] [cursor=pointer]:
+      - /url: /
+      - img [ref=f9e7]
+      - generic [ref=f9e9]:
+        - text: Free
+        - emphasis [ref=f9e10]: Model
+    - generic [ref=f9e11]:
+      - generic [ref=f9e12]: 工作区
+      - button "主页" [ref=f9e13] [cursor=pointer]:
+        - img [ref=f9e14]
+        - text: 主页
+      - button "API 密钥" [ref=f9e18] [cursor=pointer]:
+        - img [ref=f9e19]
+        - text: API 密钥
+      - button "用量" [ref=f9e22] [cursor=pointer]:
+        - img [ref=f9e23]
+        - text: 用量
+      - button "日志" [ref=f9e26] [cursor=pointer]:
+        - img [ref=f9e27]
+        - text: 日志
+      - button "套餐管理" [ref=f9e30] [cursor=pointer]:
+        - img [ref=f9e31]
+        - text: 套餐管理
+    - generic [ref=f9e33]:
+      - generic [ref=f9e34]: 账户
+      - button "推荐赚钱" [ref=f9e35] [cursor=pointer]:
+        - img [ref=f9e36]
+        - text: 推荐赚钱
+      - button "个人资料" [ref=f9e38] [cursor=pointer]:
+        - img [ref=f9e39]
+        - text: 个人资料
+      - button "文档" [ref=f9e42] [cursor=pointer]:
+        - img [ref=f9e43]
+        - text: 文档
+    - button "1 1934406903 已认证账号 1934406903@qq.com" [ref=f9e49] [cursor=pointer]:
+      - generic [ref=f9e50]: "1"
+      - generic [ref=f9e51]:
+        - generic [ref=f9e52]:
+          - generic [ref=f9e53]: "1934406903"
+          - generic "已认证账号" [ref=f9e54]:
+            - img [ref=f9e55]
+        - generic [ref=f9e57]: 1934406903@qq.com
+      - img [ref=f9e58]
+  - main [ref=f9e60]:
+    - generic [ref=f9e61]:
+      - generic [ref=f9e63]:
+        - generic [ref=f9e64]: § 文档
+        - heading "Codex 安装指南" [level=1] [ref=f9e65]:
+          - text: Codex
+          - emphasis [ref=f9e66]: 安装指南
+      - generic [ref=f9e67]:
+        - generic [ref=f9e68]:
+          - generic [ref=f9e69]:
+            - button "Claude Code" [ref=f9e70] [cursor=pointer]
+            - button "Codex" [ref=f9e71] [cursor=pointer]
+          - navigation "Table of contents" [ref=f9e72]:
+            - generic [ref=f9e73]: 本页目录
+            - link "概览" [ref=f9e74] [cursor=pointer]:
+              - /url: "#docs-intro"
+            - link "安装 Codex CLI" [ref=f9e75] [cursor=pointer]:
+              - /url: "#docs-step-1"
+            - link "创建 .codex 目录" [ref=f9e76] [cursor=pointer]:
+              - /url: "#docs-step-2"
+            - link "获取 API 密钥" [ref=f9e77] [cursor=pointer]:
+              - /url: "#docs-step-3"
+            - link "创建 auth.json" [ref=f9e78] [cursor=pointer]:
+              - /url: "#docs-step-4"
+            - link "创建 config.toml" [ref=f9e79] [cursor=pointer]:
+              - /url: "#docs-step-5"
+            - link "重启并验证" [ref=f9e80] [cursor=pointer]:
+              - /url: "#docs-step-6"
+            - link "开始使用" [ref=f9e81] [cursor=pointer]:
+              - /url: "#docs-step-7"
+        - article [ref=f9e82]:
+          - generic [ref=f9e83]:
+            - tablist [ref=f9e84]:
+              - tab "macOS / Linux" [ref=f9e85] [cursor=pointer]:
+                - img [ref=f9e86]
+                - text: macOS / Linux
+              - tab "Windows" [selected] [ref=f9e88] [cursor=pointer]:
+                - img [ref=f9e89]
+                - text: Windows
+            - generic [ref=f9e91]:
+              - strong [ref=f9e92]: 官方原版安装
+              - text: — 此流程 100% 使用官方原版安装包，确保服务体验与官方完全一致。
+            - generic [ref=f9e94]:
+              - strong [ref=f9e95]: 系统要求
+              - text: · Windows 10（版本 1809 / build 17763）及以上
+          - generic [ref=f9e96]:
+            - generic [ref=f9e97]: "01"
+            - heading "安装 Codex CLI" [level=3] [ref=f9e98]:
+              - text: 安装
+              - emphasis [ref=f9e99]: Codex CLI
+            - paragraph [ref=f9e100]: 运行以下任意一条命令，全局安装官方 Codex CLI：
+            - generic [ref=f9e101]:
+              - button "Copy" [ref=f9e102] [cursor=pointer]
+              - generic [ref=f9e103]: "npm install -g @openai/codex # or brew install codex"
+            - generic [ref=f9e104]: 两条命令安装的是同一个包，选择适合你环境的即可。
+          - generic [ref=f9e105]:
+            - generic [ref=f9e106]: "02"
+            - heading "创建 .codex 目录" [level=3] [ref=f9e107]:
+              - text: 创建
+              - emphasis [ref=f9e108]: .codex 目录
+            - paragraph [ref=f9e109]: 若目录已存在请先删除，再重新创建（在文件资源管理器或 PowerShell 中操作）：
+            - generic [ref=f9e110]:
+              - button "Copy" [ref=f9e111] [cursor=pointer]
+              - generic [ref=f9e112]: "# PowerShell Remove-Item -Recurse -Force ~\\.codex -ErrorAction SilentlyContinue New-Item -ItemType Directory ~\\.codex"
+            - generic [ref=f9e113]: 将 <your-username> 替换为你的实际 Windows 用户名。
+          - generic [ref=f9e114]:
+            - generic [ref=f9e115]: "03"
+            - heading "获取 API 密钥" [level=3] [ref=f9e116]:
+              - text: 获取
+              - emphasis [ref=f9e117]: API 密钥
+            - paragraph [ref=f9e118]:
+              - text: 前往仪表板的
+              - link "「API 密钥」" [ref=f9e119] [cursor=pointer]:
+                - /url: "#"
+              - text: 页面，创建一个新密钥并复制。
+          - generic [ref=f9e120]:
+            - generic [ref=f9e121]: "04"
+            - heading "创建 auth.json" [level=3] [ref=f9e122]:
+              - text: 创建
+              - emphasis [ref=f9e123]: auth.json
+            - paragraph [ref=f9e124]: 在 C:\Users\<your-username>\.codex 路径下，删除已有的 auth.json（若有），新建一个：
+            - generic [ref=f9e125]:
+              - button "Copy" [ref=f9e126] [cursor=pointer]
+              - generic [ref=f9e127]: "{ \"OPENAI_API_KEY\": \"YOUR_API_KEY\" }"
+            - generic [ref=f9e128]: 将 YOUR_API_KEY 替换为上一步复制的密钥。
+          - generic [ref=f9e129]:
+            - generic [ref=f9e130]: "05"
+            - heading "创建 config.toml" [level=3] [ref=f9e131]:
+              - text: 创建
+              - emphasis [ref=f9e132]: config.toml
+            - paragraph [ref=f9e133]: 在 C:\Users\<your-username>\.codex 路径下，删除已有的 config.toml（若有），新建一个：
+            - generic [ref=f9e134]:
+              - button "Copy" [ref=f9e135] [cursor=pointer]
+              - generic [ref=f9e136]: model_provider = "freemodel" model = "gpt-5.5" model_reasoning_effort = "xhigh" disable_response_storage = true preferred_auth_method = "apikey" [model_providers.freemodel] name = "freemodel" base_url = "https://api.freemodel.dev" wire_api = "responses"
+            - generic [ref=f9e137]: 以下内容请原封不动粘贴，不要修改任何值。
+          - generic [ref=f9e138]:
+            - generic [ref=f9e139]: "06"
+            - heading "重启终端 验证安装" [level=3] [ref=f9e140]:
+              - text: 重启终端
+              - emphasis [ref=f9e141]: 验证安装
+            - paragraph [ref=f9e142]: 重启终端后运行以下命令，确认安装成功：
+            - generic [ref=f9e143]:
+              - button "Copy" [ref=f9e144] [cursor=pointer]
+              - generic [ref=f9e145]: codex -V
+            - generic [ref=f9e146]: 若输出版本号，则说明 Codex 已正确安装。
+          - generic [ref=f9e147]:
+            - generic [ref=f9e148]: "07"
+            - heading "开始 使用 Codex" [level=3] [ref=f9e149]:
+              - text: 开始
+              - emphasis [ref=f9e150]: 使用 Codex
+            - paragraph [ref=f9e151]: 进入任意项目目录，启动 Codex：
+            - generic [ref=f9e152]:
+              - button "Copy" [ref=f9e153] [cursor=pointer]
+              - generic [ref=f9e154]: "# Navigate to project cd your-project-folder # Launch Codex codex"
+            - generic [ref=f9e155]: 完全支持 VSCode 官方插件。
+  - button "TG群" [ref=f9e158] [cursor=pointer]:
+    - img [ref=f9e159]
+    - generic [ref=f9e161]: TG群

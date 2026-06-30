@@ -23,11 +23,11 @@ def parse_combo_key(combo_str):
     return mods, main_key
 
 
-def execute_combo_key(app, combo_str, priority=0, hold_delay=0.15):
+def execute_combo_key(controller, combo_str, priority=0, hold_delay=0.15):
     """执行组合键：按顺序按下修饰键+主键，等待，反向释放
 
     Args:
-        app: 应用实例（含 input_controller）
+        controller: 应用控制器实例（含 input_controller）
         combo_str: 组合键字符串，如 "Ctrl+F1" 或 "F1"
         priority: 输入优先级
         hold_delay: 按住延迟（秒）
@@ -35,25 +35,25 @@ def execute_combo_key(app, combo_str, priority=0, hold_delay=0.15):
     mods, main_key = parse_combo_key(combo_str)
     all_keys = mods + [main_key]
 
-    if hasattr(app, 'logging_manager'):
-        app.logging_manager.debug("INPUT", f"组合键按下: {combo_str} → keys={all_keys}")
+    if hasattr(controller, 'logging_manager'):
+        controller.logging_manager.debug("INPUT", f"组合键按下: {combo_str} → keys={all_keys}")
     for k in all_keys:
-        app.input_controller.key_down(k, priority=priority)
+        controller.input_controller.key_down(k, priority=priority)
     time.sleep(hold_delay)
     for k in reversed(all_keys):
-        app.input_controller.key_up(k, priority=priority)
-    if hasattr(app, 'logging_manager'):
-        app.logging_manager.debug("INPUT", f"组合键释放: {combo_str}")
+        controller.input_controller.key_up(k, priority=priority)
+    if hasattr(controller, 'logging_manager'):
+        controller.logging_manager.debug("INPUT", f"组合键释放: {combo_str}")
 
 
-class ClickHandler:
+class ClickWorker:
     """统一的鼠标点击处理器
     
     提供统一的鼠标点击接口，封装优先级处理、异常处理、日志记录等功能。
     """
     
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, controller):
+        self.controller = controller
     
     @staticmethod
     def _apply_random_offset(x, y, offset_range):
@@ -77,24 +77,24 @@ class ClickHandler:
         Returns:
             bool: 是否执行成功
         """
-        self.app.logging_manager.debug("INPUT",
+        self.controller.logging_manager.debug("INPUT",
             f"execute_click: ({x},{y}), module={module_name}{index+1}, offset={offset_range}")
         if not for_test and not self._validate_running_state():
-            self.app.logging_manager.debug("INPUT", "execute_click: 运行状态无效，跳过")
+            self.controller.logging_manager.debug("INPUT", "execute_click: 运行状态无效，跳过")
             return False
         
         x, y = self._apply_random_offset(x, y, offset_range)
-        self.app.logging_manager.debug("INPUT", f"execute_click: 偏移后 ({x},{y})")
+        self.controller.logging_manager.debug("INPUT", f"execute_click: 偏移后 ({x},{y})")
         
         if not self._validate_coordinates(x, y):
-            self.app.logging_manager.debug("INPUT", "execute_click: 坐标无效")
+            self.controller.logging_manager.debug("INPUT", "execute_click: 坐标无效")
             return False
         
         try:
-            self.app.input_controller.move_to(x, y, priority=priority)
-            self.app.input_controller.mouse_down(x=x, y=y, button='left', priority=priority)
+            self.controller.input_controller.move_to(x, y, priority=priority)
+            self.controller.input_controller.mouse_down(x=x, y=y, button='left', priority=priority)
             time.sleep(0.1)
-            self.app.input_controller.mouse_up(x=x, y=y, button='left', priority=priority)
+            self.controller.input_controller.mouse_up(x=x, y=y, button='left', priority=priority)
             self._log_click_success(x, y, module_name, index)
             self._wait_delay(delay)
             return True
@@ -125,7 +125,7 @@ class ClickHandler:
     
     def _validate_running_state(self):
         """验证运行状态"""
-        if not self.app.is_running or getattr(self.app, 'system_stopped', False):
+        if not self.controller.is_running or getattr(self.controller, 'system_stopped', False):
             return False
         return True
     
@@ -138,16 +138,16 @@ class ClickHandler:
     def _log_click_success(self, x, y, module_name, index):
         """记录点击成功日志"""
         if module_name:
-            platform = getattr(self.app, 'platform_adapter', None)
+            platform = getattr(self.controller, 'platform_adapter', None)
             platform_name = platform.platform if platform else ""
-            self.app.logging_manager.log_message(
+            self.controller.logging_manager.log_message(
                 f"[{platform_name}] {module_name}{index+1}执行鼠标点击: ({x}, {y})"
             )
     
     def _log_click_error(self, error, module_name, index):
         """记录点击错误日志"""
         if module_name:
-            self.app.logging_manager.log_message(
+            self.controller.logging_manager.log_message(
                 f"{module_name}{index+1}鼠标点击失败: {str(error)}"
             )
     
@@ -155,7 +155,7 @@ class ClickHandler:
         """等待延迟时间"""
         if delay is not None:
             time.sleep(delay)
-        elif hasattr(self.app, 'click_delay'):
-            time.sleep(self.app.click_delay)
+        elif hasattr(self.controller, 'click_delay'):
+            time.sleep(self.controller.click_delay)
         else:
             time.sleep(0.1)

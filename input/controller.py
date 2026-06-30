@@ -18,35 +18,35 @@ _dd_input_instance = None
 _pyautogui_input_instance = None
 
 
-def _get_dd_input(app=None):
+def _get_dd_input(controller=None):
     """延迟加载DD输入实例"""
     global _dd_input_instance
     if _dd_input_instance is None:
         try:
-            from .dd_input import DDVirtualInput
-            _dd_input_instance = DDVirtualInput(app=app)
+            from .dd_input import DDInputBackend
+            _dd_input_instance = DDInputBackend(controller=controller)
         except Exception as e:
-            app.logging_manager.error("INPUT", f"加载DD输入模块失败: {e}")
+            controller.logging_manager.error("INPUT", f"加载DD输入模块失败: {e}")
     return _dd_input_instance
 
 
-def _get_pyautogui_input(app=None):
+def _get_pyautogui_input(controller=None):
     """延迟加载PyAutoGUI输入实例"""
     global _pyautogui_input_instance
     if _pyautogui_input_instance is None:
         try:
-            from .pyautogui_input import PyAutoGUIInput
-            _pyautogui_input_instance = PyAutoGUIInput(app=app)
+            from .pyautogui_input import PyAutoGUIInputBackend
+            _pyautogui_input_instance = PyAutoGUIInputBackend(controller=controller)
         except Exception as e:
-            app.logging_manager.error("INPUT", f"加载PyAutoGUI输入模块失败: {e}")
+            controller.logging_manager.error("INPUT", f"加载PyAutoGUI输入模块失败: {e}")
     return _pyautogui_input_instance
 
 
-def _get_win32_input(app=None):
+def _get_win32_input(controller=None):
     """延迟加载Win32 API输入实例"""
     try:
         from .win32_input import Win32InputBackend
-        return Win32InputBackend(app=app)
+        return Win32InputBackend(controller=controller)
     except Exception as e:
         logging.getLogger(__name__).error(f"_get_win32_input 失败: {e}")
         return None
@@ -60,16 +60,16 @@ class InputController:
     使用优先级锁确保高优先级模块优先执行输入操作。
     """
     
-    def __init__(self, app=None, method: str = None):
+    def __init__(self, controller=None, method: str = None):
         """
         初始化输入控制器
         
         Args:
-            app: 应用实例
+            controller: 应用控制器实例
             method: 输入方式，可选 'pyautogui' 或 'dd'
                    如果为None，则根据编译标志自动选择
         """
-        self.app = app
+        self.controller = controller
         self.core_graphics_available = False
         self.key_lock = PriorityLock()
         self.mouse_lock = PriorityLock()
@@ -89,21 +89,21 @@ class InputController:
                 method = 'pyautogui'
         
         if method == 'dd':
-            impl = _get_dd_input(self.app)
+            impl = _get_dd_input(self.controller)
             if impl and impl.is_available:
                 self._impl = impl
                 self._method = 'dd'
                 self._log(f"InputController初始化完成，使用DD虚拟键盘执行所有输入操作")
                 return
         
-        impl = _get_pyautogui_input(self.app)
+        impl = _get_pyautogui_input(self.controller)
         if impl and impl.is_available:
             self._impl = impl
             self._method = 'pyautogui'
             self._log(f"InputController初始化完成，使用PyAutoGUI执行所有输入操作")
             return
         
-        impl = _get_win32_input(self.app)
+        impl = _get_win32_input(self.controller)
         if impl and impl.is_available:
             self._impl = impl
             self._method = 'win32'
@@ -133,8 +133,8 @@ class InputController:
     
     def _log(self, message: str):
         """日志输出"""
-        if self.app and hasattr(self.app, 'logging_manager'):
-            self.app.logging_manager.log_message(message)
+        if self.controller and hasattr(self.controller, 'logging_manager'):
+            self.controller.logging_manager.log_message(message)
     
     @staticmethod
     def handle_permission_errors(func):
@@ -144,12 +144,12 @@ class InputController:
                 return func(self, *args, **kwargs)
             except Exception as e:
                 error_msg = str(e).lower()
-                if self.app and ("accessibility" in error_msg or "permission" in error_msg):
+                if self.controller and ("accessibility" in error_msg or "permission" in error_msg):
                     self._log("❌ 辅助功能权限缺失，请授权后重试")
-                    if hasattr(self.app, '_guide_accessibility_setup'):
+                    if hasattr(self.controller, '_guide_accessibility_setup'):
                         from PySide6.QtCore import QTimer
-                        QTimer.singleShot(0, self.app._guide_accessibility_setup)
-                elif self.app:
+                        QTimer.singleShot(0, self.controller._guide_accessibility_setup)
+                elif self.controller:
                     self._log(f"❌ 操作错误: {e}")
                 raise
         return wrapper

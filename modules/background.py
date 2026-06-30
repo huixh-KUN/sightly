@@ -17,7 +17,7 @@ from utils.recognition import OCRRecognizer, ImageRecognizer, ColorRecognizer
 from utils.image import _preprocess_image
 from core.priority_lock import get_module_priority
 from utils.memory import MemoryMonitor
-from core.click_handler import ClickHandler, execute_combo_key
+from core.click_worker import ClickWorker, execute_combo_key
 
 
 # 虚拟点击 WM_ 消息常量
@@ -78,8 +78,8 @@ class BackgroundMonitor:
     
     PRIORITY = get_module_priority('background')
     
-    def __init__(self, app, group_index: int = 0):
-        self.app = app
+    def __init__(self, controller, group_index: int = 0):
+        self.controller = controller
         self.group_index = group_index
         self.is_running = False
         self._task = None
@@ -201,7 +201,7 @@ class BackgroundMonitor:
     
     async def _monitor_async(self) -> None:
         """异步监控主循环"""
-        self.app.logging_manager.debug("BG",
+        self.controller.logging_manager.debug("BG",
             f"组{self.group_index} 协程监控开始: type={self.recognition_type}, "
             f"interval={self.interval}s, 循环={'开' if self.cycle_enabled else '关'}")
         frame_count = 0
@@ -216,43 +216,43 @@ class BackgroundMonitor:
                 try:
                     region = self._get_current_region()
                     if not region:
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 无有效区域")
+                        self.controller.logging_manager.debug("BG", f"组{self.group_index} 无有效区域")
                         await asyncio.sleep(interval)
                         continue
 
-                    self.app.logging_manager.debug("BG",
+                    self.controller.logging_manager.debug("BG",
                         f"组{self.group_index} 开始识别: region={region}, type={self.recognition_type}")
                     matched, click_position, _ = await run_in_executor(self.recognize_once)
-                    self.app.logging_manager.debug("BG",
+                    self.controller.logging_manager.debug("BG",
                         f"组{self.group_index} 识别结果: matched={matched}, click={click_position}")
 
                     if matched:
-                        self.app.logging_manager.log_message(
+                        self.controller.logging_manager.log_message(
                             f"后台监控组{self.group_index+1} 匹配成功: pos={click_position}")
                         await run_in_executor(self.trigger_actions, click_position)
                     else:
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 未匹配")
+                        self.controller.logging_manager.debug("BG", f"组{self.group_index} 未匹配")
 
                     if not self.cycle_enabled:
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 单次执行完成，退出")
+                        self.controller.logging_manager.debug("BG", f"组{self.group_index} 单次执行完成，退出")
                         break
 
                     await asyncio.sleep(interval)
 
                     frame_count += 1
                     if self.memory_monitor.gc_if_needed(frame_count):
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 触发 GC")
+                        self.controller.logging_manager.debug("BG", f"组{self.group_index} 触发 GC")
 
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:
-                    self.app.logging_manager.error("BG",
+                    self.controller.logging_manager.error("BG",
                         f"后台监控组{self.group_index + 1}错误: {str(e)}"
                     )
                     await asyncio.sleep(5)
 
         except asyncio.CancelledError:
-            self.app.logging_manager.debug("BG", f"组{self.group_index} 协程被取消")
+            self.controller.logging_manager.debug("BG", f"组{self.group_index} 协程被取消")
             self.is_running = False
     
     def _capture_region(self, region: tuple):
@@ -263,7 +263,7 @@ class BackgroundMonitor:
         try:
             return capture_window_region(self.hwnd, region)
         except Exception as e:
-            self.app.logging_manager.error("BG", f"_capture_region 失败: {e}")
+            self.controller.logging_manager.error("BG", f"_capture_region 失败: {e}")
             return None
     
     def _recognize(self, image) -> tuple:
@@ -296,7 +296,7 @@ class BackgroundMonitor:
             text = OCRRecognizer.get_text(processed, language)
             
             if text and text.strip() != self._last_text:
-                self.app.logging_manager.log_message(
+                self.controller.logging_manager.log_message(
                     f"后台监控组{self.group_index + 1}识别结果: '{text.strip()}'"
                 )
                 self._last_text = text.strip()
@@ -308,7 +308,7 @@ class BackgroundMonitor:
             if not any(keyword in lower_text for keyword in keyword_list):
                 return (False, None)
             
-            self.app.logging_manager.log_message(
+            self.controller.logging_manager.log_message(
                 f"后台监控组{self.group_index + 1}识别到关键词: {text.strip()}"
             )
             
@@ -337,7 +337,7 @@ class BackgroundMonitor:
         
         matched, click_pos, _ = ImageRecognizer.match_template(
             image, template, threshold,
-            log_func=self.app.logging_manager.log_message,
+            log_func=self.controller.logging_manager.log_message,
             group_index=self.group_index
         )
         
@@ -353,7 +353,7 @@ class BackgroundMonitor:
         
         matched, click_pos, _ = ColorRecognizer.match_color(
             image, target_color, tolerance,
-            log_func=self.app.logging_manager.log_message,
+            log_func=self.controller.logging_manager.log_message,
             group_index=self.group_index
         )
         
@@ -396,23 +396,23 @@ class BackgroundMonitor:
 
     def _trigger_action(self, click_position=None, *, for_test=False) -> None:
         """触发动作"""
-        self.app.logging_manager.debug("BG", f"组{self.group_index} 触发动作: click_position={click_position}, trigger_click={self.trigger_click}, trigger_key={self.trigger_key}")
-        if not for_test and not self.app.is_running:
-            self.app.logging_manager.debug("BG", f"组{self.group_index} app未运行")
+        self.controller.logging_manager.debug("BG", f"组{self.group_index} 触发动作: click_position={click_position}, trigger_click={self.trigger_click}, trigger_key={self.trigger_key}")
+        if not for_test and not self.controller.is_running:
+            self.controller.logging_manager.debug("BG", f"组{self.group_index} app未运行")
             return
         
         # 播放报警声音
         if self.alarm_enabled:
             try:
-                self.app.alarm_module.play_alarm_sound(True)
+                self.controller.alarm_module.play_alarm_sound(True)
             except Exception as e:
-                self.app.logging_manager.error("BG", f"播放报警声音失败: {e}")
+                self.controller.logging_manager.error("BG", f"播放报警声音失败: {e}")
         
         # 如果只设置了报警，无需后续操作
         if not self.trigger_click and not self.trigger_key:
             return
 
-        self.app.logging_manager.log_message(
+        self.controller.logging_manager.log_message(
             f"组{self.group_index} 点击模式: {self.click_mode}, trigger_click={self.trigger_click}, trigger_key={self.trigger_key}")
 
         # 虚拟点击：向窗口发送鼠标消息，无需切换窗口
@@ -420,7 +420,7 @@ class BackgroundMonitor:
             try:
                 target_hwnd = _find_content_hwnd(self.hwnd)
                 if click_position:
-                    cx, cy = ClickHandler._apply_random_offset(
+                    cx, cy = ClickWorker._apply_random_offset(
                         click_position[0], click_position[1], self.click_offset
                     )
                 else:
@@ -428,7 +428,7 @@ class BackgroundMonitor:
                     if region:
                         cx = (region[0] + region[2]) // 2
                         cy = (region[1] + region[3]) // 2
-                        cx, cy = ClickHandler._apply_random_offset(cx, cy, self.click_offset)
+                        cx, cy = ClickWorker._apply_random_offset(cx, cy, self.click_offset)
                     else:
                         cx, cy = 0, 0
 
@@ -442,37 +442,37 @@ class BackgroundMonitor:
                 ctypes.windll.user32.SendMessageW(target_hwnd, wm_down, mk_flag, lparam)
                 ctypes.windll.user32.SendMessageW(target_hwnd, wm_up, 0, lparam)
 
-                self.app.logging_manager.log_message(
+                self.controller.logging_manager.log_message(
                     f"组{self.group_index} 虚拟点击: target_hwnd={target_hwnd}, pos=({cx}, {cy})")
             except Exception as e:
-                self.app.logging_manager.error("BG",
+                self.controller.logging_manager.error("BG",
                     f"组{self.group_index} 虚拟点击失败: {e}")
 
         # 物理点击或按键需要窗口切换
         need_switch = (self.click_mode == "physical" and self.trigger_click) or bool(self.trigger_key)
         if need_switch:
-            self.app.logging_manager.log_message(
+            self.controller.logging_manager.log_message(
                 f"组{self.group_index} 物理路径: need_switch={need_switch}, click_mode={self.click_mode}")
-            quick_switch = QuickSwitchBackend(self.app)
+            quick_switch = QuickSwitchBackend(self.controller)
             quick_switch.set_hwnd(self.hwnd)
             quick_switch._save_foreground_window()
             switch_success = quick_switch._switch_to_target()
-            self.app.logging_manager.debug("BG", f"组{self.group_index} 窗口切换: {switch_success}")
+            self.controller.logging_manager.debug("BG", f"组{self.group_index} 窗口切换: {switch_success}")
 
             if switch_success:
                 if self.trigger_click and self.click_mode == "physical":
                     if click_position:
                         rect = get_window_rect(self.hwnd)
-                        self.app.logging_manager.debug("BG", f"组{self.group_index} 点击: hwnd={self.hwnd}, rect={rect}, click_pos={click_position}")
+                        self.controller.logging_manager.debug("BG", f"组{self.group_index} 点击: hwnd={self.hwnd}, rect={rect}, click_pos={click_position}")
                         if rect:
                             abs_x = rect[0] + click_position[0]
                             abs_y = rect[1] + click_position[1]
-                            abs_x, abs_y = ClickHandler._apply_random_offset(abs_x, abs_y, self.click_offset)
-                            self.app.logging_manager.debug("BG", f"组{self.group_index} 执行点击: ({abs_x}, {abs_y})")
-                            self.app.input_controller.click(abs_x, abs_y, priority=1)
-                            self.app.logging_manager.debug("BG", f"组{self.group_index} 点击执行完成")
+                            abs_x, abs_y = ClickWorker._apply_random_offset(abs_x, abs_y, self.click_offset)
+                            self.controller.logging_manager.debug("BG", f"组{self.group_index} 执行点击: ({abs_x}, {abs_y})")
+                            self.controller.input_controller.click(abs_x, abs_y, priority=1)
+                            self.controller.logging_manager.debug("BG", f"组{self.group_index} 点击执行完成")
                         else:
-                            self.app.logging_manager.debug("BG", f"组{self.group_index} 获取窗口矩形失败")
+                            self.controller.logging_manager.debug("BG", f"组{self.group_index} 获取窗口矩形失败")
                     else:
                         region = self._get_current_region()
                         if region:
@@ -482,26 +482,27 @@ class BackgroundMonitor:
                             if rect:
                                 abs_x = rect[0] + click_x
                                 abs_y = rect[1] + click_y
-                                abs_x, abs_y = ClickHandler._apply_random_offset(abs_x, abs_y, self.click_offset)
-                                self.app.input_controller.click(abs_x, abs_y, priority=1)
+                                abs_x, abs_y = ClickWorker._apply_random_offset(abs_x, abs_y, self.click_offset)
+                                self.controller.input_controller.click(abs_x, abs_y, priority=1)
 
                 time.sleep(0.1)
 
                 if self.trigger_key:
                     import random
                     hold_delay = random.randint(self.delay_min, self.delay_max) / 1000.0
-                    execute_combo_key(self.app, self.trigger_key, priority=1, hold_delay=hold_delay)
+                    execute_combo_key(self.controller, self.trigger_key, priority=1, hold_delay=hold_delay)
 
                 quick_switch._restore_foreground_window()
             else:
-                self.app.logging_manager.error("BG",
+                self.controller.logging_manager.error("BG",
                     f"后台监控组{self.group_index + 1}窗口切换失败，跳过操作"
                 )
 
 class BackgroundManager:
     """后台监控管理器"""
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, controller):
+        self.controller = controller
+        self.groups = []
         self.monitors: Dict[int, BackgroundMonitor] = {}
         self.quick_switch = QuickSwitchBackend()
         self.target_hwnd: Optional[int] = None
@@ -510,6 +511,21 @@ class BackgroundManager:
         self.window_process: Optional[str] = None
         self._loop = None
         self._async_thread = None
+
+    def set_config(self, config):
+        if isinstance(config, dict):
+            self.groups = config.get("groups", [])
+        else:
+            self.groups = config if isinstance(config, list) else []
+
+    def collect_config(self):
+        return self.groups
+
+    def start(self):
+        self.start_all_groups()
+
+    def stop(self):
+        self.stop_all_groups()
     
     def find_target_window(self, keyword: str) -> tuple:
         """
@@ -568,12 +584,12 @@ class BackgroundManager:
                         hwnd = h
                         return False
                 except Exception as e:
-                    self.app.logging_manager.error("BG", f"auto_reconnect 枚举回调失败: {e}")
+                    self.controller.logging_manager.error("BG", f"auto_reconnect 枚举回调失败: {e}")
                 return True
             try:
                 win32gui.EnumWindows(enum_cb, None)
             except Exception as e:
-                self.app.logging_manager.error("BG", f"auto_reconnect EnumWindows 失败: {e}")
+                self.controller.logging_manager.error("BG", f"auto_reconnect EnumWindows 失败: {e}")
         self._log("BG",
             f"auto_reconnect: class={window_class}, process={window_process}, "
             f"title={window_title}, found={hwnd}")
@@ -583,8 +599,8 @@ class BackgroundManager:
         return False
 
     def _log(self, tag, msg):
-        if hasattr(self.app, 'logging_manager'):
-            self.app.logging_manager.debug(tag, msg)
+        if hasattr(self.controller, 'logging_manager'):
+            self.controller.logging_manager.debug(tag, msg)
     
     def window_info(self) -> Dict[str, Any]:
         """返回窗口标识信息，供配置持久化使用"""
@@ -649,15 +665,15 @@ class BackgroundManager:
             cycle = cycle.lower() in ("true", "1")
         monitor.cycle_enabled = bool(cycle)
 
-    def run_once(self, index: int) -> dict:
+    def test_group(self, index: int) -> dict:
         """单次测试：识别 + 执行动作。"""
-        groups = getattr(self.app, 'background_groups', [])
+        groups = self.groups
         if index >= len(groups):
             return {"matched": False, "executed": False, "detail": "组索引越界"}
         if not self.target_hwnd:
             return {"matched": False, "executed": False, "detail": "未绑定目标窗口，无法截图"}
         group = groups[index]
-        monitor = BackgroundMonitor(self.app, index)
+        monitor = BackgroundMonitor(self.controller, index)
         monitor.set_window(self.target_hwnd)
         self._apply_group_config(monitor, group)
         if not monitor.region and not monitor.region_ratio:
@@ -672,7 +688,7 @@ class BackgroundManager:
 
     def create_group(self, index: int, monitor_type: str = "ocr") -> BackgroundMonitor:
         """创建监控组"""
-        monitor = BackgroundMonitor(self.app, index)
+        monitor = BackgroundMonitor(self.controller, index)
         monitor.recognition_type = monitor_type
         
         if self.target_hwnd:
@@ -711,11 +727,11 @@ class BackgroundManager:
             int: 启动的监控组数量
         """
         if not self.target_hwnd:
-            self.app.logging_manager.log_message("请先绑定目标窗口")
+            self.controller.logging_manager.log_message("请先绑定目标窗口")
             return 0
 
         start_count = 0
-        groups = getattr(self.app, 'background_groups', [])
+        groups = self.groups
 
         # 同步配置阶段（在主线程执行）
         for group_index, group in enumerate(groups):
@@ -734,7 +750,7 @@ class BackgroundManager:
             if not monitor.region and not monitor.region_ratio:
                 continue
 
-            self.app.logging_manager.debug("BG",
+            self.controller.logging_manager.debug("BG",
                 f"组{group_index}: region={monitor.region}, click={monitor.trigger_click}, key={monitor.trigger_key}")
 
             if monitor.start_monitoring():
